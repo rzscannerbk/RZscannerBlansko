@@ -2634,6 +2634,14 @@
     const color = document.getElementById('colorSelect').value.trim();
 
     if(!officerName || !selectedOffense){
+      if(!officerName && !auth.currentUser){
+        // Strážník chybí, protože appka vůbec neví, kdo je přihlášený —
+        // místo červené hlášky rovnou nabídnout přihlášení (stejné pole je
+        // beztak zamčené, viz applyOfficerLock).
+        document.getElementById('loginError').style.display = 'none';
+        show('login');
+        return;
+      }
       const missing = [];
       if(!officerName) missing.push('strážníka');
       if(!selectedOffense) missing.push('kvalifikaci přestupku');
