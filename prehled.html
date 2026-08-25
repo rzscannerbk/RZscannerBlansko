@@ -58,8 +58,8 @@
     margin:0; background:var(--asphalt); color:var(--text);
     font-family:'Inter',system-ui,sans-serif;
   }
-  #app{min-height:100%; display:flex; flex-direction:column; overflow-x:hidden;}
-  .screen{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100%)); display:none; flex-direction:column; overflow-x:hidden;}
+  #app{min-height:100dvh; display:flex; flex-direction:column; overflow-x:hidden;}
+  .screen{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100dvh)); display:none; flex-direction:column; overflow-x:hidden;}
   .screen.active{display:flex;}
 
   h1,h2{font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.02em; margin:0;}
@@ -296,9 +296,17 @@
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
   window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight, 100));
+  window.addEventListener('load', setAppHeight);
+  document.addEventListener('pageshow', setAppHeight);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setAppHeight(); });
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', setAppHeight);
   }
+  // Appka spuštěná z plochy (standalone) hlásí při startu na iOS občas
+  // ještě neustálenou výšku (probíhá spouštěcí animace) — přeměříme
+  // ještě několikrát s prodlevou, ať se appka doopravdy natáhne na celou
+  // obrazovku i po doběhnutí přechodu.
+  [50, 150, 300, 600, 1000, 1500].forEach(ms => setTimeout(setAppHeight, ms));
 
   // Respektuje volbu tématu nastavenou v index.html (4s podržení loga na
   // úvodní obrazovce appky) — samotné gesto tady není, jen se drží stejná

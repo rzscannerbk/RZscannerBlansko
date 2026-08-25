@@ -65,10 +65,10 @@
     overflow:hidden;
     overscroll-behavior:none;
   }
-  #app{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100%)); display:flex; flex-direction:column;}
+  #app{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100dvh)); display:flex; flex-direction:column;}
 
   /* ---------- SCREEN: START ---------- */
-  .screen{position:absolute; inset:0; display:none; flex-direction:column;}
+  .screen{position:absolute; top:0; left:0; right:0; height:calc(var(--app-height, 100dvh)); display:none; flex-direction:column;}
   .screen.active{display:flex;}
 
   #startScreen{align-items:center; justify-content:center; text-align:center; padding:32px;}
@@ -790,9 +790,17 @@
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
   window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight, 100));
+  window.addEventListener('load', setAppHeight);
+  document.addEventListener('pageshow', setAppHeight);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setAppHeight(); });
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', setAppHeight);
   }
+  // Appka spuštěná z plochy (standalone) hlásí při startu na iOS občas
+  // ještě neustálenou výšku (probíhá spouštěcí animace) — přeměříme
+  // ještě několikrát s prodlevou, ať se appka doopravdy natáhne na celou
+  // obrazovku i po doběhnutí přechodu.
+  [50, 150, 300, 600, 1000, 1500].forEach(ms => setTimeout(setAppHeight, ms));
 
   // ---------- Nastavení API klíčů přes odkaz (setup link) ----------
   // Po smazání a novém přidání appky na plochu iOS vytvoří nový, prázdný
