@@ -266,7 +266,7 @@
     }
 
     #listScreen, #detailScreen{
-      width:100%; max-width:900px;
+      width:100%; max-width:1080px;
       border-left:1px solid var(--line); border-right:1px solid var(--line);
       background:var(--asphalt);
     }
@@ -312,9 +312,17 @@
     .detail-top{padding-top:22px;}
     #detailPreviewWrap{
       padding:32px 28px;
-      display:flex; flex-direction:column; align-items:center;
+      display:flex; flex-direction:row; align-items:flex-start; justify-content:center;
+      gap:28px; flex-wrap:wrap;
     }
-    .notice-card{width:100%;}
+    #noticeCardContainer{flex:1 1 440px; max-width:560px;}
+    .notice-card{width:100%; margin:0;}
+    /* Na desktopu se fotky zobrazí rovnou vedle výzvy — přepínací
+       tlačítko "Foto" (z mobilu) tu není potřeba. */
+    .photo-toggle-row{display:none !important;}
+    .notice-photo-wrap{
+      display:block; margin:0; flex:1 1 300px; max-width:380px; margin-left:0;
+    }
     .detail-fixed-bottom .list-bottom-bar{padding:14px 28px 20px;}
     .list-bottom-btn.back{order:99;}
 
