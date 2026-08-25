@@ -95,14 +95,29 @@
   .brand .word{font-family:'Oswald',sans-serif; font-weight:600; font-size:15px; letter-spacing:.02em;}
   .brand .word span{color:var(--muted); font-weight:400; font-family:'Inter',sans-serif; letter-spacing:0;}
 
+  .searchbox-wrap{position:relative; flex:1 1 auto; max-width:440px;}
   .searchbox{
-    flex:1 1 auto; max-width:440px; display:flex; align-items:center; gap:9px;
+    display:flex; align-items:center; gap:9px;
     background:var(--asphalt-3); border:1px solid var(--line); border-radius:9px;
     padding:0 13px; height:37px;
   }
   .searchbox svg{flex:0 0 auto; opacity:.5;}
   .searchbox input{background:none; border:none; outline:none; color:var(--text); font-family:inherit; font-size:13.5px; width:100%;}
   .searchbox input::placeholder{color:var(--faint);}
+
+  .search-suggestions{
+    display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:40;
+    background:var(--asphalt-3); border:1px solid var(--line); border-radius:10px;
+    box-shadow:0 14px 34px rgba(0,0,0,.45); max-height:300px; overflow-y:auto;
+  }
+  .search-suggestions.open{display:block;}
+  .search-suggestion-item{
+    padding:10px 14px; font-size:12.5px; color:var(--text); cursor:pointer;
+    border-bottom:1px solid var(--line-soft); line-height:1.4;
+  }
+  .search-suggestion-item:last-child{border-bottom:none;}
+  .search-suggestion-item:hover, .search-suggestion-item.active{background:var(--asphalt-4);}
+  .search-suggestion-item .suggestion-count{color:var(--faint); font-family:'Roboto Mono',monospace; font-size:10.5px; margin-left:6px;}
 
   .date-tabs{display:flex; gap:2px; background:var(--asphalt-3); border:1px solid var(--line); border-radius:8px; padding:3px; flex:0 0 auto;}
   .date-tabs button{border:none; background:none; color:var(--muted); font-family:inherit; font-size:12.5px; font-weight:500; padding:6px 13px; border-radius:6px; cursor:pointer;}
@@ -149,6 +164,7 @@
     font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
     color:var(--faint); border-bottom:1px solid var(--line); gap:0 10px;
   }
+  .list-head span{text-align:center;}
   #listBody{flex:1; overflow-y:auto;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
@@ -168,7 +184,7 @@
   .record-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; letter-spacing:.02em; line-height:1.3;}
   .record-notice-number{font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--faint); letter-spacing:.02em;}
 
-  .record-doctype-badge{font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; width:fit-content; letter-spacing:.02em; color:#8FB6FF; background:rgba(93,156,255,.14); margin-top:2px;}
+  .record-doctype-badge{font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; width:fit-content; letter-spacing:.02em; color:#8FB6FF; background:rgba(93,156,255,.14); margin-top:2px; justify-self:center;}
   .record-doctype-badge.boticka{color:var(--amber); background:var(--amber-glow);}
 
   .record-addr{font-size:12.5px; color:var(--muted); line-height:1.4; padding-top:3px; padding-right:10px;}
@@ -183,7 +199,7 @@
   .record-status.st-oznameno .dot{background:#8FB6FF;}
   .record-status.st-prikaz .dot{background:var(--good);}
 
-  .record-sent-col{display:flex; flex-direction:column; gap:3px; padding-top:1px;}
+  .record-sent-col{display:flex; flex-direction:column; align-items:center; gap:3px; padding-top:1px; text-align:center;}
   .record-sent-date{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint);}
   .record-sent-time{font-family:'Roboto Mono',monospace; font-size:12px; color:var(--muted);}
 
@@ -228,16 +244,28 @@
     background:rgba(255,255,255,.08); padding:5px 12px; border-radius:20px;
   }
 
-  /* ---------- DETAIL PANEL ---------- */
-  .panel{width:292px; flex:0 0 292px; border-left:1px solid var(--line); background:var(--asphalt-2); display:flex; flex-direction:column;}
-  .panel-empty{flex:1; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:13.5px; text-align:center; padding:30px;}
-  .panel-content{flex:1; display:flex; flex-direction:column; min-height:0;}
-  .panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line); flex:0 0 auto;}
+  /* ---------- DETAIL MODAL ---------- */
+  .detail-modal-overlay{
+    display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.6);
+    align-items:center; justify-content:center; padding:32px;
+  }
+  .detail-modal-overlay.open{display:flex;}
+  .detail-modal{
+    width:100%; max-width:780px; max-height:88vh; display:flex; flex-direction:column;
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 30px 90px rgba(0,0,0,.6); overflow:hidden;
+  }
+  .panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 22px; border-bottom:1px solid var(--line); flex:0 0 auto;}
   .panel-head .id{font-size:12px; color:var(--faint);}
   .panel-head button{background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:13px;}
   .panel-head button:hover{color:var(--text); border-color:var(--faint);}
-  #detailPreviewWrap{flex:1; overflow-y:auto; padding:18px 14px; background:transparent;}
-  .panel-actions{display:flex; gap:9px; padding:16px 14px; border-top:1px solid var(--line); flex:0 0 auto;}
+  #detailPreviewWrap{
+    flex:1; overflow-y:auto; padding:28px 26px; background:transparent;
+    display:flex; flex-direction:row; align-items:flex-start; justify-content:center;
+    gap:26px; flex-wrap:wrap;
+  }
+  #noticeCardContainer{flex:1 1 340px; max-width:400px;}
+  .panel-actions{display:flex; gap:9px; padding:16px 22px; border-top:1px solid var(--line); flex:0 0 auto;}
   .panel-actions .btn{flex:1;}
 
   .status-line{
@@ -247,22 +275,21 @@
   .status-line.ok{background:var(--good-glow); border-color:rgba(51,211,153,.25); color:var(--good);}
   .status-line .dot{width:7px; height:7px; border-radius:50%; background:currentColor;}
 
-  /* ---------- NOTICE CARD (stejný vzhled jako v appce Přehled na mobilu,
-     jen s trochu menšími odsazeními kvůli užšímu pravému panelu) ---------- */
+  /* ---------- NOTICE CARD (stejný vzhled jako v appce Přehled na mobilu) ---------- */
   .notice-card{
-    background:#ffffff; color:#141414; border-radius:14px; padding:22px 14px 20px;
+    background:#ffffff; color:#141414; border-radius:14px; padding:28px 22px 24px;
     font-family:'Inter',sans-serif; text-align:center; width:100%; margin:0;
     box-shadow:0 14px 34px rgba(0,0,0,.35);
   }
-  .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:22px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
-  .notice-subtitle{color:#777; font-size:11.5px; margin:0 0 16px;}
-  .notice-subtitle-boticka{font-size:16px; font-weight:700; color:#333;}
-  .notice-number{color:#666; font-size:10.5px; letter-spacing:.03em; margin:-8px 0 16px; font-weight:800;}
+  .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:25px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
+  .notice-subtitle{color:#777; font-size:12px; margin:0 0 17px;}
+  .notice-subtitle-boticka{font-size:17px; font-weight:700; color:#333;}
+  .notice-number{color:#666; font-size:11px; letter-spacing:.03em; margin:-9px 0 17px; font-weight:800;}
   .notice-officer{font-weight:600; font-size:11px; color:#555; margin-bottom:4px;}
-  .notice-label{color:#999; font-weight:700; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:7px;}
+  .notice-label{color:#999; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
   .notice-platebox{
     display:inline-block; border:1.6px solid #181818; border-radius:10px;
-    padding:9px 16px; font-family:'Oswald',sans-serif; font-weight:700; font-size:23px;
+    padding:11px 22px; font-family:'Oswald',sans-serif; font-weight:700; font-size:27px;
     letter-spacing:.03em; margin-bottom:14px;
   }
   .notice-vehicle{font-size:14px; color:#555; margin:-8px 0 18px; font-weight:600;}
@@ -345,9 +372,12 @@
         <div class="word">RZ SCANNER <span>· Přehled</span></div>
       </a>
 
-      <div class="searchbox">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="searchInput" placeholder="Hledat SPZ, adresu, číslo jednací nebo strážníka…" autocomplete="off">
+      <div class="searchbox-wrap">
+        <div class="searchbox">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="searchInput" placeholder="Hledat SPZ, adresu, přestupek, číslo jednací nebo strážníka…" autocomplete="off">
+        </div>
+        <div class="search-suggestions" id="searchSuggestions"></div>
       </div>
 
       <div class="date-tabs" id="dateTabs">
@@ -374,7 +404,7 @@
       <div class="list-area">
         <div class="list-head">
           <span></span>
-          <span>SPZ</span>
+          <span>RZ</span>
           <span>Typ</span>
           <span>Ulice</span>
           <span>Přestupek</span>
@@ -387,30 +417,29 @@
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-empty" id="panelEmpty">Vyber přestupek ze seznamu vlevo.</div>
-        <div class="panel-content" id="panelContent" style="display:none;">
-          <div class="panel-head">
-            <span class="id mono" id="detailPlateLabel">DETAIL</span>
-            <button id="detailCloseBtn" aria-label="Zavřít">✕</button>
-          </div>
-          <div id="detailPreviewWrap">
-            <div id="noticeCardContainer"></div>
-            <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
-              <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
-            </div>
-            <div class="notice-photo-wrap" id="photoWrap">
-              <div id="photoGallery"></div>
-            </div>
-            <div class="submit-note" id="detailNote"></div>
-          </div>
-          <div class="panel-actions">
-            <button class="btn" id="printBtn" title="Vytisknout">🖨 Tisk</button>
-            <button class="btn" id="resolveMenuBtn">Dořešit</button>
-          </div>
-        </div>
-      </div>
+    </div>
+  </div>
 
+  <div class="detail-modal-overlay" id="detailModalOverlay">
+    <div class="detail-modal">
+      <div class="panel-head">
+        <span class="id mono" id="detailPlateLabel">DETAIL</span>
+        <button id="detailCloseBtn" aria-label="Zavřít">✕</button>
+      </div>
+      <div id="detailPreviewWrap">
+        <div id="noticeCardContainer"></div>
+        <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
+          <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
+        </div>
+        <div class="notice-photo-wrap" id="photoWrap">
+          <div id="photoGallery"></div>
+        </div>
+        <div class="submit-note" id="detailNote"></div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn" id="printBtn" title="Vytisknout">🖨 Tisk</button>
+        <button class="btn" id="resolveMenuBtn">Dořešit</button>
+      </div>
     </div>
   </div>
 
@@ -575,6 +604,7 @@
       console.log('[diagnostika] fetch:', Math.round(t1-t0), 'ms, počet záznamů:', allRecords.length,
         ', celková velikost payloadu:', totalKB, 'KB, z toho staré vložené fotky:', legacyKB, 'KB v', legacyCount, 'záznamech');
 
+      rebuildOffenseCatalog();
       renderRail();
       renderList(document.getElementById('searchInput').value);
       const diag = document.createElement('div');
@@ -1542,7 +1572,23 @@
     rail.appendChild(gOfficer);
   }
 
+  // Katalog přestupků pro našeptávač ve vyhledávání — sestavený z toho, co
+  // appka skutečně ve Firestore vidí (ne z pevného seznamu 34 položek
+  // v appce RZ Scanner), ať se nabízí jen to, co má smysl hledat.
+  let offenseCatalog = [];
+  function rebuildOffenseCatalog(){
+    const counts = {};
+    allRecords.forEach(r=>{
+      if(!r.offenseLabel) return;
+      counts[r.offenseLabel] = (counts[r.offenseLabel] || 0) + 1;
+    });
+    offenseCatalog = Object.keys(counts)
+      .map(label=>({ label, count: counts[label] }))
+      .sort((a,b)=> b.count - a.count || a.label.localeCompare(b.label, 'cs'));
+  }
+
   function refreshView(){
+    rebuildOffenseCatalog();
     renderRail();
     renderList(document.getElementById('searchInput').value);
   }
@@ -1566,7 +1612,8 @@
         (r.plate || '').toLowerCase().includes(q) ||
         (r.address || '').toLowerCase().includes(q) ||
         (r.noticeNumber || '').toLowerCase().includes(q) ||
-        (r.officerName || '').toLowerCase().includes(q)
+        (r.officerName || '').toLowerCase().includes(q) ||
+        (r.offenseLabel || '').toLowerCase().includes(q)
       );
     }
 
@@ -1671,7 +1718,47 @@
     });
   }
 
-  document.getElementById('searchInput').addEventListener('input', (e)=> renderList(e.target.value));
+  const searchInputEl = document.getElementById('searchInput');
+  const searchSuggestionsEl = document.getElementById('searchSuggestions');
+
+  function hideSuggestions(){
+    searchSuggestionsEl.classList.remove('open');
+    searchSuggestionsEl.innerHTML = '';
+  }
+
+  function showSuggestionsFor(query){
+    const q = query.trim().toLowerCase();
+    if(q.length < 2){ hideSuggestions(); return; }
+    const matches = offenseCatalog.filter(o=> o.label.toLowerCase().includes(q)).slice(0, 8);
+    if(!matches.length){ hideSuggestions(); return; }
+    searchSuggestionsEl.innerHTML = '';
+    matches.forEach(m=>{
+      const item = document.createElement('div');
+      item.className = 'search-suggestion-item';
+      item.innerHTML = escapeHtml(m.label) + '<span class="suggestion-count">' + m.count + '×</span>';
+      item.addEventListener('mousedown', (e)=>{
+        // mousedown (ne click) — proběhne dřív než blur pole, ať se
+        // dropdown nezavře dřív, než appka stihne zaregistrovat výběr.
+        e.preventDefault();
+        searchInputEl.value = m.label;
+        hideSuggestions();
+        renderList(m.label);
+        searchInputEl.focus();
+      });
+      searchSuggestionsEl.appendChild(item);
+    });
+    searchSuggestionsEl.classList.add('open');
+  }
+
+  searchInputEl.addEventListener('input', (e)=>{
+    renderList(e.target.value);
+    showSuggestionsFor(e.target.value);
+  });
+  searchInputEl.addEventListener('focus', (e)=> showSuggestionsFor(e.target.value));
+  searchInputEl.addEventListener('blur', ()=> setTimeout(hideSuggestions, 120));
+  searchInputEl.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape') hideSuggestions();
+  });
 
   // ---------- Detail ----------
   let currentDetailRecord = null;
@@ -1819,8 +1906,7 @@
     setDetailNote('', '');
     currentRecordPrinted = false;
 
-    document.getElementById('panelEmpty').style.display = 'none';
-    document.getElementById('panelContent').style.display = 'flex';
+    document.getElementById('detailModalOverlay').classList.add('open');
   }
 
   function updateResolveBtn(record){
@@ -1961,11 +2047,17 @@
     await loadAndShowPhotos(record);
   });
 
-  document.getElementById('detailCloseBtn').addEventListener('click', ()=>{
-    document.getElementById('panelContent').style.display = 'none';
-    document.getElementById('panelEmpty').style.display = 'flex';
+  function closeDetailModal(){
+    document.getElementById('detailModalOverlay').classList.remove('open');
     document.querySelectorAll('.record-item.selected').forEach(el=>el.classList.remove('selected'));
     currentDetailRecord = null;
+  }
+  document.getElementById('detailCloseBtn').addEventListener('click', closeDetailModal);
+  document.getElementById('detailModalOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'detailModalOverlay') closeDetailModal();
+  });
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && document.getElementById('detailModalOverlay').classList.contains('open')) closeDetailModal();
   });
 
 })();
