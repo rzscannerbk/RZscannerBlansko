@@ -2243,7 +2243,8 @@
     const em = opts.em ? 'true' : 'false';
     const width = opts.width || 1;
     const height = opts.height || 1;
-    return '<text align="' + align + '" em="' + em + '" width="' + width + '" height="' + height + '">' +
+    const fontAttr = opts.font ? ' font="' + opts.font + '"' : '';
+    return '<text align="' + align + '" em="' + em + '" width="' + width + '" height="' + height + '"' + fontAttr + '>' +
       escapeXml(data) + '</text>';
   }
 
