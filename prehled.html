@@ -159,6 +159,7 @@
     letter-spacing:.03em; white-space:nowrap;
   }
   .record-plate-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .record-thumb{display:none;}
   .record-plate{font-family:'Oswald',sans-serif; font-weight:600; font-size:20px; letter-spacing:.05em;}
   .record-resolved-badge{
     font-size:10px; font-weight:700; color:var(--good); text-transform:uppercase; letter-spacing:.05em;
@@ -273,14 +274,37 @@
     .list-top{padding-top:22px;}
     .list-top h1{font-size:19px;}
     .search-row{padding:16px 28px 0;}
-    #listBody{
-      padding:20px 28px 28px;
-      display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
-      gap:14px; align-content:start;
+    #listBody{padding:20px 28px 28px;}
+
+    /* Řádek: [info — klikací] [náhled fotky] [stav/výzva, zarovnáno vpravo] */
+    .record-item{
+      display:flex; align-items:center; gap:18px; margin-bottom:10px; padding:12px 16px;
     }
-    .record-item{margin-bottom:0;}
     .record-item:hover{border-color:var(--amber); cursor:pointer;}
     .record-item.resolved:hover{border-color:var(--good);}
+    .record-main{flex:1; min-width:0;}
+
+    .record-thumb{
+      display:flex; align-items:center; justify-content:center; position:relative;
+      flex:0 0 76px; width:76px; height:76px; border-radius:10px; overflow:hidden;
+      background:var(--asphalt-3); border:1px solid var(--line);
+    }
+    .record-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+    .record-thumb-placeholder{color:var(--muted); font-size:22px;}
+    .record-thumb.empty .record-thumb-placeholder{font-size:14px;}
+    .record-thumb-count{
+      position:absolute; right:3px; bottom:3px; background:rgba(0,0,0,.7); color:#fff;
+      font-size:10px; font-weight:700; padding:1px 5px; border-radius:8px;
+      font-family:'Roboto Mono',monospace;
+    }
+
+    .record-footer{
+      flex:0 0 190px; display:flex; flex-direction:column; align-items:flex-end;
+      justify-content:center; text-align:right; margin-top:0; padding-top:0; border-top:none;
+      gap:4px; align-self:stretch; padding-left:16px; border-left:1px solid var(--line);
+    }
+    .record-submitted{text-align:right;}
+
     .list-bottom-bar{padding:14px 28px 20px; justify-content:flex-end; gap:14px;}
     .list-bottom-btn{flex:0 0 auto; padding:12px 34px;}
     .list-bottom-btn:hover{opacity:.85;}
@@ -1252,6 +1276,67 @@
   }
 
 
+  // ---------- Lazy náhledy fotek v seznamu (jen desktop) ----------
+  // Na mobilu je .record-thumb schovaný přes display:none, takže sem
+  // IntersectionObserver kvůli chybějícímu layoutu vůbec nic nepošle —
+  // appka tak na mobilu žádné fotky navíc nedotahuje (viz poznámka o
+  // rychlosti seznamu u loadAndShowPhotos výše). Na desktopu se náhled
+  // fotky dotáhne, teprve když řádek doopravdy vjede do viewportu.
+  const thumbObserver = ('IntersectionObserver' in window)
+    ? new IntersectionObserver((entries)=>{
+        entries.forEach(entry=>{
+          if(!entry.isIntersecting) return;
+          const el = entry.target;
+          thumbObserver.unobserve(el);
+          loadThumbFor(el, el.__record);
+        });
+      }, { rootMargin: '200px' })
+    : null;
+
+  function observeThumb(thumbEl, record){
+    thumbEl.__record = record;
+    if(thumbObserver){
+      thumbObserver.observe(thumbEl);
+    } else {
+      // Prohlížeč bez IntersectionObserver (vzácné) — rovnou dotáhnout.
+      loadThumbFor(thumbEl, record);
+    }
+  }
+
+  async function loadThumbFor(thumbEl, record){
+    try{
+      let photosB64 = record._resolvedPhotos;
+      let mime = record._resolvedMime || 'image/jpeg';
+      if(!photosB64){
+        const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
+        const data = doc.exists ? doc.data() : null;
+        photosB64 = (data && data.photos) || [];
+        mime = (data && data.photoMime) || 'image/jpeg';
+        record._resolvedPhotos = photosB64;
+        record._resolvedMime = mime;
+      }
+      if(!photosB64.length){
+        thumbEl.innerHTML = '<span class="record-thumb-placeholder">—</span>';
+        thumbEl.classList.add('empty');
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = 'data:' + mime + ';base64,' + photosB64[0];
+      img.alt = 'Fotodokumentace';
+      thumbEl.innerHTML = '';
+      thumbEl.appendChild(img);
+      if(photosB64.length > 1){
+        const count = document.createElement('span');
+        count.className = 'record-thumb-count';
+        count.textContent = '+' + (photosB64.length - 1);
+        thumbEl.appendChild(count);
+      }
+    }catch(e){
+      console.error('Náhled fotky se nepodařilo načíst:', e);
+      thumbEl.innerHTML = '<span class="record-thumb-placeholder">?</span>';
+    }
+  }
+
   function renderList(filterText){
     const container = document.getElementById('listBody');
     const statusEl = document.getElementById('listStatus');
@@ -1279,6 +1364,11 @@
     filtered.forEach(r=>{
       const item = document.createElement('div');
       item.className = 'record-item' + (r.resolved ? ' resolved' : '') + (r.docType === 'boticka' ? ' boticka' : '');
+
+      // Hlavní sloupec (klikací) — na mobilu je to celá karta beze změny,
+      // na desktopu je to levý (širší) sloupec řádku.
+      const main = document.createElement('div');
+      main.className = 'record-main';
 
       const topRow = document.createElement('div');
       topRow.className = 'record-top-row';
@@ -1310,20 +1400,40 @@
         num.textContent = r.noticeNumber;
         topRow.appendChild(num);
       }
-      item.appendChild(topRow);
+      main.appendChild(topRow);
 
       const meta = document.createElement('div');
       meta.className = 'record-meta';
       meta.textContent = (r.time || '') + ' · ' + formatDateCz(r.date) + (r.address ? ' · ' + r.address : '');
-      item.appendChild(meta);
+      main.appendChild(meta);
 
       if(r.offenseLabel){
         const off = document.createElement('div');
         off.className = 'record-offense';
         off.textContent = r.offenseLabel;
-        item.appendChild(off);
+        main.appendChild(off);
       }
+      item.appendChild(main);
 
+      // Náhled fotky — jen na desktopu (na mobilu je sloupec schovaný přes
+      // CSS, viz .record-thumb{display:none}, takže se ani nezačne
+      // dotahovat). Fotka se navíc dotáhne líně, teprve když se řádek
+      // opravdu objeví na obrazovce (viz IntersectionObserver níže) — ať
+      // se seznamem nezpomalí kvůli fotkám, které nikdo ani neuvidí.
+      const thumb = document.createElement('div');
+      thumb.className = 'record-thumb';
+      if(r.hasPhotos){
+        thumb.dataset.recordId = r.id;
+        thumb.innerHTML = '<span class="record-thumb-placeholder">📷</span>';
+        observeThumb(thumb, r);
+      } else {
+        thumb.classList.add('empty');
+        thumb.innerHTML = '<span class="record-thumb-placeholder">—</span>';
+      }
+      item.appendChild(thumb);
+
+      // Pravý sloupec ("výzva"/stav) — na mobilu vypadá stejně jako dřív
+      // (spodní řádek karty), na desktopu se přesune doprava vedle náhledu.
       const footer = document.createElement('div');
       footer.className = 'record-footer';
 
