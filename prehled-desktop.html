@@ -1833,26 +1833,17 @@
     return penalty ? ('Příkaz na místě (' + penalty + ')') : 'Příkaz na místě';
   }
 
-  // Ukládá skutečnou fotku (ne screenshot obrazovky) do Fotek. Atribut
-  // "download" na <a href="data:..."> je na iOS Safari (obzvlášť v appce
-  // přidané na plochu) nespolehlivý — tap na něj místo staženého souboru
-  // často jen zobrazí obrázek a to, co se pak reálně uloží do Fotek, je
-  // screenshot aktuální obrazovky. Nativní sdílecí okno (Web Share API se
-  // skutečným File objektem) ukládá spolehlivě přímo fotku; když ho telefon
-  // nepodporuje, otevřeme fotku v nové kartě, odkud jde uložit podržením prstu.
-  async function shareOrOpenPhoto(dataUrl, filename){
-    try{
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
-      if(navigator.canShare && navigator.canShare({ files: [file] })){
-        await navigator.share({ files: [file] });
-        return;
-      }
-    }catch(e){
-      // Uživatel sdílení zrušil, nebo API není k dispozici — zkusíme fallback.
-    }
-    window.open(dataUrl, '_blank');
+  // Na desktopu funguje běžné stažení přes <a download> spolehlivě (na
+  // rozdíl od mobilního Safari, kde appka RZ Scanner / Přehled kvůli
+  // tomu používá Web Share API) — soubor tak jde rovnou do složky
+  // Stažené soubory, místo aby appka otevírala sdílecí okno Windows.
+  function downloadPhoto(dataUrl, filename){
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   function renderPhotoGallery(record, photos, mime){
@@ -1872,8 +1863,8 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'download-link';
-      btn.textContent = 'Uložit fotku' + (photos.length > 1 ? ' ' + (idx + 1) : '');
-      btn.addEventListener('click', ()=> shareOrOpenPhoto(dataUrl, filename));
+      btn.textContent = 'Stáhnout fotku' + (photos.length > 1 ? ' ' + (idx + 1) : '');
+      btn.addEventListener('click', ()=> downloadPhoto(dataUrl, filename));
       item.appendChild(btn);
 
       gallery.appendChild(item);
