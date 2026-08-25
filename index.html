@@ -2340,6 +2340,11 @@
     const isBoticka = record.docType === 'boticka';
     let x = '';
 
+    // DOČASNÁ DIAGNOSTIKA — ověřuje, jestli appka na telefonu opravdu
+    // spouští tenhle aktuální kód. Jakmile se potvrdí, že se objevuje na
+    // výtisku, tenhle řádek zase odstraním.
+    x += textEl('*** BUILD-TEST-' + Date.now() + ' ***\n', { align: 'center', em: true });
+
     x += textEl((isBoticka ? 'OZNÁMENÍ' : 'VÝZVA') + '\n', { align: 'center', width: 2, height: 2, em: true });
     x += textEl(wrapWords(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku') + '\n', { align: 'center' });
     if(record.noticeNumber){
