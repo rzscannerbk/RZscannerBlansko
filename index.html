@@ -65,7 +65,7 @@
     overflow:hidden;
     overscroll-behavior:none;
   }
-  #app{position:fixed; inset:0; display:flex; flex-direction:column;}
+  #app{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100%)); display:flex; flex-direction:column;}
 
   /* ---------- SCREEN: START ---------- */
   .screen{position:absolute; inset:0; display:none; flex-direction:column;}
@@ -776,6 +776,24 @@
 
 <script>
 (function(){
+  // ---------- Oprava výšky viewportu na iOS Safari ----------
+  // iOS Safari nespolehlivě počítá výšku pro position:fixed;inset:0 —
+  // po použití kamery nebo po sbalení adresního řádku appka nezaplní
+  // celou obrazovku a dole zůstane černá mezera (mimo dosah appky, mimo
+  // vlastní CSS appky). Řešení: JS změří skutečnou výšku viditelné
+  // plochy (visualViewport, nebo innerHeight jako záloha) a uloží ji do
+  // CSS proměnné --app-height, na kterou je #app navázané místo inset:0.
+  function setAppHeight(){
+    const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    document.documentElement.style.setProperty('--app-height', h + 'px');
+  }
+  setAppHeight();
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight, 100));
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', setAppHeight);
+  }
+
   // ---------- Nastavení API klíčů přes odkaz (setup link) ----------
   // Po smazání a novém přidání appky na plochu iOS vytvoří nový, prázdný
   // úložný kontejner (localStorage se vynuluje) — appka se pak znovu zeptá

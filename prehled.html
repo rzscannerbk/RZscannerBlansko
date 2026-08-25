@@ -59,7 +59,7 @@
     font-family:'Inter',system-ui,sans-serif;
   }
   #app{min-height:100%; display:flex; flex-direction:column; overflow-x:hidden;}
-  .screen{position:fixed; inset:0; display:none; flex-direction:column; overflow-x:hidden;}
+  .screen{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100%)); display:none; flex-direction:column; overflow-x:hidden;}
   .screen.active{display:flex;}
 
   h1,h2{font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.02em; margin:0;}
@@ -283,6 +283,23 @@
 
 <script>
 (function(){
+  // ---------- Oprava výšky viewportu na iOS Safari ----------
+  // Stejný fix jako v index.html — iOS Safari nespolehlivě počítá výšku
+  // pro position:fixed;inset:0, po sbalení adresního řádku appka
+  // nezaplní celou obrazovku a dole zůstane černá mezera. JS změří
+  // skutečnou výšku viditelné plochy a uloží ji do CSS proměnné
+  // --app-height, na kterou jsou obrazovky (.screen) navázané.
+  function setAppHeight(){
+    const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    document.documentElement.style.setProperty('--app-height', h + 'px');
+  }
+  setAppHeight();
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight, 100));
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', setAppHeight);
+  }
+
   // Respektuje volbu tématu nastavenou v index.html (4s podržení loga na
   // úvodní obrazovce appky) — samotné gesto tady není, jen se drží stejná
   // paleta jako zbytek appky.
