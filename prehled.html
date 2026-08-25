@@ -309,7 +309,8 @@
     const safeBottom = getComputedStyle(probe).paddingBottom;
     document.body.removeChild(probe);
     box.textContent =
-      'innerH:' + window.innerHeight +
+      'standalone:' + (window.navigator.standalone) + ' displayMode:' + (window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser') +
+      ' | innerH:' + window.innerHeight +
       ' vvH:' + (window.visualViewport ? Math.round(window.visualViewport.height) : 'n/a') +
       ' docClientH:' + document.documentElement.clientHeight +
       ' screenH:' + window.screen.height + '/' + window.screen.availHeight +
