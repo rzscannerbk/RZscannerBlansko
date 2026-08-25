@@ -2243,8 +2243,8 @@
     const em = opts.em ? 'true' : 'false';
     const width = opts.width || 1;
     const height = opts.height || 1;
-    const fontAttr = opts.font ? ' font="' + opts.font + '"' : '';
-    return '<text align="' + align + '" em="' + em + '" width="' + width + '" height="' + height + '"' + fontAttr + '>' +
+    const font = opts.font || 'font_b';
+    return '<text align="' + align + '" em="' + em + '" width="' + width + '" height="' + height + '" font="' + font + '">' +
       escapeXml(data) + '</text>';
   }
 
@@ -2255,7 +2255,7 @@
   // skutečného výtisku). Zachovává existující odřádkování (prázdné řádky
   // mezi odstavci).
   function wrapWords(text, width){
-    width = width || 32;
+    width = width || 44;
     return String(text == null ? '' : text).split('\n').map(function(line){
       if(line.length <= width) return line;
       const words = line.split(' ');
@@ -2345,21 +2345,20 @@
     if(record.noticeNumber){
       x += textEl('Č. j.: ' + record.noticeNumber + '\n', { align: 'center', em: true });
     }
-    x += textEl('\nREGISTRAČNÍ ZNAČKA\n', { align: 'center' });
+    x += textEl('REGISTRAČNÍ ZNAČKA\n', { align: 'center' });
     x += textEl((record.plate || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
     if(record.brand || record.color){
       x += textEl([record.brand, record.color].filter(Boolean).join(', ') + '\n', { align: 'center' });
     }
     x += textEl('--------------------------------\n', { align: 'center' });
-    x += textEl('Datum: ' + formatDateCz(record.date) + '   Čas: ' + (record.time || '—') + '\n\n', { align: 'left' });
+    x += textEl('Datum: ' + formatDateCz(record.date) + '   Čas: ' + (record.time || '—') + '\n', { align: 'left' });
 
     x += textEl('Místo přestupku\n', { align: 'center', em: true });
-    x += textEl(wrapWords(record.address || '') + '\n\n', { align: 'center' });
+    x += textEl(wrapWords(record.address || '') + '\n', { align: 'center' });
 
     x += textEl('Právní kvalifikace přestupku\n', { align: 'center', em: true });
     if(record.offenseLabel) x += textEl(wrapWords(record.offenseLabel) + '\n', { align: 'center' });
     if(record.offenseCitation) x += textEl(wrapWords(record.offenseCitation) + '\n', { align: 'center' });
-    x += textEl('\n', { align: 'center' });
 
     // "Botička" (TPZOV) — jiný text než běžná Výzva. Zatím pracovní návrh
     // (žádost byla výslovně o "nějaký random text"), doporučuju znění
@@ -2370,10 +2369,10 @@
           'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek ' +
           'k zabránění odjezdu vozidla (TPZOV) dle § 45a zákona č. 361/2000 Sb., ' +
           'o silničním provozu, a to z důvodu porušení pravidel uvedeného výše.'
-        ) + '\n\n',
+        ) + '\n',
         { align: 'center' }
       );
-      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true });
+      x += textEl('pořízena fotodokumentace\n', { align: 'center', em: true });
       x += textEl('POUČENÍ\n', { align: 'center', em: true });
       x += textEl(
         wrapWords(
@@ -2381,7 +2380,7 @@
           'použitím a odstraněním, a to na Městské policii Blansko, Sadová 2. ' +
           'Neoprávněné odstranění technického prostředku vlastní silou je přestupkem ' +
           'dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.'
-        ) + '\n\n',
+        ) + '\n',
         { align: 'center' }
       );
     } else {
@@ -2389,10 +2388,10 @@
         wrapWords(
           'Dostavte se proto ve vlastním zájmu, a to neprodleně na Městskou policii ' +
           'Blansko, Sadová 2. Tuto výzvu vezměte s sebou.'
-        ) + '\n\n',
+        ) + '\n',
         { align: 'center' }
       );
-      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true });
+      x += textEl('pořízena fotodokumentace\n', { align: 'center', em: true });
       x += textEl('POUČENÍ\n', { align: 'center', em: true });
       x += textEl(
         wrapWords(
@@ -2400,7 +2399,7 @@
           'výzvě vyhovět. Nedostavíte-li se bez dostatečné omluvy, můžete být dle ' +
           '§ 11/odst. 8 výše uvedeného zákona předveden(a) nebo může být přestupek ' +
           'oznámen příslušnému správnímu orgánu k projednání.'
-        ) + '\n\n',
+        ) + '\n',
         { align: 'center' }
       );
     }
@@ -2411,7 +2410,7 @@
     }
     x += textEl('Městská policie Blansko\n', { align: 'center', em: true });
     x += textEl('Sadová 149/2, 678 01 Blansko\n', { align: 'center' });
-    x += textEl('Tel.: 775 859 486, 516 418 418\n\n', { align: 'center' });
+    x += textEl('Tel.: 775 859 486, 516 418 418\n', { align: 'center' });
     x += textEl('vygenerováno aplikací\n', { align: 'center' });
     x += textEl('RZ Scanner © Šuraj\n', { align: 'center' });
 
