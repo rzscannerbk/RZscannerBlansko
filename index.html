@@ -633,7 +633,7 @@
           <label>Místo přestupku</label>
           <input type="text" id="addressInput" placeholder="Zjišťuji polohu…" readonly style="cursor:pointer;">
         </div>
-        <div class="field field-center">
+        <div class="field field-center" id="officerFieldWrap" style="position:relative;">
           <label>Strážník</label>
           <select id="officerSelect" class="officer-select">
             <option value="" disabled>Vyber strážníka</option>
@@ -656,6 +656,7 @@
             <option>Tóth Pavel</option>
             <option>Vašíček Zdeněk</option>
           </select>
+          <div id="officerLoginOverlay" style="display:none; position:absolute; inset:0; cursor:pointer;"></div>
         </div>
       </div>
     </div>
@@ -2049,6 +2050,7 @@
 
   function applyOfficerLock(){
     const officerSelect = document.getElementById('officerSelect');
+    const loginOverlay = document.getElementById('officerLoginOverlay');
     const lockedOfficer = getLockedOfficerName();
     if(lockedOfficer){
       // Přihlášený účet patří konkrétnímu strážníkovi — appka mu jméno
@@ -2056,16 +2058,31 @@
       officerSelect.value = lockedOfficer;
       officerSelect.disabled = true;
       officerSelect.title = 'Jméno se určuje podle přihlášeného účtu';
-    } else {
-      // admin@rzscanner.cz nebo neznámý/needentifikovaný účet — ruční výběr
-      // jako dřív, appka si jen pamatuje poslední vybrané jméno v telefonu.
+      loginOverlay.style.display = 'none';
+    } else if(auth.currentUser){
+      // admin@rzscanner.cz — ruční výběr jako dřív, appka si jen pamatuje
+      // poslední vybrané jméno v telefonu.
       const savedOfficer = getSavedOfficer();
       officerSelect.disabled = false;
       officerSelect.title = '';
       officerSelect.value = savedOfficer && [...officerSelect.options].some(o => o.value === savedOfficer)
         ? savedOfficer : '';
+      loginOverlay.style.display = 'none';
+    } else {
+      // Nikdo není přihlášený — místo volného ručního výběru (což by šlo
+      // zneužít k vydávání se za kohokoliv) appka radši rovnou nabídne
+      // přihlášení. Select zůstává zamčený, přes něj leží klikací overlay.
+      officerSelect.disabled = true;
+      officerSelect.title = 'Pro výběr strážníka se nejdřív přihlaste';
+      officerSelect.value = '';
+      loginOverlay.style.display = 'block';
     }
   }
+
+  document.getElementById('officerLoginOverlay').addEventListener('click', ()=>{
+    document.getElementById('loginError').style.display = 'none';
+    show('login');
+  });
 
   function populateResult(text, confidence, ocrErrorMessage, location){
     document.getElementById('plateInput').value = formatPlateDisplay(text);
