@@ -2243,7 +2243,8 @@
     const em = opts.em ? 'true' : 'false';
     const width = opts.width || 1;
     const height = opts.height || 1;
-    return '<text align="' + align + '" em="' + em + '" width="' + width + '" height="' + height + '">' +
+    const fontAttr = opts.font ? ' font="' + opts.font + '"' : '';
+    return '<text align="' + align + '" em="' + em + '" width="' + width + '" height="' + height + '"' + fontAttr + '>' +
       escapeXml(data) + '</text>';
   }
 
@@ -2368,39 +2369,43 @@
         wrapWords(
           'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek ' +
           'k zabránění odjezdu vozidla (TPZOV) dle § 45a zákona č. 361/2000 Sb., ' +
-          'o silničním provozu, a to z důvodu porušení pravidel uvedeného výše.'
+          'o silničním provozu, a to z důvodu porušení pravidel uvedeného výše.',
+          44
         ) + '\n\n',
-        { align: 'center' }
+        { align: 'center', font: 'font_b' }
       );
-      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true });
+      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true, height: 2 });
       x += textEl('POUČENÍ\n', { align: 'center', em: true });
       x += textEl(
         wrapWords(
           'Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho ' +
           'použitím a odstraněním, a to na Městské policii Blansko, Sadová 2. ' +
           'Neoprávněné odstranění technického prostředku vlastní silou je přestupkem ' +
-          'dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.'
+          'dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.',
+          44
         ) + '\n\n',
-        { align: 'center' }
+        { align: 'center', font: 'font_b' }
       );
     } else {
       x += textEl(
         wrapWords(
           'Dostavte se proto ve vlastním zájmu, a to neprodleně na Městskou policii ' +
-          'Blansko, Sadová 2. Tuto výzvu vezměte s sebou.'
+          'Blansko, Sadová 2. Tuto výzvu vezměte s sebou.',
+          44
         ) + '\n\n',
-        { align: 'center' }
+        { align: 'center', font: 'font_b' }
       );
-      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true });
+      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true, height: 2 });
       x += textEl('POUČENÍ\n', { align: 'center', em: true });
       x += textEl(
         wrapWords(
           'Dle § 11/odst. 1 a 2, zák. 553/1991 Sb., o obecní policii je osoba povinna ' +
           'výzvě vyhovět. Nedostavíte-li se bez dostatečné omluvy, můžete být dle ' +
           '§ 11/odst. 8 výše uvedeného zákona předveden(a) nebo může být přestupek ' +
-          'oznámen příslušnému správnímu orgánu k projednání.'
+          'oznámen příslušnému správnímu orgánu k projednání.',
+          44
         ) + '\n\n',
-        { align: 'center' }
+        { align: 'center', font: 'font_b' }
       );
     }
 
