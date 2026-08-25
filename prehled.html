@@ -986,7 +986,7 @@
     try{
       if(typeof JSZip === 'undefined'){
         setDetailNote('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).', 'err');
-        return;
+        return false;
       }
       // Fotky mohly být v této session už dřív načtené (viz openDetail /
       // loadAndShowPhotos) — jinak je stejným způsobem dotáhneme teď.
@@ -1004,7 +1004,7 @@
         const file = new File([blob], filename, { type: blob.type });
         if(navigator.canShare && navigator.canShare({ files: [file] })){
           await navigator.share({ files: [file] });
-          return;
+          return true;
         }
       }catch(e){
         // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
@@ -1013,9 +1013,11 @@
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(()=> URL.revokeObjectURL(url), 60000);
+      return true;
     }catch(e){
       console.error('Export Oznámení selhal:', e);
       setDetailNote('Vytvoření dokumentu se nezdařilo (' + e.message + ').', 'err');
+      return false;
     }finally{
       btn.disabled = false;
       btn.textContent = originalText;
@@ -1397,7 +1399,9 @@
       if(r.resolved){
         const badge = document.createElement('div');
         badge.className = 'record-resolved-badge';
-        badge.textContent = 'Dořešeno';
+        badge.textContent = r.resolvedMethod === 'oznameni' ? 'Oznámeno'
+          : r.resolvedMethod === 'prikaz' ? 'Dořešeno příkazem'
+          : 'Dořešeno';
         plateRow.appendChild(badge);
       }
       topRow.appendChild(plateRow);
@@ -1620,7 +1624,17 @@
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     const penaltyText = getOffensePenaltyText(record);
     if(record.resolved){
-      menuBtn.textContent = '✓ Dořešeno';
+      // Text u horního tlačítka "Dořešit" se liší podle toho, jak byl
+      // přestupek doopravdy vyřešen — starší záznamy bez uloženého
+      // resolvedMethod (z appky před touhle úpravou) spadnou na obecné
+      // "Dořešeno".
+      if(record.resolvedMethod === 'oznameni'){
+        menuBtn.textContent = '✓ Oznámeno';
+      } else if(record.resolvedMethod === 'prikaz'){
+        menuBtn.textContent = '✓ Dořešeno příkazem';
+      } else {
+        menuBtn.textContent = '✓ Dořešeno';
+      }
       vyresenoBtn.textContent = '✓ ' + penaltyText;
       vyresenoBtn.disabled = true;
     } else {
@@ -1628,6 +1642,29 @@
       vyresenoBtn.textContent = penaltyText;
       vyresenoBtn.disabled = false;
     }
+  }
+
+  // Sdílené označení přestupku jako vyřešeného — volá se jak po úspěšném
+  // otevření dokumentu "Oznámení", tak po klepnutí na "Příkaz na místě".
+  // "method" rozlišuje, jaký text appka pak zobrazí (viz updateResolveBtn
+  // a vykreslení odznaku v seznamu).
+  async function markResolved(record, method){
+    if(!record || record.resolved) return;
+    // Shortens this record's Firestore TTL from the default 90 days
+    // (set when it was created) to 60 days from now — the "expireAt"
+    // field is what the TTL policy actually watches, so updating it is
+    // enough; no need to move the document anywhere.
+    const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
+    await db.collection('prestupky').doc(record.id).update({
+      resolved: true,
+      resolvedMethod: method,
+      resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      expireAt: expireAt
+    });
+    record.resolved = true;
+    record.resolvedMethod = method;
+    updateResolveBtn(record);
+    renderList(document.getElementById('searchInput').value);
   }
 
   // Zatím jen placeholder — šablona dokumentu "Výzva" (jiný typ než
@@ -1650,9 +1687,14 @@
     document.getElementById('resolveMenuOverlay').classList.remove('open');
   });
 
-  document.getElementById('menuOznameniBtn').addEventListener('click', ()=>{
+  document.getElementById('menuOznameniBtn').addEventListener('click', async ()=>{
     document.getElementById('resolveMenuOverlay').classList.remove('open');
-    if(currentDetailRecord) exportOznameni(currentDetailRecord);
+    const record = currentDetailRecord;
+    if(!record) return;
+    const opened = await exportOznameni(record);
+    // Jen když se dokument doopravdy otevřel/stáhnul (ne při chybě) a jen
+    // pokud přestupek ještě nebyl vyřešený jiným způsobem dřív.
+    if(opened) markResolved(record, 'oznameni');
   });
 
   document.getElementById('menuVyzvaBtn').addEventListener('click', ()=>{
@@ -1668,19 +1710,7 @@
     btn.disabled = true;
     btn.textContent = 'Ukládám…';
     try{
-      // Shortens this record's Firestore TTL from the default 90 days
-      // (set when it was created) to 60 days from now — the "expireAt"
-      // field is what the TTL policy actually watches, so updating it is
-      // enough; no need to move the document anywhere.
-      const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
-      await db.collection('prestupky').doc(record.id).update({
-        resolved: true,
-        resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        expireAt: expireAt
-      });
-      record.resolved = true;
-      updateResolveBtn(record);
-      renderList(document.getElementById('searchInput').value);
+      await markResolved(record, 'prikaz');
     }catch(e){
       console.error('Označení jako dořešeno selhalo:', e);
       btn.disabled = false;
