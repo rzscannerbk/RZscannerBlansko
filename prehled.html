@@ -779,7 +779,11 @@
         const filename = 'image' + (i + 1) + '.jpeg';
         mediaFiles.push({ name: filename, bytes: base64ToUint8Array(photosB64[i]) });
         relEntries.push({ id: relId, target: 'media/' + filename });
-        body += docxImageParagraph(relId, dims.w, dims.h, 170, 240, docId, i > 0);
+        // První fotka má o něco nižší povolenou výšku než ostatní (220 mm
+        // místo 240 mm) — jinak by se v plné výšce nevešla pod nadpis
+        // "Fotodokumentace" na stejnou stránku a Word by ji sám přesunul
+        // na další (prázdný nadpis nahoře, fotka sama o stránku dál).
+        body += docxImageParagraph(relId, dims.w, dims.h, 170, i === 0 ? 220 : 240, docId, i > 0);
         relId++; docId++;
       }
     }
