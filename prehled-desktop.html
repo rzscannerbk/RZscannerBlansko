@@ -626,48 +626,29 @@
   });
 
   // ---------- List ----------
-  async function loadRecords(){
+  // Real-time listener — appka se sama překreslí, kdykoliv se ve Firestore
+  // něco změní (nový přestupek odeslaný z RZ Scanner, dořešení odjinud
+  // apod.), bez nutnosti stránku ručně obnovovat. onSnapshot se navíc
+  // jednou zavolá hned na začátku se stávajícími daty, takže nahrazuje
+  // i původní jednorázové načtení.
+  function loadRecords(){
     const statusEl = document.getElementById('listStatus');
     statusEl.style.display = 'block';
     statusEl.textContent = 'Načítám…';
-    const t0 = performance.now();
-    try{
-      const snap = await db.collection('prestupky').orderBy('createdAt', 'desc').limit(500).get();
-      const t1 = performance.now();
-      allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // Temporary diagnostics — helps pin down whether the slowness is the
-      // network fetch itself or something else, and whether older records
-      // still carrying inline photos (from before photos moved to a
-      // subcollection) are the culprit.
-      let legacyPhotoBytes = 0, legacyCount = 0;
-      allRecords.forEach(r=>{
-        if(r.photos && r.photos.length){
-          legacyCount++;
-          legacyPhotoBytes += r.photos.reduce((s,p)=> s + (p ? p.length : 0), 0);
-        } else if(r.photoBase64){
-          legacyCount++;
-          legacyPhotoBytes += r.photoBase64.length;
-        }
+    let first = true;
+    db.collection('prestupky').orderBy('createdAt', 'desc').limit(500)
+      .onSnapshot(snap=>{
+        allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log('[živý přenos]', first ? 'počáteční načtení' : 'změna dat', '—', allRecords.length, 'záznamů');
+        first = false;
+        rebuildOffenseCatalog();
+        renderRail();
+        renderList(document.getElementById('searchInput').value);
+      }, e=>{
+        console.error('Načtení přehledu selhalo:', e);
+        statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
+        statusEl.style.display = 'block';
       });
-      const totalKB = Math.round(JSON.stringify(snap.docs.map(d=>d.data())).length / 1024);
-      const legacyKB = Math.round(legacyPhotoBytes / 1024);
-      console.log('[diagnostika] fetch:', Math.round(t1-t0), 'ms, počet záznamů:', allRecords.length,
-        ', celková velikost payloadu:', totalKB, 'KB, z toho staré vložené fotky:', legacyKB, 'KB v', legacyCount, 'záznamech');
-
-      rebuildOffenseCatalog();
-      renderRail();
-      renderList(document.getElementById('searchInput').value);
-      const diag = document.createElement('div');
-      diag.style.cssText = 'text-align:center; color:var(--muted); font-size:10.5px; font-family:monospace; margin-top:14px; opacity:.7; overflow-wrap:anywhere;';
-      diag.textContent = 'Diagnostika: fetch ' + Math.round(t1-t0) + ' ms, render ' + Math.round(t2-t1) + ' ms, ' +
-        allRecords.length + ' záznamů, ' + totalKB + ' KB celkem (' + legacyKB + ' KB staré fotky v ' + legacyCount + ' záznamech)';
-      document.getElementById('listBody').appendChild(diag);
-    }catch(e){
-      console.error('Načtení přehledu selhalo:', e);
-      statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
-      statusEl.style.display = 'block';
-    }
   }
 
   function formatCreatedAt(ts){
