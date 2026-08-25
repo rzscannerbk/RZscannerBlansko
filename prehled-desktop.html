@@ -144,45 +144,46 @@
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
   .list-head{
-    display:grid; grid-template-columns: 3px 128px 108px 1fr 150px 148px 64px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 32px 138px 64px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
     font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
-    color:var(--faint); border-bottom:1px solid var(--line);
+    color:var(--faint); border-bottom:1px solid var(--line); gap:0 10px;
   }
   #listBody{flex:1; overflow-y:auto;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
   .record-item{
-    display:grid; grid-template-columns: 3px 128px 108px 1fr 150px 148px 64px;
-    align-items:center; padding:9px 22px; min-height:74px; cursor:pointer;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 32px 138px 64px;
+    align-items:start; padding:12px 22px; min-height:74px; cursor:pointer;
     border-bottom:1px solid var(--line-soft); position:relative; gap:0 10px;
   }
   .record-item:hover{background:var(--asphalt-2);}
   .record-item.selected{background:var(--asphalt-3);}
-  .record-item.resolved{opacity:.5;}
-  .record-item.resolved:hover{opacity:.8;}
+  .record-item.resolved{background:rgba(255,255,255,.02); opacity:.55;}
+  .record-item.resolved:hover{opacity:.85; background:var(--asphalt-2);}
   .record-item .stripe{width:3px; align-self:stretch; border-radius:2px; background:#5D9CFF;}
   .record-item.boticka .stripe{background:var(--amber);}
 
-  .record-plate-col{display:flex; flex-direction:column; gap:3px;}
-  .record-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; letter-spacing:.02em;}
+  .record-plate-col{display:flex; flex-direction:column; gap:3px; padding-top:1px;}
+  .record-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; letter-spacing:.02em; line-height:1.3;}
   .record-notice-number{font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--faint); letter-spacing:.02em;}
 
-  .record-doctype-badge{font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; width:fit-content; letter-spacing:.02em; color:#8FB6FF; background:rgba(93,156,255,.14);}
+  .record-doctype-badge{font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; width:fit-content; letter-spacing:.02em; color:#8FB6FF; background:rgba(93,156,255,.14); margin-top:2px;}
   .record-doctype-badge.boticka{color:var(--amber); background:var(--amber-glow);}
 
-  .record-offense{
-    font-size:12.5px; color:#C7CBD3; line-height:1.4; padding-right:16px;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-  }
-  .record-offense .addr{color:var(--faint); margin-right:5px;}
+  .record-addr{font-size:12.5px; color:var(--muted); line-height:1.4; padding-top:3px; padding-right:10px;}
 
-  .record-status{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);}
-  .record-status .dot{width:7px; height:7px; border-radius:50%; flex:0 0 auto; background:var(--faint);}
+  .record-offense{
+    font-size:12.5px; color:#C7CBD3; line-height:1.4; padding-right:16px; padding-top:3px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:help;
+  }
+
+  .record-status{display:flex; align-items:center; justify-content:center; padding-top:5px;}
+  .record-status .dot{width:14px; height:14px; border-radius:50%; flex:0 0 auto; background:var(--faint); cursor:help;}
   .record-status.st-oznameno .dot{background:#8FB6FF;}
   .record-status.st-prikaz .dot{background:var(--good);}
 
-  .record-sent-col{display:flex; flex-direction:column; gap:3px;}
+  .record-sent-col{display:flex; flex-direction:column; gap:3px; padding-top:1px;}
   .record-sent-date{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint);}
   .record-sent-time{font-family:'Roboto Mono',monospace; font-size:12px; color:var(--muted);}
 
@@ -228,15 +229,15 @@
   }
 
   /* ---------- DETAIL PANEL ---------- */
-  .panel{width:440px; flex:0 0 440px; border-left:1px solid var(--line); background:var(--asphalt-2); display:flex; flex-direction:column;}
+  .panel{width:292px; flex:0 0 292px; border-left:1px solid var(--line); background:var(--asphalt-2); display:flex; flex-direction:column;}
   .panel-empty{flex:1; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:13.5px; text-align:center; padding:30px;}
   .panel-content{flex:1; display:flex; flex-direction:column; min-height:0;}
   .panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line); flex:0 0 auto;}
   .panel-head .id{font-size:12px; color:var(--faint);}
   .panel-head button{background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:13px;}
   .panel-head button:hover{color:var(--text); border-color:var(--faint);}
-  #detailPreviewWrap{flex:1; overflow-y:auto; padding:22px 20px; background:transparent;}
-  .panel-actions{display:flex; gap:9px; padding:16px 20px; border-top:1px solid var(--line); flex:0 0 auto;}
+  #detailPreviewWrap{flex:1; overflow-y:auto; padding:18px 14px; background:transparent;}
+  .panel-actions{display:flex; gap:9px; padding:16px 14px; border-top:1px solid var(--line); flex:0 0 auto;}
   .panel-actions .btn{flex:1;}
 
   .status-line{
@@ -246,22 +247,23 @@
   .status-line.ok{background:var(--good-glow); border-color:rgba(51,211,153,.25); color:var(--good);}
   .status-line .dot{width:7px; height:7px; border-radius:50%; background:currentColor;}
 
-  /* ---------- NOTICE CARD (stejný vzhled jako v appce Přehled na mobilu) ---------- */
+  /* ---------- NOTICE CARD (stejný vzhled jako v appce Přehled na mobilu,
+     jen s trochu menšími odsazeními kvůli užšímu pravému panelu) ---------- */
   .notice-card{
-    background:#ffffff; color:#141414; border-radius:14px; padding:30px 22px 26px;
+    background:#ffffff; color:#141414; border-radius:14px; padding:22px 14px 20px;
     font-family:'Inter',sans-serif; text-align:center; width:100%; margin:0;
     box-shadow:0 14px 34px rgba(0,0,0,.35);
   }
-  .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:26px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
-  .notice-subtitle{color:#777; font-size:12.5px; margin:0 0 18px;}
-  .notice-subtitle-boticka{font-size:18.75px; font-weight:700; color:#333;}
-  .notice-number{color:#666; font-size:11px; letter-spacing:.03em; margin:-10px 0 18px; font-weight:800;}
+  .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:22px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
+  .notice-subtitle{color:#777; font-size:11.5px; margin:0 0 16px;}
+  .notice-subtitle-boticka{font-size:16px; font-weight:700; color:#333;}
+  .notice-number{color:#666; font-size:10.5px; letter-spacing:.03em; margin:-8px 0 16px; font-weight:800;}
   .notice-officer{font-weight:600; font-size:11px; color:#555; margin-bottom:4px;}
-  .notice-label{color:#999; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
+  .notice-label{color:#999; font-weight:700; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:7px;}
   .notice-platebox{
     display:inline-block; border:1.6px solid #181818; border-radius:10px;
-    padding:12px 26px; font-family:'Oswald',sans-serif; font-weight:700; font-size:30px;
-    letter-spacing:.04em; margin-bottom:16px;
+    padding:9px 16px; font-family:'Oswald',sans-serif; font-weight:700; font-size:23px;
+    letter-spacing:.03em; margin-bottom:14px;
   }
   .notice-vehicle{font-size:14px; color:#555; margin:-8px 0 18px; font-weight:600;}
   .notice-datetime{font-size:15.5px; margin-bottom:20px; color:#222;}
@@ -374,6 +376,7 @@
           <span></span>
           <span>SPZ</span>
           <span>Typ</span>
+          <span>Ulice</span>
           <span>Přestupek</span>
           <span>Stav</span>
           <span>Odesláno</span>
@@ -1612,14 +1615,20 @@
       doctype.textContent = isBoticka ? 'Botička' : 'Parkovačka';
       item.appendChild(doctype);
 
+      const addr = document.createElement('span');
+      addr.className = 'record-addr';
+      addr.textContent = r.address || '—';
+      item.appendChild(addr);
+
       const offense = document.createElement('span');
       offense.className = 'record-offense';
-      offense.innerHTML = (r.address ? '<span class="addr">' + escapeHtml(r.address) + ' ·</span>' : '') + escapeHtml(shortOffenseLabel(r.offenseLabel) || '—');
+      offense.textContent = shortOffenseLabel(r.offenseLabel) || '—';
+      if(r.offenseLabel) offense.title = r.offenseLabel;
       item.appendChild(offense);
 
       const status = document.createElement('span');
       status.className = 'record-status st-' + sKey;
-      status.innerHTML = '<span class="dot"></span>' + statusLabel[sKey];
+      status.innerHTML = '<span class="dot" title="' + escapeHtml(statusLabel[sKey]) + '"></span>';
       item.appendChild(status);
 
       const sentCol = document.createElement('span');
