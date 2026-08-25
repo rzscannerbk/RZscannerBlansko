@@ -144,7 +144,7 @@
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
   .list-head{
-    display:grid; grid-template-columns: 3px 112px 112px 1fr 176px 138px 60px;
+    display:grid; grid-template-columns: 3px 128px 108px 1fr 150px 148px 64px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
     font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
     color:var(--faint); border-bottom:1px solid var(--line);
@@ -153,33 +153,78 @@
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
   .record-item{
-    display:grid; grid-template-columns: 3px 112px 112px 1fr 176px 138px 60px;
-    align-items:center; padding:0 22px; height:58px; cursor:pointer;
-    border-bottom:1px solid var(--line-soft); position:relative;
+    display:grid; grid-template-columns: 3px 128px 108px 1fr 150px 148px 64px;
+    align-items:center; padding:9px 22px; min-height:74px; cursor:pointer;
+    border-bottom:1px solid var(--line-soft); position:relative; gap:0 10px;
   }
   .record-item:hover{background:var(--asphalt-2);}
   .record-item.selected{background:var(--asphalt-3);}
-  .record-item .stripe{width:3px; height:32px; border-radius:2px; background:#5D9CFF;}
+  .record-item.resolved{opacity:.5;}
+  .record-item.resolved:hover{opacity:.8;}
+  .record-item .stripe{width:3px; align-self:stretch; border-radius:2px; background:#5D9CFF;}
   .record-item.boticka .stripe{background:var(--amber);}
-  .record-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:14.5px; letter-spacing:.02em;}
+
+  .record-plate-col{display:flex; flex-direction:column; gap:3px;}
+  .record-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; letter-spacing:.02em;}
+  .record-notice-number{font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--faint); letter-spacing:.02em;}
+
   .record-doctype-badge{font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; width:fit-content; letter-spacing:.02em; color:#8FB6FF; background:rgba(93,156,255,.14);}
   .record-doctype-badge.boticka{color:var(--amber); background:var(--amber-glow);}
-  .record-offense{font-size:12.5px; color:#C7CBD3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:16px;}
-  .record-offense .addr{color:var(--faint); margin-right:6px;}
+
+  .record-offense{
+    font-size:12.5px; color:#C7CBD3; line-height:1.4; padding-right:16px;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .record-offense .addr{color:var(--faint); margin-right:5px;}
+
   .record-status{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);}
   .record-status .dot{width:7px; height:7px; border-radius:50%; flex:0 0 auto; background:var(--faint);}
   .record-status.st-oznameno .dot{background:#8FB6FF;}
   .record-status.st-prikaz .dot{background:var(--good);}
-  .record-time{font-family:'Roboto Mono',monospace; font-size:12px; color:var(--muted);}
+
+  .record-sent-col{display:flex; flex-direction:column; gap:3px;}
+  .record-sent-date{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint);}
+  .record-sent-time{font-family:'Roboto Mono',monospace; font-size:12px; color:var(--muted);}
+
   .record-thumb{
-    width:36px; height:36px; border-radius:8px; background:var(--asphalt-4); border:1px solid var(--line);
+    width:52px; height:52px; border-radius:9px; background:var(--asphalt-4); border:1px solid var(--line);
     overflow:hidden; display:flex; align-items:center; justify-content:center; justify-self:end;
-    color:var(--faint); font-size:14px; position:relative;
+    color:var(--faint); font-size:16px; position:relative; cursor:zoom-in;
   }
+  .record-thumb:hover{border-color:var(--faint);}
+  .record-thumb.empty{cursor:default;}
+  .record-thumb.loading{opacity:.5; cursor:wait;}
   .record-thumb img{width:100%; height:100%; object-fit:cover;}
   .record-thumb-count{
     position:absolute; right:2px; bottom:2px; background:rgba(0,0,0,.7); color:#fff;
     font-size:9px; font-weight:700; padding:0 4px; border-radius:7px; font-family:'Roboto Mono',monospace;
+  }
+
+  /* ---------- FULLSCREEN PROHLÍŽEČ FOTEK ---------- */
+  .lightbox-overlay{
+    display:none; position:fixed; inset:0; z-index:80; background:rgba(0,0,0,.92);
+    align-items:center; justify-content:center;
+  }
+  .lightbox-overlay.open{display:flex;}
+  .lightbox-img{max-width:88vw; max-height:88vh; border-radius:6px; box-shadow:0 20px 60px rgba(0,0,0,.6);}
+  .lightbox-close{
+    position:absolute; top:22px; right:26px; width:38px; height:38px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); color:#fff;
+    font-size:16px; cursor:pointer;
+  }
+  .lightbox-close:hover{background:rgba(255,255,255,.16);}
+  .lightbox-nav{
+    position:absolute; top:50%; transform:translateY(-50%); width:52px; height:52px; border-radius:50%;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); color:#fff;
+    font-size:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+  .lightbox-nav:hover{background:rgba(255,255,255,.16);}
+  .lightbox-nav.prev{left:26px;}
+  .lightbox-nav.next{right:26px;}
+  .lightbox-counter{
+    position:absolute; bottom:26px; left:50%; transform:translateX(-50%);
+    font-family:'Roboto Mono',monospace; font-size:12.5px; color:rgba(255,255,255,.7);
+    background:rgba(255,255,255,.08); padding:5px 12px; border-radius:20px;
   }
 
   /* ---------- DETAIL PANEL ---------- */
@@ -376,6 +421,14 @@
         <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
       </div>
     </div>
+  </div>
+
+  <div class="lightbox-overlay" id="lightboxOverlay">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Zavřít">✕</button>
+    <button class="lightbox-nav prev" id="lightboxPrev" aria-label="Předchozí fotka">‹</button>
+    <img class="lightbox-img" id="lightboxImg" alt="Fotodokumentace">
+    <button class="lightbox-nav next" id="lightboxNext" aria-label="Další fotka">›</button>
+    <div class="lightbox-counter" id="lightboxCounter"></div>
   </div>
 
 </div>
@@ -1279,38 +1332,111 @@
     }
   }
 
+  // Sdílené dotažení fotek záznamu (subkolekce Firestore) — používá ho
+  // jak líný náhled v řádku seznamu, tak fullscreen prohlížeč po kliknutí
+  // na náhled. Výsledek se cachuje na record._resolvedPhotos, ať appka
+  // fotky nedotahuje opakovaně.
+  async function ensurePhotosLoaded(record){
+    if(record._resolvedPhotos) return { photos: record._resolvedPhotos, mime: record._resolvedMime || 'image/jpeg' };
+    const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
+    const data = doc.exists ? doc.data() : null;
+    const photos = (data && data.photos) || [];
+    const mime = (data && data.photoMime) || 'image/jpeg';
+    record._resolvedPhotos = photos;
+    record._resolvedMime = mime;
+    return { photos, mime };
+  }
+
   async function loadThumbFor(thumbEl, record){
     try{
-      let photosB64 = record._resolvedPhotos;
-      let mime = record._resolvedMime || 'image/jpeg';
-      if(!photosB64){
-        const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
-        const data = doc.exists ? doc.data() : null;
-        photosB64 = (data && data.photos) || [];
-        mime = (data && data.photoMime) || 'image/jpeg';
-        record._resolvedPhotos = photosB64;
-        record._resolvedMime = mime;
-      }
-      if(!photosB64.length){
+      const { photos, mime } = await ensurePhotosLoaded(record);
+      if(!photos.length){
         thumbEl.innerHTML = '<span class="record-thumb-placeholder">—</span>';
         thumbEl.classList.add('empty');
         return;
       }
       const img = document.createElement('img');
-      img.src = 'data:' + mime + ';base64,' + photosB64[0];
+      img.src = 'data:' + mime + ';base64,' + photos[0];
       img.alt = 'Fotodokumentace';
       thumbEl.innerHTML = '';
       thumbEl.appendChild(img);
-      if(photosB64.length > 1){
+      if(photos.length > 1){
         const count = document.createElement('span');
         count.className = 'record-thumb-count';
-        count.textContent = '+' + (photosB64.length - 1);
+        count.textContent = '+' + (photos.length - 1);
         thumbEl.appendChild(count);
       }
     }catch(e){
       console.error('Náhled fotky se nepodařilo načíst:', e);
       thumbEl.innerHTML = '<span class="record-thumb-placeholder">?</span>';
     }
+  }
+
+  // ---------- Fullscreen prohlížeč fotek ----------
+  let lightboxPhotos = [];
+  let lightboxMime = 'image/jpeg';
+  let lightboxIndex = 0;
+
+  function renderLightbox(){
+    const img = document.getElementById('lightboxImg');
+    img.src = 'data:' + lightboxMime + ';base64,' + lightboxPhotos[lightboxIndex];
+    document.getElementById('lightboxCounter').textContent = (lightboxIndex + 1) + ' / ' + lightboxPhotos.length;
+    const multi = lightboxPhotos.length > 1;
+    document.getElementById('lightboxPrev').style.display = multi ? 'flex' : 'none';
+    document.getElementById('lightboxNext').style.display = multi ? 'flex' : 'none';
+    document.getElementById('lightboxCounter').style.display = multi ? 'block' : 'none';
+  }
+
+  async function openLightbox(record, thumbEl){
+    if(thumbEl) thumbEl.classList.add('loading');
+    try{
+      const { photos, mime } = await ensurePhotosLoaded(record);
+      if(thumbEl) thumbEl.classList.remove('loading');
+      if(!photos.length) return;
+      lightboxPhotos = photos;
+      lightboxMime = mime;
+      lightboxIndex = 0;
+      renderLightbox();
+      document.getElementById('lightboxOverlay').classList.add('open');
+    }catch(e){
+      if(thumbEl) thumbEl.classList.remove('loading');
+      console.error('Fullscreen náhled se nepodařilo otevřít:', e);
+    }
+  }
+
+  document.getElementById('lightboxOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'lightboxOverlay') closeLightbox();
+  });
+  document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+  document.getElementById('lightboxPrev').addEventListener('click', ()=>{
+    lightboxIndex = (lightboxIndex - 1 + lightboxPhotos.length) % lightboxPhotos.length;
+    renderLightbox();
+  });
+  document.getElementById('lightboxNext').addEventListener('click', ()=>{
+    lightboxIndex = (lightboxIndex + 1) % lightboxPhotos.length;
+    renderLightbox();
+  });
+  function closeLightbox(){
+    document.getElementById('lightboxOverlay').classList.remove('open');
+  }
+  document.addEventListener('keydown', (e)=>{
+    if(!document.getElementById('lightboxOverlay').classList.contains('open')) return;
+    if(e.key === 'Escape') closeLightbox();
+    if(e.key === 'ArrowLeft') document.getElementById('lightboxPrev').click();
+    if(e.key === 'ArrowRight') document.getElementById('lightboxNext').click();
+  });
+
+  // Zkracuje opakující se úvod řady kvalifikací přestupků ("Řidič nesmí
+  // zastavit a stát ..." / "Řidič smí zastavit a stát jen ...") jen pro
+  // zobrazení v řádku seznamu — appka tím ušetří místo, protože tahle
+  // fráze je naprosto stejná u drtivé většiny položek. Uložená data (a
+  // detail/tisk/export) zůstávají beze změny, zkracuje se jen tenhle
+  // jeden štítek v tabulce.
+  function shortOffenseLabel(label){
+    if(!label) return '';
+    return label
+      .replace(/^Řidič nesmí zastavit a stát /, '')
+      .replace(/^Řidič smí zastavit a stát jen /, '');
   }
 
   // ---------- Filtry (postranní panel + rychlé datumové karty) ----------
@@ -1461,16 +1587,25 @@
       const isBoticka = (r.docType || 'vyzva') === 'boticka';
 
       const item = document.createElement('div');
-      item.className = 'record-item' + (isBoticka ? ' boticka' : '') + (r.id === (currentDetailRecord && currentDetailRecord.id) ? ' selected' : '');
+      item.className = 'record-item' + (isBoticka ? ' boticka' : '') + (sKey !== 'pending' ? ' resolved' : '') + (r.id === (currentDetailRecord && currentDetailRecord.id) ? ' selected' : '');
 
       const stripe = document.createElement('span');
       stripe.className = 'stripe';
       item.appendChild(stripe);
 
+      const plateCol = document.createElement('span');
+      plateCol.className = 'record-plate-col';
       const plate = document.createElement('span');
       plate.className = 'record-plate mono';
       plate.textContent = r.plate || 'NEZNÁMÁ SPZ';
-      item.appendChild(plate);
+      plateCol.appendChild(plate);
+      if(r.noticeNumber){
+        const num = document.createElement('span');
+        num.className = 'record-notice-number';
+        num.textContent = r.noticeNumber;
+        plateCol.appendChild(num);
+      }
+      item.appendChild(plateCol);
 
       const doctype = document.createElement('span');
       doctype.className = 'record-doctype-badge' + (isBoticka ? ' boticka' : '');
@@ -1479,7 +1614,7 @@
 
       const offense = document.createElement('span');
       offense.className = 'record-offense';
-      offense.innerHTML = (r.address ? '<span class="addr">' + escapeHtml(r.address) + ' ·</span>' : '') + escapeHtml(r.offenseLabel || '—');
+      offense.innerHTML = (r.address ? '<span class="addr">' + escapeHtml(r.address) + ' ·</span>' : '') + escapeHtml(shortOffenseLabel(r.offenseLabel) || '—');
       item.appendChild(offense);
 
       const status = document.createElement('span');
@@ -1487,20 +1622,33 @@
       status.innerHTML = '<span class="dot"></span>' + statusLabel[sKey];
       item.appendChild(status);
 
-      const time = document.createElement('span');
-      time.className = 'record-time mono';
-      time.textContent = (r.time || '') + (r.officerName ? ' · ' + r.officerName.split(' ')[0] : '');
-      item.appendChild(time);
+      const sentCol = document.createElement('span');
+      sentCol.className = 'record-sent-col';
+      const sentDate = document.createElement('span');
+      sentDate.className = 'record-sent-date';
+      sentDate.textContent = formatDateCz(r.date);
+      sentCol.appendChild(sentDate);
+      const sentTime = document.createElement('span');
+      sentTime.className = 'record-sent-time';
+      sentTime.textContent = (r.time || '') + (r.officerName ? ' · ' + r.officerName.split(' ')[0] : '');
+      sentCol.appendChild(sentTime);
+      item.appendChild(sentCol);
 
       // Náhled fotky — dotahuje se líně, teprve když řádek vjede do
       // viewportu (viz IntersectionObserver / observeThumb níže), ať
-      // appka nezpomalí kvůli fotkám, které nikdo ani neuvidí.
+      // appka nezpomalí kvůli fotkám, které nikdo ani neuvidí. Kliknutí
+      // na náhled otevře fullscreen prohlížeč místo detailu záznamu.
       const thumb = document.createElement('div');
       thumb.className = 'record-thumb';
       if(r.hasPhotos){
         thumb.innerHTML = '<span class="record-thumb-placeholder">📷</span>';
         observeThumb(thumb, r);
+        thumb.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          openLightbox(r, thumb);
+        });
       } else {
+        thumb.classList.add('empty');
         thumb.innerHTML = '<span class="record-thumb-placeholder">—</span>';
       }
       item.appendChild(thumb);
