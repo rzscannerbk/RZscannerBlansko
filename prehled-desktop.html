@@ -3,12 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>RZ Scanner — Přehled</title>
+<title>RZ Scanner — Přehled (desktop)</title>
 <meta name="theme-color" content="#0A0C10">
-<meta name="apple-mobile-web-app-title" content="Přehled">
-<link rel="manifest" href="manifest-prehled.json">
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -25,179 +22,190 @@
     --asphalt:#0A0C10;
     --asphalt-2:#14171D;
     --asphalt-3:#1D2129;
+    --asphalt-4:#262B33;
     --ink:#111214;
     --amber:#FFB020;
     --amber-dim:#7A5713;
+    --amber-glow:rgba(255,176,32,.14);
     --text:#ECEDEF;
     --muted:#8B92A0;
+    --faint:#5A6270;
     --good:#33D399;
+    --good-glow:rgba(51,211,153,.13);
     --bad:#FF6058;
     --line:#262B33;
+    --line-soft:#1B1F27;
   }
-  /* Stejný skrytý světlý režim jako v index.html — volba se přebírá přes
-     localStorage (rzTheme), gesto se ovládá jen na úvodní obrazovce
-     appky, tady se jen respektuje. */
-  html.light-theme{
-    --asphalt:#F4F5F7;
-    --asphalt-2:#FFFFFF;
-    --asphalt-3:#ECEDF0;
-    --ink:#F4F5F7;
-    --amber:#C77800;
-    --amber-dim:#E8B26B;
-    --text:#14161A;
-    --muted:#5B6472;
-    --good:#0E9A6E;
-    --bad:#D4342A;
-    --line:#DDE1E6;
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{height:100%; overflow-x:hidden; max-width:100vw;}
+  *{box-sizing:border-box;}
+  html,body{height:100%; margin:0; overflow:hidden;}
   body{
-    margin:0; background:var(--asphalt); color:var(--text);
+    background:
+      radial-gradient(1200px 800px at 50% -10%, rgba(255,176,32,.05), transparent 60%),
+      var(--asphalt);
+    color:var(--text);
     font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
   }
-  #app{min-height:100dvh; display:flex; flex-direction:column; overflow-x:hidden;}
-  .screen{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100dvh)); display:none; flex-direction:column; overflow-x:hidden;}
-  .screen.active{display:flex;}
-
+  .mono{font-family:'Roboto Mono',monospace;}
   h1,h2{font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.02em; margin:0;}
 
+  #app{height:100vh; display:flex; flex-direction:column;}
+  .view{display:none; flex:1; min-height:0; flex-direction:column;}
+  .view.active{display:flex;}
+
   .btn{
-    padding:12px 20px; border-radius:14px; font-size:14.5px; font-weight:600;
-    border:none; cursor:pointer; font-family:inherit;
+    padding:10px 18px; border-radius:10px; font-size:13.5px; font-weight:600;
+    border:1px solid var(--line); cursor:pointer; font-family:inherit;
+    background:var(--asphalt-3); color:var(--text);
   }
-  .btn-primary{background:var(--amber); color:#241a00;}
-  .btn-ghost{background:transparent; border:1.5px solid var(--line); color:var(--text);}
-  .submit-note{margin-top:10px; text-align:center; font-size:12.5px; font-family:'Roboto Mono',monospace; display:none;}
+  .btn-primary{background:var(--amber); border-color:var(--amber); color:#241a00;}
+  .btn-ghost{background:transparent;}
+  .btn:hover{border-color:var(--faint);}
+  .btn-primary:hover{opacity:.92; border-color:var(--amber);}
+  .btn[disabled]{opacity:.5; pointer-events:none;}
+  .submit-note{margin-top:12px; text-align:center; font-size:12.5px; font-family:'Roboto Mono',monospace; display:none;}
   .submit-note.ok{color:var(--good);}
   .submit-note.err{color:var(--bad);}
-  .btn:active{transform:scale(.97);}
-  .btn[disabled]{opacity:.5; pointer-events:none;}
 
   /* ---------- LOGIN ---------- */
-  #loginScreen{align-items:center; justify-content:center; padding:32px;}
-  #loginScreen .login-box{width:100%; max-width:340px;}
+  #loginScreen.view.active{display:flex; align-items:center; justify-content:center; padding:32px;}
+  #loginScreen .login-box{
+    width:100%; max-width:400px; background:var(--asphalt-2); border:1px solid var(--line);
+    border-radius:20px; padding:40px 36px; box-shadow:0 24px 70px rgba(0,0,0,.5);
+  }
   #loginScreen h1{font-size:22px; text-transform:uppercase; margin-bottom:6px;}
-  #loginScreen p.hint{color:var(--muted); font-size:13px; line-height:1.5; margin:0 0 24px;}
-  .field{background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:14px;}
+  #loginScreen p.hint{color:var(--muted); font-size:13px; line-height:1.5; margin:0 0 26px;}
+  .field{background:var(--asphalt-3); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:14px;}
   .field label{display:block; font-size:10.5px; color:var(--muted); font-family:'Roboto Mono',monospace; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px;}
   .field input{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
   #loginError{color:var(--bad); font-size:12.5px; margin:10px 0 0; display:none; line-height:1.4;}
 
-  /* ---------- LIST ---------- */
-  #listScreen{overflow:hidden;}
-  .list-top{
+  /* ---------- TOPBAR ---------- */
+  .topbar{
+    height:64px; flex:0 0 64px; display:flex; align-items:center; gap:24px;
+    padding:0 26px; border-bottom:1px solid var(--line); background:var(--asphalt-2);
+  }
+  .brand{display:flex; align-items:baseline; gap:10px; flex:0 0 auto; text-decoration:none; color:inherit;}
+  .brand .mark{
+    width:30px; height:30px; border-radius:7px;
+    background:linear-gradient(155deg, var(--amber), #C4790E);
     display:flex; align-items:center; justify-content:center;
-    padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 14px; background:var(--asphalt-2);
-    border-bottom:1px solid var(--line);
+    font-family:'Roboto Mono',monospace; font-weight:700; font-size:12.5px; color:#1A1200;
   }
-  .list-top h1{
-    font-size:17px; text-transform:uppercase; text-align:center;
-    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  .brand .word{font-family:'Oswald',sans-serif; font-weight:600; font-size:15px; letter-spacing:.02em;}
+  .brand .word span{color:var(--muted); font-weight:400; font-family:'Inter',sans-serif; letter-spacing:0;}
+
+  .searchbox{
+    flex:1 1 auto; max-width:440px; display:flex; align-items:center; gap:9px;
+    background:var(--asphalt-3); border:1px solid var(--line); border-radius:9px;
+    padding:0 13px; height:37px;
   }
-  .list-bottom-bar{
-    flex-shrink:0;
-    display:flex; justify-content:space-between; align-items:center; gap:10px;
-    padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 14px);
-    background:var(--asphalt-2); border-top:1px solid var(--line);
+  .searchbox svg{flex:0 0 auto; opacity:.5;}
+  .searchbox input{background:none; border:none; outline:none; color:var(--text); font-family:inherit; font-size:13.5px; width:100%;}
+  .searchbox input::placeholder{color:var(--faint);}
+
+  .date-tabs{display:flex; gap:2px; background:var(--asphalt-3); border:1px solid var(--line); border-radius:8px; padding:3px; flex:0 0 auto;}
+  .date-tabs button{border:none; background:none; color:var(--muted); font-family:inherit; font-size:12.5px; font-weight:500; padding:6px 13px; border-radius:6px; cursor:pointer;}
+  .date-tabs button.active{background:var(--asphalt-4); color:var(--text);}
+
+  .topbar-spacer{flex:1;}
+  .backlink{color:var(--muted); font-size:13px; text-decoration:none; flex:0 0 auto; padding:8px 4px;}
+  .backlink:hover{color:var(--text);}
+  .shift-pill{display:flex; align-items:center; gap:9px; flex:0 0 auto; padding:5px 6px 5px 5px; border:1px solid var(--line); border-radius:20px; background:var(--asphalt-3);}
+  .shift-pill .avatar{
+    width:26px; height:26px; border-radius:50%; background:var(--amber-glow); color:var(--amber);
+    border:1px solid var(--amber-dim); display:flex; align-items:center; justify-content:center;
+    font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700;
   }
-  .list-bottom-btn{
-    flex:1 1 0; padding:12px 10px; border-radius:10px; font-family:'Inter',sans-serif;
-    font-weight:600; font-size:14px; cursor:pointer; text-decoration:none; text-align:center;
-    border:1.5px solid var(--line); color:var(--text); background:transparent;
+  .shift-pill .txt{font-size:12px; line-height:1.25;}
+  .shift-pill .txt b{display:block; font-weight:600;}
+  .shift-pill button.logout{
+    border:none; background:none; color:var(--faint); font-family:inherit; font-size:11px;
+    cursor:pointer; padding:4px 8px 4px 2px; text-decoration:underline;
   }
-  .list-bottom-btn.print{color:#5B8DEF; border-color:#5B8DEF;}
-  .list-bottom-btn.oznameni{color:#5B8DEF; border-color:#5B8DEF;}
-  .list-bottom-btn.resolve{color:var(--good); border-color:var(--good);}
-  .list-bottom-btn.resolve[disabled]{background:var(--good); color:#0A0C10; opacity:1;}
-  .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
-  .list-bottom-btn:active{transform:scale(.96);}
-  .confirm-overlay{
-    display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55);
-    align-items:center; justify-content:center; padding:24px;
+  .shift-pill button.logout:hover{color:var(--bad);}
+
+  /* ---------- BODY LAYOUT ---------- */
+  .body-row{flex:1; display:flex; min-height:0;}
+
+  /* ---------- RAIL ---------- */
+  .rail{width:230px; flex:0 0 230px; border-right:1px solid var(--line); background:var(--asphalt-2); padding:20px 14px; overflow-y:auto;}
+  .rail-group{margin-bottom:24px;}
+  .rail-title{font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); padding:0 10px 8px;}
+  .rail-item{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:7px; cursor:pointer; font-size:13.5px; color:#D7DAE1; margin-bottom:1px; border:none; background:none; width:100%; font-family:inherit; text-align:left;}
+  .rail-item:hover{background:var(--asphalt-3);}
+  .rail-item.active{background:var(--amber-glow); color:var(--amber); font-weight:600;}
+  .rail-item .label{display:flex; align-items:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rail-item .count{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint); background:var(--asphalt-4); border-radius:10px; padding:1px 7px; flex:0 0 auto; margin-left:8px;}
+  .rail-item.active .count{color:var(--amber); background:rgba(255,176,32,.16);}
+  .rail-item .dot{width:7px; height:7px; border-radius:50%; margin-right:9px; flex:0 0 auto;}
+  .rail-empty{color:var(--faint); font-size:12px; padding:6px 10px;}
+
+  /* ---------- LIST ---------- */
+  .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .list-head{
+    display:grid; grid-template-columns: 3px 112px 112px 1fr 176px 138px 60px;
+    padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
+    font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--faint); border-bottom:1px solid var(--line);
   }
-  .confirm-overlay.open{display:flex;}
-  .confirm-box{
-    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
-    padding:22px 20px; max-width:320px; width:100%; text-align:center;
-  }
-  .confirm-text{font-size:15.5px; color:var(--text); margin-bottom:18px; line-height:1.4;}
-  .confirm-btns{display:flex; gap:12px;}
-  .confirm-btns-col{flex-direction:column;}
-  .confirm-btn{
-    flex:1; padding:11px 12px; border-radius:10px; font-family:'Inter',sans-serif;
-    font-weight:600; font-size:14.5px; cursor:pointer; line-height:1.3;
-  }
-  .confirm-no{background:transparent; border:1.5px solid var(--line); color:var(--text);}
-  .confirm-yes{background:#2F6FED; border:1.5px solid #2F6FED; color:#fff;}
-  .confirm-cancel{background:transparent; border:none; color:var(--muted); font-size:13.5px; margin-top:4px;}
-  .detail-fixed-bottom{
-    flex-shrink:0;
-    background:var(--asphalt-2); border-top:1px solid var(--line);
-  }
-  .detail-fixed-bottom .list-bottom-bar{
-    position:static; background:transparent; border-top:none;
-  }
-  .detail-fixed-bottom .submit-note{margin:10px 18px 0;}
-  .search-row{padding:14px 18px 0;}
-  .search-row input{
-    width:100%; background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px;
-    padding:11px 14px; color:var(--text); font-size:14.5px; font-family:inherit; outline:none;
-  }
-  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px 20px;}
+  #listBody{flex:1; overflow-y:auto;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
+
   .record-item{
-    position:relative; background:rgba(91,141,239,.07); border:1.5px solid rgba(91,141,239,.55);
-    border-radius:14px; padding:14px 16px 12px; margin-bottom:14px; cursor:pointer; overflow:hidden;
+    display:grid; grid-template-columns: 3px 112px 112px 1fr 176px 138px 60px;
+    align-items:center; padding:0 22px; height:58px; cursor:pointer;
+    border-bottom:1px solid var(--line-soft); position:relative;
   }
-  .record-item.boticka{background:rgba(255,176,32,.07); border-color:rgba(255,176,32,.55);}
-  .record-item:active{transform:scale(.98);}
-  .record-item.resolved{background:rgba(51,211,153,.07); border-color:rgba(51,211,153,.5); opacity:.75;}
-  .record-top-row{display:flex; flex-direction:column; gap:6px;}
-  .record-notice-number{
-    font-family:'Roboto Mono',monospace; font-size:10px; color:var(--muted);
-    letter-spacing:.03em; white-space:nowrap;
+  .record-item:hover{background:var(--asphalt-2);}
+  .record-item.selected{background:var(--asphalt-3);}
+  .record-item .stripe{width:3px; height:32px; border-radius:2px; background:#5D9CFF;}
+  .record-item.boticka .stripe{background:var(--amber);}
+  .record-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:14.5px; letter-spacing:.02em;}
+  .record-doctype-badge{font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; width:fit-content; letter-spacing:.02em; color:#8FB6FF; background:rgba(93,156,255,.14);}
+  .record-doctype-badge.boticka{color:var(--amber); background:var(--amber-glow);}
+  .record-offense{font-size:12.5px; color:#C7CBD3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:16px;}
+  .record-offense .addr{color:var(--faint); margin-right:6px;}
+  .record-status{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted);}
+  .record-status .dot{width:7px; height:7px; border-radius:50%; flex:0 0 auto; background:var(--faint);}
+  .record-status.st-oznameno .dot{background:#8FB6FF;}
+  .record-status.st-prikaz .dot{background:var(--good);}
+  .record-time{font-family:'Roboto Mono',monospace; font-size:12px; color:var(--muted);}
+  .record-thumb{
+    width:36px; height:36px; border-radius:8px; background:var(--asphalt-4); border:1px solid var(--line);
+    overflow:hidden; display:flex; align-items:center; justify-content:center; justify-self:end;
+    color:var(--faint); font-size:14px; position:relative;
   }
-  .record-plate-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-  .record-plate{font-family:'Oswald',sans-serif; font-weight:600; font-size:20px; letter-spacing:.05em;}
-  .record-resolved-badge{
-    font-size:10px; font-weight:700; color:var(--good); text-transform:uppercase; letter-spacing:.05em;
-    border:1px solid var(--good); border-radius:20px; padding:3px 8px;
+  .record-thumb img{width:100%; height:100%; object-fit:cover;}
+  .record-thumb-count{
+    position:absolute; right:2px; bottom:2px; background:rgba(0,0,0,.7); color:#fff;
+    font-size:9px; font-weight:700; padding:0 4px; border-radius:7px; font-family:'Roboto Mono',monospace;
   }
-  .record-doctype-badge{
-    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
-    padding:3px 8px; border-radius:20px; color:#5B8DEF; border:1px solid #5B8DEF;
-  }
-  .record-doctype-badge.boticka{color:var(--amber); border-color:var(--amber);}
-  .record-meta{
-    font-family:'Roboto Mono',monospace; font-size:11.5px; color:var(--muted);
-    margin-top:8px; letter-spacing:.02em; overflow-wrap:anywhere;
-  }
-  .record-offense{
-    font-size:13.5px; color:var(--text); margin-top:10px; padding-top:10px;
-    border-top:1px solid var(--line); line-height:1.4; overflow-wrap:anywhere;
-  }
-  .record-footer{
-    display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:4px 12px;
-    margin-top:10px; padding-top:9px; border-top:1px solid var(--line);
-  }
-  .record-officer{font-size:11.5px; color:var(--text); font-weight:600;}
-  .record-submitted{font-size:10.5px; color:var(--muted); overflow-wrap:anywhere; text-align:right;}
 
-  /* ---------- DETAIL ---------- */
-  #detailScreen{background:#111;}
-  .detail-top{
-    display:flex; align-items:center; justify-content:center; gap:10px;
-    padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 14px; background:var(--asphalt-2);
-    border-bottom:1px solid var(--line);
-  }
-  .detail-top span{font-size:18px !important; letter-spacing:.08em;}
-  #detailPreviewWrap{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 22px;}
+  /* ---------- DETAIL PANEL ---------- */
+  .panel{width:440px; flex:0 0 440px; border-left:1px solid var(--line); background:var(--asphalt-2); display:flex; flex-direction:column;}
+  .panel-empty{flex:1; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:13.5px; text-align:center; padding:30px;}
+  .panel-content{flex:1; display:flex; flex-direction:column; min-height:0;}
+  .panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--line); flex:0 0 auto;}
+  .panel-head .id{font-size:12px; color:var(--faint);}
+  .panel-head button{background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:13px;}
+  .panel-head button:hover{color:var(--text); border-color:var(--faint);}
+  #detailPreviewWrap{flex:1; overflow-y:auto; padding:22px 20px; background:transparent;}
+  .panel-actions{display:flex; gap:9px; padding:16px 20px; border-top:1px solid var(--line); flex:0 0 auto;}
+  .panel-actions .btn{flex:1;}
 
-  /* ---------- NOTICE CARD (same look used in the app's own preview) ---------- */
+  .status-line{
+    display:flex; align-items:center; gap:9px; margin-top:18px; padding:11px 13px; border-radius:9px;
+    background:var(--asphalt-3); border:1px solid var(--line); font-size:12.5px; color:var(--muted); font-weight:600;
+  }
+  .status-line.ok{background:var(--good-glow); border-color:rgba(51,211,153,.25); color:var(--good);}
+  .status-line .dot{width:7px; height:7px; border-radius:50%; background:currentColor;}
+
+  /* ---------- NOTICE CARD (stejný vzhled jako v appce Přehled na mobilu) ---------- */
   .notice-card{
     background:#ffffff; color:#141414; border-radius:14px; padding:30px 22px 26px;
-    font-family:'Inter',sans-serif; text-align:center; max-width:440px; margin:0 auto;
+    font-family:'Inter',sans-serif; text-align:center; width:100%; margin:0;
+    box-shadow:0 14px 34px rgba(0,0,0,.35);
   }
   .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:26px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
   .notice-subtitle{color:#777; font-size:12.5px; margin:0 0 18px;}
@@ -226,84 +234,146 @@
   .notice-footer .authority-phone{font-size:9.5px; color:#999; margin-top:2px;}
   .notice-footer .generated-by{font-size:9.5px; color:#aaa; margin-top:10px;}
 
-  .photo-toggle-row{text-align:center; margin-top:20px;}
-  .photo-toggle-row .btn-ghost{color:#fff; border-color:rgba(255,255,255,.45);}
-  .notice-photo-wrap{margin-top:14px; display:none; max-width:440px; margin-left:auto; margin-right:auto;}
-  .notice-photo-wrap.open{display:block;}
-  .photo-item{margin-bottom:20px;}
+  .photo-toggle-row{display:none !important;}
+  .notice-photo-wrap{margin-top:18px; display:block;}
+  .photo-item{margin-bottom:14px;}
   .photo-item:last-child{margin-bottom:0;}
   .photo-item img{width:100%; border-radius:12px; display:block;}
   .photo-item a.download-link, .photo-item button.download-link{
-    display:block; width:100%; text-align:center; margin-top:8px; font-size:12.5px;
-    color:#fff; text-decoration:underline; background:none; border:none;
-    font-family:inherit; cursor:pointer; padding:6px 0;
+    display:block; width:100%; text-align:center; margin-top:6px; font-size:12px;
+    color:var(--muted); text-decoration:underline; background:none; border:none;
+    font-family:inherit; cursor:pointer; padding:5px 0;
   }
 
+  /* ---------- DOŘEŠIT dialog (beze změny oproti appce na mobilu) ---------- */
+  .confirm-overlay{
+    display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55);
+    align-items:center; justify-content:center; padding:24px;
+  }
+  .confirm-overlay.open{display:flex;}
+  .confirm-box{
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
+    padding:22px 20px; max-width:320px; width:100%; text-align:center;
+  }
+  .confirm-text{font-size:15.5px; color:var(--text); margin-bottom:18px; line-height:1.4;}
+  .confirm-btns{display:flex; gap:12px;}
+  .confirm-btns-col{flex-direction:column;}
+  .confirm-btn{
+    flex:1; padding:11px 12px; border-radius:10px; font-family:'Inter',sans-serif;
+    font-weight:600; font-size:14.5px; cursor:pointer; line-height:1.3; border:none;
+  }
+  .confirm-no{background:transparent; border:1.5px solid var(--line); color:var(--text);}
+  .confirm-no:hover{border-color:var(--faint);}
+  .confirm-yes{background:#2F6FED; border:1.5px solid #2F6FED; color:#fff;}
+  .confirm-yes:hover{opacity:.9;}
+  .confirm-cancel{background:transparent; border:none; color:var(--muted); font-size:13.5px; margin-top:4px; cursor:pointer; font-family:inherit;}
+
+  ::-webkit-scrollbar{width:9px; height:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--asphalt-4); border-radius:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
 </style>
 </head>
 <body>
 <div id="app">
 
   <!-- LOGIN -->
-  <div id="loginScreen" class="screen active">
+  <div id="loginScreen" class="view active">
     <div class="login-box">
       <h1>RZ Scanner</h1>
-      <p class="hint">Přehled odeslaných přestupků. Přihlaste se svým účtem.</p>
+      <p class="hint">Přehled odeslaných přestupků — desktopová verze. Přihlaste se svým účtem.</p>
       <div class="field"><label>E-mail</label><input type="email" id="loginEmail" autocapitalize="off" autocomplete="username"></div>
       <div class="field"><label>Heslo</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
       <button class="btn btn-primary" id="loginSubmitBtn" style="width:100%;">Přihlásit se</button>
       <div id="loginError"></div>
-      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="btn btn-ghost" style="width:100%; display:block; box-sizing:border-box; text-align:center; text-decoration:none; margin-top:12px;">Zpět</a>
+      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="btn btn-ghost" style="width:100%; display:block; box-sizing:border-box; text-align:center; text-decoration:none; margin-top:12px;">Zpět na RZ Scanner</a>
     </div>
   </div>
 
-  <!-- LIST -->
-  <div id="listScreen" class="screen">
-    <div class="list-top">
-      <h1 id="listTitle">Přehled přestupků</h1>
-    </div>
-    <div class="search-row">
-      <input type="text" id="searchInput" placeholder="Hledat podle RZ nebo ulice…" autocomplete="off">
-    </div>
-    <div id="listBody">
-      <div class="list-empty" id="listStatus">Načítám…</div>
-    </div>
-    <div class="list-bottom-bar">
-      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="list-bottom-btn back">Zpět</a>
-    </div>
-  </div>
+  <!-- MAIN -->
+  <div id="mainScreen" class="view">
 
-  <!-- DETAIL -->
-  <div id="detailScreen" class="screen">
-    <div class="detail-top">
-      <span style="font-family:'Roboto Mono',monospace; font-size:12px; color:var(--muted); letter-spacing:.05em;" id="detailPlateLabel">DETAIL</span>
-    </div>
-    <div id="detailPreviewWrap">
-      <div id="noticeCardContainer"></div>
-      <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
-        <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
+    <div class="topbar">
+      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="brand">
+        <div class="mark">RZ</div>
+        <div class="word">RZ SCANNER <span>· Přehled</span></div>
+      </a>
+
+      <div class="searchbox">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="searchInput" placeholder="Hledat SPZ, adresu, číslo jednací nebo strážníka…" autocomplete="off">
       </div>
-      <div class="notice-photo-wrap" id="photoWrap">
-        <div id="photoGallery"></div>
+
+      <div class="date-tabs" id="dateTabs">
+        <button data-range="today">Dnes</button>
+        <button data-range="week">Týden</button>
+        <button data-range="all" class="active">Vše</button>
+      </div>
+
+      <div class="topbar-spacer"></div>
+
+      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="backlink">Zpět na RZ Scanner</a>
+
+      <div class="shift-pill">
+        <div class="avatar" id="shiftAvatar">—</div>
+        <div class="txt"><b id="shiftName">—</b></div>
+        <button class="logout" id="logoutBtn">Odhlásit</button>
       </div>
     </div>
-    <div class="detail-fixed-bottom">
-      <div class="submit-note" id="detailNote"></div>
-      <div class="list-bottom-bar">
-        <button class="list-bottom-btn print" id="printBtn" title="Vytisknout">Tisk</button>
-        <button class="list-bottom-btn resolve" id="resolveMenuBtn">Dořešit</button>
-        <button class="list-bottom-btn back" id="detailCloseBtn">Zpět</button>
-      </div>
-    </div>
-    <div class="confirm-overlay" id="resolveMenuOverlay">
-      <div class="confirm-box">
-        <div class="confirm-text">Co chceš udělat?</div>
-        <div class="confirm-btns confirm-btns-col">
-          <button class="confirm-btn confirm-no" id="menuOznameniBtn">Oznámení</button>
-          <button class="confirm-btn confirm-no" id="menuVyzvaBtn">Výzva</button>
-          <button class="confirm-btn confirm-yes" id="menuVyresenoBtn">Příkaz na místě</button>
-          <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
+
+    <div class="body-row">
+
+      <div class="rail" id="rail"></div>
+
+      <div class="list-area">
+        <div class="list-head">
+          <span></span>
+          <span>SPZ</span>
+          <span>Typ</span>
+          <span>Přestupek</span>
+          <span>Stav</span>
+          <span>Odesláno</span>
+          <span></span>
         </div>
+        <div id="listBody">
+          <div class="list-empty" id="listStatus">Načítám…</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-empty" id="panelEmpty">Vyber přestupek ze seznamu vlevo.</div>
+        <div class="panel-content" id="panelContent" style="display:none;">
+          <div class="panel-head">
+            <span class="id mono" id="detailPlateLabel">DETAIL</span>
+            <button id="detailCloseBtn" aria-label="Zavřít">✕</button>
+          </div>
+          <div id="detailPreviewWrap">
+            <div id="noticeCardContainer"></div>
+            <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
+              <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
+            </div>
+            <div class="notice-photo-wrap" id="photoWrap">
+              <div id="photoGallery"></div>
+            </div>
+            <div class="submit-note" id="detailNote"></div>
+          </div>
+          <div class="panel-actions">
+            <button class="btn" id="printBtn" title="Vytisknout">🖨 Tisk</button>
+            <button class="btn" id="resolveMenuBtn">Dořešit</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="confirm-overlay" id="resolveMenuOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text">Co chceš udělat?</div>
+      <div class="confirm-btns confirm-btns-col">
+        <button class="confirm-btn confirm-no" id="menuOznameniBtn">Oznámení</button>
+        <button class="confirm-btn confirm-no" id="menuVyzvaBtn">Výzva</button>
+        <button class="confirm-btn confirm-yes" id="menuVyresenoBtn">Příkaz na místě</button>
+        <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
       </div>
     </div>
   </div>
@@ -348,8 +418,7 @@
 
   const screens = {
     login: document.getElementById('loginScreen'),
-    list: document.getElementById('listScreen'),
-    detail: document.getElementById('detailScreen'),
+    main: document.getElementById('mainScreen'),
   };
   function show(name){
     Object.values(screens).forEach(s=>s.classList.remove('active'));
@@ -375,7 +444,11 @@
   // ---------- Auth ----------
   auth.onAuthStateChanged(user=>{
     if(user){
-      show('list');
+      show('main');
+      const name = user.email || '';
+      const initials = name.slice(0, 2).toUpperCase();
+      document.getElementById('shiftAvatar').textContent = initials || '—';
+      document.getElementById('shiftName').textContent = name || '—';
       loadRecords();
     } else {
       show('login');
@@ -409,28 +482,12 @@
     if(e.key === 'Enter') document.getElementById('loginSubmitBtn').click();
   });
 
-  // Skrytý odhlašovací gesto: podržení nadpisu "Přehled přestupků" 4 s.
-  // Žádné tlačítko odhlášení v UI záměrně není — appka je sdílená mezi
-  // strážníky na jednom telefonu, takže odhlášení nemá být na první pohled
-  // dostupné/omylem stisknutelné.
-  (function setupHiddenLogout(){
-    const titleEl = document.getElementById('listTitle');
-    if(!titleEl) return;
-    let holdTimer = null;
-    function start(){
-      cancel();
-      holdTimer = setTimeout(()=>{ auth.signOut(); }, 4000);
-    }
-    function cancel(){
-      if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
-    }
-    titleEl.addEventListener('touchstart', start, { passive: true });
-    titleEl.addEventListener('touchend', cancel);
-    titleEl.addEventListener('touchcancel', cancel);
-    titleEl.addEventListener('mousedown', start);
-    titleEl.addEventListener('mouseup', cancel);
-    titleEl.addEventListener('mouseleave', cancel);
-  })();
+  // Na desktopu appku neobsluhuje jen jedna sdílená osoba, co appku drží v
+  // ruce (jako na mobilu) — odhlášení tu proto může být rovnou viditelné
+  // tlačítko místo skrytého gesta.
+  document.getElementById('logoutBtn').addEventListener('click', ()=>{
+    if(confirm('Opravdu se chceš odhlásit?')) auth.signOut();
+  });
 
   // ---------- List ----------
   async function loadRecords(){
@@ -462,9 +519,8 @@
       console.log('[diagnostika] fetch:', Math.round(t1-t0), 'ms, počet záznamů:', allRecords.length,
         ', celková velikost payloadu:', totalKB, 'KB, z toho staré vložené fotky:', legacyKB, 'KB v', legacyCount, 'záznamech');
 
+      renderRail();
       renderList(document.getElementById('searchInput').value);
-
-      const t2 = performance.now();
       const diag = document.createElement('div');
       diag.style.cssText = 'text-align:center; color:var(--muted); font-size:10.5px; font-family:monospace; margin-top:14px; opacity:.7; overflow-wrap:anywhere;';
       diag.textContent = 'Diagnostika: fetch ' + Math.round(t1-t0) + ' ms, render ' + Math.round(t2-t1) + ' ms, ' +
@@ -1196,17 +1252,194 @@
   }
 
 
+  // ---------- Lazy náhledy fotek v seznamu (jen desktop) ----------
+  // Na mobilu je .record-thumb schovaný přes display:none, takže sem
+  // IntersectionObserver kvůli chybějícímu layoutu vůbec nic nepošle —
+  // appka tak na mobilu žádné fotky navíc nedotahuje (viz poznámka o
+  // rychlosti seznamu u loadAndShowPhotos výše). Na desktopu se náhled
+  // fotky dotáhne, teprve když řádek doopravdy vjede do viewportu.
+  const thumbObserver = ('IntersectionObserver' in window)
+    ? new IntersectionObserver((entries)=>{
+        entries.forEach(entry=>{
+          if(!entry.isIntersecting) return;
+          const el = entry.target;
+          thumbObserver.unobserve(el);
+          loadThumbFor(el, el.__record);
+        });
+      }, { rootMargin: '200px' })
+    : null;
+
+  function observeThumb(thumbEl, record){
+    thumbEl.__record = record;
+    if(thumbObserver){
+      thumbObserver.observe(thumbEl);
+    } else {
+      // Prohlížeč bez IntersectionObserver (vzácné) — rovnou dotáhnout.
+      loadThumbFor(thumbEl, record);
+    }
+  }
+
+  async function loadThumbFor(thumbEl, record){
+    try{
+      let photosB64 = record._resolvedPhotos;
+      let mime = record._resolvedMime || 'image/jpeg';
+      if(!photosB64){
+        const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
+        const data = doc.exists ? doc.data() : null;
+        photosB64 = (data && data.photos) || [];
+        mime = (data && data.photoMime) || 'image/jpeg';
+        record._resolvedPhotos = photosB64;
+        record._resolvedMime = mime;
+      }
+      if(!photosB64.length){
+        thumbEl.innerHTML = '<span class="record-thumb-placeholder">—</span>';
+        thumbEl.classList.add('empty');
+        return;
+      }
+      const img = document.createElement('img');
+      img.src = 'data:' + mime + ';base64,' + photosB64[0];
+      img.alt = 'Fotodokumentace';
+      thumbEl.innerHTML = '';
+      thumbEl.appendChild(img);
+      if(photosB64.length > 1){
+        const count = document.createElement('span');
+        count.className = 'record-thumb-count';
+        count.textContent = '+' + (photosB64.length - 1);
+        thumbEl.appendChild(count);
+      }
+    }catch(e){
+      console.error('Náhled fotky se nepodařilo načíst:', e);
+      thumbEl.innerHTML = '<span class="record-thumb-placeholder">?</span>';
+    }
+  }
+
+  // ---------- Filtry (postranní panel + rychlé datumové karty) ----------
+  let filterStatus = 'all';   // 'all' | 'pending' | 'oznameni' | 'prikaz'
+  let filterType = 'all';     // 'all' | 'vyzva' | 'boticka'
+  let filterOfficer = 'all';  // 'all' | jméno strážníka
+  let filterRange = 'all';    // 'all' | 'today' | 'week'
+
+  function recordStatusKey(r){
+    if(!r.resolved) return 'pending';
+    if(r.resolvedMethod === 'oznameni') return 'oznameni';
+    if(r.resolvedMethod === 'prikaz') return 'prikaz';
+    return 'prikaz'; // starší záznamy bez uloženého resolvedMethod
+  }
+
+  function passesFilters(r){
+    if(filterStatus !== 'all' && recordStatusKey(r) !== filterStatus) return false;
+    if(filterType !== 'all' && (r.docType || 'vyzva') !== filterType) return false;
+    if(filterOfficer !== 'all' && r.officerName !== filterOfficer) return false;
+    if(filterRange !== 'all'){
+      if(!r.date) return false;
+      const today = todayCz ? todayIso() : new Date().toISOString().slice(0,10);
+      if(filterRange === 'today' && r.date !== today) return false;
+      if(filterRange === 'week'){
+        const d = new Date(r.date + 'T00:00:00');
+        const now = new Date(); now.setHours(0,0,0,0);
+        const diffDays = Math.round((now - d) / 86400000);
+        if(isNaN(diffDays) || diffDays < 0 || diffDays > 6) return false;
+      }
+    }
+    return true;
+  }
+
+  function todayIso(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  }
+
+  function renderRail(){
+    const rail = document.getElementById('rail');
+    const base = allRecords; // počty vždy z celé sady, ne z aktuálně filtrovaného pohledu
+    const statusCounts = { pending:0, oznameni:0, prikaz:0 };
+    const typeCounts = { vyzva:0, boticka:0 };
+    const officerCounts = {};
+    base.forEach(r=>{
+      statusCounts[recordStatusKey(r)]++;
+      typeCounts[(r.docType || 'vyzva') === 'boticka' ? 'boticka' : 'vyzva']++;
+      if(r.officerName) officerCounts[r.officerName] = (officerCounts[r.officerName] || 0) + 1;
+    });
+    const officers = Object.keys(officerCounts).sort((a,b)=> officerCounts[b]-officerCounts[a]);
+
+    function item(label, count, active, onClick, dotColor){
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'rail-item' + (active ? ' active' : '');
+      el.innerHTML = (dotColor ? '<span class="dot" style="background:' + dotColor + '"></span>' : '') + '<span class="label">' + escapeHtml(label) + '</span>';
+      const countEl = document.createElement('span');
+      countEl.className = 'count';
+      countEl.textContent = count;
+      el.appendChild(countEl);
+      el.addEventListener('click', onClick);
+      return el;
+    }
+    function group(title){
+      const g = document.createElement('div');
+      g.className = 'rail-group';
+      const t = document.createElement('div');
+      t.className = 'rail-title';
+      t.textContent = title;
+      g.appendChild(t);
+      return g;
+    }
+
+    rail.innerHTML = '';
+
+    const gStatus = group('Stav');
+    gStatus.appendChild(item('Vše', base.length, filterStatus === 'all', ()=>{ filterStatus='all'; refreshView(); }));
+    gStatus.appendChild(item('Nevyřešené', statusCounts.pending, filterStatus === 'pending', ()=>{ filterStatus='pending'; refreshView(); }, 'var(--faint)'));
+    gStatus.appendChild(item('Oznámeno', statusCounts.oznameni, filterStatus === 'oznameni', ()=>{ filterStatus='oznameni'; refreshView(); }, '#8FB6FF'));
+    gStatus.appendChild(item('Dořešeno příkazem', statusCounts.prikaz, filterStatus === 'prikaz', ()=>{ filterStatus='prikaz'; refreshView(); }, 'var(--good)'));
+    rail.appendChild(gStatus);
+
+    const gType = group('Typ dokumentu');
+    gType.appendChild(item('Parkovačka', typeCounts.vyzva, filterType === 'vyzva', ()=>{ filterType = filterType==='vyzva' ? 'all' : 'vyzva'; refreshView(); }));
+    gType.appendChild(item('Botička', typeCounts.boticka, filterType === 'boticka', ()=>{ filterType = filterType==='boticka' ? 'all' : 'boticka'; refreshView(); }));
+    rail.appendChild(gType);
+
+    const gOfficer = group('Strážník');
+    if(officers.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'rail-empty';
+      empty.textContent = 'Zatím žádné záznamy';
+      gOfficer.appendChild(empty);
+    } else {
+      officers.forEach(name=>{
+        gOfficer.appendChild(item(name, officerCounts[name], filterOfficer === name, ()=>{ filterOfficer = filterOfficer===name ? 'all' : name; refreshView(); }));
+      });
+    }
+    rail.appendChild(gOfficer);
+  }
+
+  function refreshView(){
+    renderRail();
+    renderList(document.getElementById('searchInput').value);
+  }
+
+  document.getElementById('dateTabs').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-range]');
+    if(!btn) return;
+    filterRange = btn.dataset.range;
+    document.querySelectorAll('#dateTabs button').forEach(b=>b.classList.toggle('active', b === btn));
+    refreshView();
+  });
+
   function renderList(filterText){
     const container = document.getElementById('listBody');
     const statusEl = document.getElementById('listStatus');
     const q = (filterText || '').trim().toLowerCase();
 
-    const filtered = !q ? allRecords : allRecords.filter(r=>
-      (r.plate || '').toLowerCase().includes(q) ||
-      (r.address || '').toLowerCase().includes(q) ||
-      (r.noticeNumber || '').toLowerCase().includes(q) ||
-      (r.officerName || '').toLowerCase().includes(q)
-    );
+    let filtered = allRecords.filter(passesFilters);
+    if(q){
+      filtered = filtered.filter(r=>
+        (r.plate || '').toLowerCase().includes(q) ||
+        (r.address || '').toLowerCase().includes(q) ||
+        (r.noticeNumber || '').toLowerCase().includes(q) ||
+        (r.officerName || '').toLowerCase().includes(q)
+      );
+    }
 
     container.innerHTML = '';
     if(allRecords.length === 0){
@@ -1215,79 +1448,68 @@
       return;
     }
     if(filtered.length === 0){
-      statusEl.textContent = 'Žádná shoda pro „' + filterText + '“.';
+      statusEl.textContent = q ? ('Žádná shoda pro „' + filterText + '“.') : 'Žádné záznamy neodpovídají zvolenému filtru.';
       container.appendChild(statusEl);
       return;
     }
 
+    const statusLabel = { pending:'Nevyřešeno', oznameni:'Oznámeno', prikaz:'Dořešeno příkazem' };
+    const statusDot = { pending:'var(--faint)', oznameni:'#8FB6FF', prikaz:'var(--good)' };
+
     filtered.forEach(r=>{
+      const sKey = recordStatusKey(r);
+      const isBoticka = (r.docType || 'vyzva') === 'boticka';
+
       const item = document.createElement('div');
-      item.className = 'record-item' + (r.resolved ? ' resolved' : '') + (r.docType === 'boticka' ? ' boticka' : '');
+      item.className = 'record-item' + (isBoticka ? ' boticka' : '') + (r.id === (currentDetailRecord && currentDetailRecord.id) ? ' selected' : '');
 
-      const topRow = document.createElement('div');
-      topRow.className = 'record-top-row';
+      const stripe = document.createElement('span');
+      stripe.className = 'stripe';
+      item.appendChild(stripe);
 
-      const plateRow = document.createElement('div');
-      plateRow.className = 'record-plate-row';
-
-      const plate = document.createElement('div');
-      plate.className = 'record-plate';
+      const plate = document.createElement('span');
+      plate.className = 'record-plate mono';
       plate.textContent = r.plate || 'NEZNÁMÁ SPZ';
-      plateRow.appendChild(plate);
+      item.appendChild(plate);
 
-      const docTypeBadge = document.createElement('div');
-      docTypeBadge.className = 'record-doctype-badge' + (r.docType === 'boticka' ? ' boticka' : '');
-      docTypeBadge.textContent = r.docType === 'boticka' ? 'Botička' : 'Parkovačka';
-      plateRow.appendChild(docTypeBadge);
+      const doctype = document.createElement('span');
+      doctype.className = 'record-doctype-badge' + (isBoticka ? ' boticka' : '');
+      doctype.textContent = isBoticka ? 'Botička' : 'Parkovačka';
+      item.appendChild(doctype);
 
-      if(r.resolved){
-        const badge = document.createElement('div');
-        badge.className = 'record-resolved-badge';
-        badge.textContent = r.resolvedMethod === 'oznameni' ? 'Oznámeno'
-          : r.resolvedMethod === 'prikaz' ? 'Dořešeno příkazem'
-          : 'Dořešeno';
-        plateRow.appendChild(badge);
+      const offense = document.createElement('span');
+      offense.className = 'record-offense';
+      offense.innerHTML = (r.address ? '<span class="addr">' + escapeHtml(r.address) + ' ·</span>' : '') + escapeHtml(r.offenseLabel || '—');
+      item.appendChild(offense);
+
+      const status = document.createElement('span');
+      status.className = 'record-status st-' + sKey;
+      status.innerHTML = '<span class="dot"></span>' + statusLabel[sKey];
+      item.appendChild(status);
+
+      const time = document.createElement('span');
+      time.className = 'record-time mono';
+      time.textContent = (r.time || '') + (r.officerName ? ' · ' + r.officerName.split(' ')[0] : '');
+      item.appendChild(time);
+
+      // Náhled fotky — dotahuje se líně, teprve když řádek vjede do
+      // viewportu (viz IntersectionObserver / observeThumb níže), ať
+      // appka nezpomalí kvůli fotkám, které nikdo ani neuvidí.
+      const thumb = document.createElement('div');
+      thumb.className = 'record-thumb';
+      if(r.hasPhotos){
+        thumb.innerHTML = '<span class="record-thumb-placeholder">📷</span>';
+        observeThumb(thumb, r);
+      } else {
+        thumb.innerHTML = '<span class="record-thumb-placeholder">—</span>';
       }
-      topRow.appendChild(plateRow);
+      item.appendChild(thumb);
 
-      if(r.noticeNumber){
-        const num = document.createElement('div');
-        num.className = 'record-notice-number';
-        num.textContent = r.noticeNumber;
-        topRow.appendChild(num);
-      }
-      item.appendChild(topRow);
-
-      const meta = document.createElement('div');
-      meta.className = 'record-meta';
-      meta.textContent = (r.time || '') + ' · ' + formatDateCz(r.date) + (r.address ? ' · ' + r.address : '');
-      item.appendChild(meta);
-
-      if(r.offenseLabel){
-        const off = document.createElement('div');
-        off.className = 'record-offense';
-        off.textContent = r.offenseLabel;
-        item.appendChild(off);
-      }
-
-      const footer = document.createElement('div');
-      footer.className = 'record-footer';
-
-      if(r.officerName){
-        const officer = document.createElement('div');
-        officer.className = 'record-officer';
-        officer.textContent = 'str. ' + r.officerName;
-        footer.appendChild(officer);
-      }
-
-      const sub = document.createElement('div');
-      sub.className = 'record-submitted';
-      sub.textContent = 'Odesláno ' + formatCreatedAt(r.createdAt) + (r.submittedBy ? ' · ' + r.submittedBy : '');
-      footer.appendChild(sub);
-
-      if(footer.children.length) item.appendChild(footer);
-
-      item.addEventListener('click', ()=> openDetail(r));
+      item.addEventListener('click', ()=>{
+        document.querySelectorAll('.record-item.selected').forEach(el=>el.classList.remove('selected'));
+        item.classList.add('selected');
+        openDetail(r);
+      });
       container.appendChild(item);
     });
   }
@@ -1440,7 +1662,8 @@
     setDetailNote('', '');
     currentRecordPrinted = false;
 
-    show('detail');
+    document.getElementById('panelEmpty').style.display = 'none';
+    document.getElementById('panelContent').style.display = 'flex';
   }
 
   function updateResolveBtn(record){
@@ -1488,7 +1711,7 @@
     record.resolved = true;
     record.resolvedMethod = method;
     updateResolveBtn(record);
-    renderList(document.getElementById('searchInput').value);
+    refreshView();
   }
 
   // Zatím jen placeholder — šablona dokumentu "Výzva" (jiný typ než
@@ -1582,20 +1805,13 @@
   });
 
   document.getElementById('detailCloseBtn').addEventListener('click', ()=>{
-    show('list');
+    document.getElementById('panelContent').style.display = 'none';
+    document.getElementById('panelEmpty').style.display = 'flex';
+    document.querySelectorAll('.record-item.selected').forEach(el=>el.classList.remove('selected'));
+    currentDetailRecord = null;
   });
 
 })();
-</script>
-<script>
-  // Registrace service workeru jen kvůli instalovatelnosti appky na
-  // Androidu (viz sw.js) — na iOS Safari se appka na plochu přidává
-  // stejně jako dřív.
-  if('serviceWorker' in navigator){
-    window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('sw.js').catch(()=>{});
-    });
-  }
 </script>
 </body>
 </html>
