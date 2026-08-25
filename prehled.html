@@ -238,6 +238,65 @@
     color:#fff; text-decoration:underline; background:none; border:none;
     font-family:inherit; cursor:pointer; padding:6px 0;
   }
+
+  /* ==========================================================
+     DESKTOP LAYOUT — aktivuje se jen na širší obrazovce (počítač).
+     Appka na mobilu (viz zbytek CSS výše) zůstává beze změny; tohle
+     jen na desktopu appku vystředí do sloupce rozumné šířky, seznam
+     přestupků přepne z jednosloupcových karet na mřížku a spodní
+     lišty přestanou být přilepené přes celou šířku okna.
+     ========================================================== */
+  @media (min-width: 880px){
+    body{
+      background:
+        radial-gradient(1200px 800px at 50% -10%, rgba(255,176,32,.06), transparent 60%),
+        #05070a;
+    }
+    #app{min-height:100vh;}
+    .screen{
+      left:50%; right:auto; transform:translateX(-50%);
+      box-shadow:0 0 0 1px var(--line);
+    }
+    #loginScreen{width:100%; max-width:480px; background:transparent;}
+    #loginScreen .login-box{
+      max-width:400px; width:100%;
+      background:var(--asphalt-2); border:1px solid var(--line); border-radius:20px;
+      padding:40px 36px; box-shadow:0 24px 70px rgba(0,0,0,.5);
+    }
+
+    #listScreen, #detailScreen{
+      width:100%; max-width:900px;
+      border-left:1px solid var(--line); border-right:1px solid var(--line);
+      background:var(--asphalt);
+    }
+
+    .list-top{padding-top:22px;}
+    .list-top h1{font-size:19px;}
+    .search-row{padding:16px 28px 0;}
+    #listBody{
+      padding:20px 28px 28px;
+      display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+      gap:14px; align-content:start;
+    }
+    .record-item{margin-bottom:0;}
+    .record-item:hover{border-color:var(--amber); cursor:pointer;}
+    .record-item.resolved:hover{border-color:var(--good);}
+    .list-bottom-bar{padding:14px 28px 20px; justify-content:flex-end; gap:14px;}
+    .list-bottom-btn{flex:0 0 auto; padding:12px 34px;}
+    .list-bottom-btn:hover{opacity:.85;}
+
+    .detail-top{padding-top:22px;}
+    #detailPreviewWrap{
+      padding:32px 28px;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    .notice-card{width:100%;}
+    .detail-fixed-bottom .list-bottom-bar{padding:14px 28px 20px;}
+    .list-bottom-btn.back{order:99;}
+
+    #loginScreen .login-box .btn, #loginScreen .login-box a.btn{cursor:pointer;}
+    .btn:hover, .list-bottom-btn:hover, .confirm-btn:hover{opacity:.9;}
+  }
 </style>
 </head>
 <body>
