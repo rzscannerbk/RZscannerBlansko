@@ -98,7 +98,7 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   .list-bottom-bar{
-    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    flex-shrink:0;
     display:flex; justify-content:space-between; align-items:center; gap:10px;
     padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 14px);
     background:var(--asphalt-2); border-top:1px solid var(--line);
@@ -115,7 +115,7 @@
   .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
   .list-bottom-btn:active{transform:scale(.96);}
   .detail-fixed-bottom{
-    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    flex-shrink:0;
     background:var(--asphalt-2); border-top:1px solid var(--line);
   }
   .detail-fixed-bottom .list-bottom-bar{
@@ -127,7 +127,7 @@
     width:100%; background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px;
     padding:11px 14px; color:var(--text); font-size:14.5px; font-family:inherit; outline:none;
   }
-  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 80px);}
+  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px 20px;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
   .record-item{
     position:relative; background:rgba(91,141,239,.07); border:1.5px solid rgba(91,141,239,.55);
@@ -175,7 +175,7 @@
     border-bottom:1px solid var(--line);
   }
   .detail-top span{font-size:18px !important; letter-spacing:.08em;}
-  #detailPreviewWrap{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 170px;}
+  #detailPreviewWrap{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 22px;}
 
   /* ---------- NOTICE CARD (same look used in the app's own preview) ---------- */
   .notice-card{
