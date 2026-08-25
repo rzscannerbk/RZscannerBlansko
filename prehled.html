@@ -112,6 +112,25 @@
   .list-bottom-btn.resolve[disabled]{background:var(--good); color:#0A0C10; opacity:1;}
   .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
   .list-bottom-btn:active{transform:scale(.96);}
+  .confirm-overlay{
+    display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55);
+    align-items:center; justify-content:center; padding:24px;
+  }
+  .confirm-overlay.open{display:flex;}
+  .confirm-box{
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
+    padding:22px 20px; max-width:320px; width:100%; text-align:center;
+  }
+  .confirm-text{font-size:15.5px; color:var(--text); margin-bottom:18px; line-height:1.4;}
+  .confirm-btns{display:flex; gap:12px;}
+  .confirm-btns-col{flex-direction:column;}
+  .confirm-btn{
+    flex:1; padding:11px 0; border-radius:10px; font-family:'Inter',sans-serif;
+    font-weight:600; font-size:14.5px; cursor:pointer;
+  }
+  .confirm-no{background:transparent; border:1.5px solid var(--line); color:var(--text);}
+  .confirm-yes{background:#2F6FED; border:1.5px solid #2F6FED; color:#fff;}
+  .confirm-cancel{background:transparent; border:none; color:var(--muted); font-size:13.5px; margin-top:4px;}
   .detail-fixed-bottom{
     flex-shrink:0;
     background:var(--asphalt-2); border-top:1px solid var(--line);
@@ -270,9 +289,19 @@
       <div class="submit-note" id="detailNote"></div>
       <div class="list-bottom-bar">
         <button class="list-bottom-btn print" id="printBtn" title="Vytisknout">Tisk</button>
-        <button class="list-bottom-btn oznameni" id="oznameniBtn" title="Stáhnout jako Oznámení přestupku (Word)">Oznámení</button>
-        <button class="list-bottom-btn resolve" id="resolveBtn">Vyřízeno</button>
+        <button class="list-bottom-btn resolve" id="resolveMenuBtn">Dořešit</button>
         <button class="list-bottom-btn back" id="detailCloseBtn">Zpět</button>
+      </div>
+    </div>
+    <div class="confirm-overlay" id="resolveMenuOverlay">
+      <div class="confirm-box">
+        <div class="confirm-text">Co chceš udělat?</div>
+        <div class="confirm-btns confirm-btns-col">
+          <button class="confirm-btn confirm-no" id="menuOznameniBtn">Oznámení</button>
+          <button class="confirm-btn confirm-no" id="menuVyzvaBtn">Výzva</button>
+          <button class="confirm-btn confirm-yes" id="menuVyresenoBtn">Vyřešeno</button>
+          <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
+        </div>
       </div>
     </div>
   </div>
@@ -858,7 +887,7 @@
   }
 
   async function exportOznameni(record){
-    const btn = document.getElementById('oznameniBtn');
+    const btn = document.getElementById('menuOznameniBtn');
     const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Připravuji…';
@@ -1363,28 +1392,54 @@
   }
 
   function updateResolveBtn(record){
-    const btn = document.getElementById('resolveBtn');
+    const menuBtn = document.getElementById('resolveMenuBtn');
+    const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     if(record.resolved){
-      btn.textContent = '✓ Vyřízeno';
-      btn.disabled = true;
+      menuBtn.textContent = '✓ Dořešeno';
+      vyresenoBtn.textContent = '✓ Vyřešeno';
+      vyresenoBtn.disabled = true;
     } else {
-      btn.textContent = 'Vyřízeno';
-      btn.disabled = false;
+      menuBtn.textContent = 'Dořešit';
+      vyresenoBtn.textContent = 'Vyřešeno';
+      vyresenoBtn.disabled = false;
     }
+  }
+
+  // Zatím jen placeholder — šablona dokumentu "Výzva" (jiný typ než
+  // stávající Oznámení) ještě není připravená. Až Lukáš dodá podklad,
+  // nahradí se tělo této funkce skutečným generováním .docx stejně jako
+  // u exportOznameni().
+  async function exportVyzva(record){
+    setDetailNote('Dokument „Výzva" zatím není připravený — tahle možnost bude funkční později.', 'err');
   }
 
   document.getElementById('printBtn').addEventListener('click', ()=>{
     if(currentDetailRecord) printViaEpson(currentDetailRecord);
   });
 
-  document.getElementById('oznameniBtn').addEventListener('click', ()=>{
+  document.getElementById('resolveMenuBtn').addEventListener('click', ()=>{
+    document.getElementById('resolveMenuOverlay').classList.add('open');
+  });
+
+  document.getElementById('menuCancelBtn').addEventListener('click', ()=>{
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+  });
+
+  document.getElementById('menuOznameniBtn').addEventListener('click', ()=>{
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
     if(currentDetailRecord) exportOznameni(currentDetailRecord);
   });
 
-  document.getElementById('resolveBtn').addEventListener('click', async ()=>{
+  document.getElementById('menuVyzvaBtn').addEventListener('click', ()=>{
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    if(currentDetailRecord) exportVyzva(currentDetailRecord);
+  });
+
+  document.getElementById('menuVyresenoBtn').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
     if(!record || record.resolved) return;
-    const btn = document.getElementById('resolveBtn');
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    const btn = document.getElementById('menuVyresenoBtn');
     btn.disabled = true;
     btn.textContent = 'Ukládám…';
     try{
@@ -1404,7 +1459,7 @@
     }catch(e){
       console.error('Označení jako dořešeno selhalo:', e);
       btn.disabled = false;
-      btn.textContent = 'Vyřízeno (chyba, zkuste znovu)';
+      btn.textContent = 'Vyřešeno (chyba, zkuste znovu)';
     }
   });
 
