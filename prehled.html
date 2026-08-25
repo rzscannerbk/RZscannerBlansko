@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RZ Scanner — Přehled</title>
+<meta name="theme-color" content="#0A0C10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Přehled">
+<link rel="manifest" href="manifest-prehled.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" onerror="console.warn('JSZip se nenačetl — export Oznámení jako .docx nebude funkční.')"></script>
+<!--
+  Tisk na Epson TM-P20II přes ePOS-Print XML — stejná logika jako v
+  index.html, žádný externí SDK soubor tu není potřeba (viz komentář
+  u printViaEpson() níže).
+-->
+<style>
+  :root{
+    --asphalt:#0A0C10;
+    --asphalt-2:#14171D;
+    --asphalt-3:#1D2129;
+    --ink:#111214;
+    --amber:#FFB020;
+    --amber-dim:#7A5713;
+    --text:#ECEDEF;
+    --muted:#8B92A0;
+    --good:#33D399;
+    --bad:#FF6058;
+    --line:#262B33;
+  }
+  /* Stejný skrytý světlý režim jako v index.html — volba se přebírá přes
+     localStorage (rzTheme), gesto se ovládá jen na úvodní obrazovce
+     appky, tady se jen respektuje. */
+  html.light-theme{
+    --asphalt:#F4F5F7;
+    --asphalt-2:#FFFFFF;
+    --asphalt-3:#ECEDF0;
+    --ink:#F4F5F7;
+    --amber:#C77800;
+    --amber-dim:#E8B26B;
+    --text:#14161A;
+    --muted:#5B6472;
+    --good:#0E9A6E;
+    --bad:#D4342A;
+    --line:#DDE1E6;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; overflow-x:hidden; max-width:100vw;}
+  body{
+    margin:0; background:var(--asphalt); color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+  }
+  #app{min-height:100%; display:flex; flex-direction:column; overflow-x:hidden;}
+  .screen{position:fixed; inset:0; display:none; flex-direction:column; overflow-x:hidden;}
+  .screen.active{display:flex;}
+
+  h1,h2{font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.02em; margin:0;}
+
+  .btn{
+    padding:12px 20px; border-radius:14px; font-size:14.5px; font-weight:600;
+    border:none; cursor:pointer; font-family:inherit;
+  }
+  .btn-primary{background:var(--amber); color:#241a00;}
+  .btn-ghost{background:transparent; border:1.5px solid var(--line); color:var(--text);}
+  .submit-note{margin-top:10px; text-align:center; font-size:12.5px; font-family:'Roboto Mono',monospace; display:none;}
+  .submit-note.ok{color:var(--good);}
+  .submit-note.err{color:var(--bad);}
+  .btn:active{transform:scale(.97);}
+  .btn[disabled]{opacity:.5; pointer-events:none;}
+
+  /* ---------- LOGIN ---------- */
+  #loginScreen{align-items:center; justify-content:center; padding:32px;}
+  #loginScreen .login-box{width:100%; max-width:340px;}
+  #loginScreen h1{font-size:22px; text-transform:uppercase; margin-bottom:6px;}
+  #loginScreen p.hint{color:var(--muted); font-size:13px; line-height:1.5; margin:0 0 24px;}
+  .field{background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:14px;}
+  .field label{display:block; font-size:10.5px; color:var(--muted); font-family:'Roboto Mono',monospace; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px;}
+  .field input{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
+  #loginError{color:var(--bad); font-size:12.5px; margin:10px 0 0; display:none; line-height:1.4;}
+
+  /* ---------- LIST ---------- */
+  #listScreen{overflow:hidden;}
+  .list-top{
+    display:flex; align-items:center; justify-content:center;
+    padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 14px; background:var(--asphalt-2);
+    border-bottom:1px solid var(--line);
+  }
+  .list-top h1{
+    font-size:17px; text-transform:uppercase; text-align:center;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  .list-bottom-bar{
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 14px);
+    background:var(--asphalt-2); border-top:1px solid var(--line);
+  }
+  .list-bottom-btn{
+    flex:1 1 0; padding:12px 10px; border-radius:10px; font-family:'Inter',sans-serif;
+    font-weight:600; font-size:14px; cursor:pointer; text-decoration:none; text-align:center;
+    border:1.5px solid var(--line); color:var(--text); background:transparent;
+  }
+  .list-bottom-btn.print{color:#5B8DEF; border-color:#5B8DEF;}
+  .list-bottom-btn.oznameni{color:#5B8DEF; border-color:#5B8DEF;}
+  .list-bottom-btn.resolve{color:var(--good); border-color:var(--good);}
+  .list-bottom-btn.resolve[disabled]{background:var(--good); color:#0A0C10; opacity:1;}
+  .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
+  .list-bottom-btn:active{transform:scale(.96);}
+  .detail-fixed-bottom{
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    background:var(--asphalt-2); border-top:1px solid var(--line);
+  }
+  .detail-fixed-bottom .list-bottom-bar{
+    position:static; background:transparent; border-top:none;
+  }
+  .detail-fixed-bottom .submit-note{margin:10px 18px 0;}
+  .search-row{padding:14px 18px 0;}
+  .search-row input{
+    width:100%; background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px;
+    padding:11px 14px; color:var(--text); font-size:14.5px; font-family:inherit; outline:none;
+  }
+  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 80px);}
+  .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
+  .record-item{
+    position:relative; background:rgba(91,141,239,.07); border:1.5px solid rgba(91,141,239,.55);
+    border-radius:14px; padding:14px 16px 12px; margin-bottom:14px; cursor:pointer; overflow:hidden;
+  }
+  .record-item.boticka{background:rgba(255,176,32,.07); border-color:rgba(255,176,32,.55);}
+  .record-item:active{transform:scale(.98);}
+  .record-item.resolved{background:rgba(51,211,153,.07); border-color:rgba(51,211,153,.5); opacity:.75;}
+  .record-top-row{display:flex; flex-direction:column; gap:6px;}
+  .record-notice-number{
+    font-family:'Roboto Mono',monospace; font-size:10px; color:var(--muted);
+    letter-spacing:.03em; white-space:nowrap;
+  }
+  .record-plate-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .record-plate{font-family:'Oswald',sans-serif; font-weight:600; font-size:20px; letter-spacing:.05em;}
+  .record-resolved-badge{
+    font-size:10px; font-weight:700; color:var(--good); text-transform:uppercase; letter-spacing:.05em;
+    border:1px solid var(--good); border-radius:20px; padding:3px 8px;
+  }
+  .record-doctype-badge{
+    font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+    padding:3px 8px; border-radius:20px; color:#5B8DEF; border:1px solid #5B8DEF;
+  }
+  .record-doctype-badge.boticka{color:var(--amber); border-color:var(--amber);}
+  .record-meta{
+    font-family:'Roboto Mono',monospace; font-size:11.5px; color:var(--muted);
+    margin-top:8px; letter-spacing:.02em; overflow-wrap:anywhere;
+  }
+  .record-offense{
+    font-size:13.5px; color:var(--text); margin-top:10px; padding-top:10px;
+    border-top:1px solid var(--line); line-height:1.4; overflow-wrap:anywhere;
+  }
+  .record-footer{
+    display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:4px 12px;
+    margin-top:10px; padding-top:9px; border-top:1px solid var(--line);
+  }
+  .record-officer{font-size:11.5px; color:var(--text); font-weight:600;}
+  .record-submitted{font-size:10.5px; color:var(--muted); overflow-wrap:anywhere; text-align:right;}
+
+  /* ---------- DETAIL ---------- */
+  #detailScreen{background:#111;}
+  .detail-top{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    padding:calc(env(safe-area-inset-top,0px) + 16px) 16px 14px; background:var(--asphalt-2);
+    border-bottom:1px solid var(--line);
+  }
+  .detail-top span{font-size:18px !important; letter-spacing:.08em;}
+  #detailPreviewWrap{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 170px;}
+
+  /* ---------- NOTICE CARD (same look used in the app's own preview) ---------- */
+  .notice-card{
+    background:#ffffff; color:#141414; border-radius:14px; padding:30px 22px 26px;
+    font-family:'Inter',sans-serif; text-align:center; max-width:440px; margin:0 auto;
+  }
+  .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:26px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
+  .notice-subtitle{color:#777; font-size:12.5px; margin:0 0 18px;}
+  .notice-subtitle-boticka{font-size:18.75px; font-weight:700; color:#333;}
+  .notice-number{color:#666; font-size:11px; letter-spacing:.03em; margin:-10px 0 18px; font-weight:800;}
+  .notice-officer{font-weight:600; font-size:11px; color:#555; margin-bottom:4px;}
+  .notice-label{color:#999; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
+  .notice-platebox{
+    display:inline-block; border:1.6px solid #181818; border-radius:10px;
+    padding:12px 26px; font-family:'Oswald',sans-serif; font-weight:700; font-size:30px;
+    letter-spacing:.04em; margin-bottom:16px;
+  }
+  .notice-vehicle{font-size:14px; color:#555; margin:-8px 0 18px; font-weight:600;}
+  .notice-datetime{font-size:15.5px; margin-bottom:20px; color:#222;}
+  .notice-section{margin-bottom:16px;}
+  .notice-heading{font-weight:700; font-size:12px; display:inline-block; border-bottom:1.5px solid #181818; padding-bottom:3px; margin-bottom:8px;}
+  .notice-address{font-size:14.5px; color:#333;}
+  .notice-offense-label{font-size:13.5px; color:#333; line-height:1.45;}
+  .notice-offense-ref{font-size:12px; color:#555; margin-top:4px;}
+  .notice-instructions{margin-top:18px; padding-top:14px; border-top:1px solid #eee; font-size:11.5px; line-height:1.55; color:#333; text-align:center;}
+  .notice-instructions b{font-weight:700;}
+  .notice-instructions .heading-caps{font-weight:700; letter-spacing:.04em; text-transform:uppercase; display:block; margin:10px 0 6px;}
+  .notice-footer{margin-top:22px; padding-top:14px; border-top:1px solid #eee;}
+  .notice-footer .authority{font-weight:700; font-size:10px; color:#555;}
+  .notice-footer .authority-addr{font-size:9.5px; color:#999; margin-top:2px;}
+  .notice-footer .authority-phone{font-size:9.5px; color:#999; margin-top:2px;}
+  .notice-footer .generated-by{font-size:9.5px; color:#aaa; margin-top:10px;}
+
+  .photo-toggle-row{text-align:center; margin-top:20px;}
+  .photo-toggle-row .btn-ghost{color:#fff; border-color:rgba(255,255,255,.45);}
+  .notice-photo-wrap{margin-top:14px; display:none; max-width:440px; margin-left:auto; margin-right:auto;}
+  .notice-photo-wrap.open{display:block;}
+  .photo-item{margin-bottom:20px;}
+  .photo-item:last-child{margin-bottom:0;}
+  .photo-item img{width:100%; border-radius:12px; display:block;}
+  .photo-item a.download-link, .photo-item button.download-link{
+    display:block; width:100%; text-align:center; margin-top:8px; font-size:12.5px;
+    color:#fff; text-decoration:underline; background:none; border:none;
+    font-family:inherit; cursor:pointer; padding:6px 0;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- LOGIN -->
+  <div id="loginScreen" class="screen active">
+    <div class="login-box">
+      <h1>RZ Scanner</h1>
+      <p class="hint">Přehled odeslaných přestupků. Přihlaste se svým účtem.</p>
+      <div class="field"><label>E-mail</label><input type="email" id="loginEmail" autocapitalize="off" autocomplete="username"></div>
+      <div class="field"><label>Heslo</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
+      <button class="btn btn-primary" id="loginSubmitBtn" style="width:100%;">Přihlásit se</button>
+      <div id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div id="listScreen" class="screen">
+    <div class="list-top">
+      <h1 id="listTitle">Přehled přestupků</h1>
+    </div>
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="Hledat podle RZ nebo ulice…" autocomplete="off">
+    </div>
+    <div id="listBody">
+      <div class="list-empty" id="listStatus">Načítám…</div>
+    </div>
+    <div class="list-bottom-bar">
+      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="list-bottom-btn back">Zpět</a>
+    </div>
+  </div>
+
+  <!-- DETAIL -->
+  <div id="detailScreen" class="screen">
+    <div class="detail-top">
+      <span style="font-family:'Roboto Mono',monospace; font-size:12px; color:var(--muted); letter-spacing:.05em;" id="detailPlateLabel">DETAIL</span>
+    </div>
+    <div id="detailPreviewWrap">
+      <div id="noticeCardContainer"></div>
+      <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
+        <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
+      </div>
+      <div class="notice-photo-wrap" id="photoWrap">
+        <div id="photoGallery"></div>
+      </div>
+    </div>
+    <div class="detail-fixed-bottom">
+      <div class="submit-note" id="detailNote"></div>
+      <div class="list-bottom-bar">
+        <button class="list-bottom-btn print" id="printBtn" title="Vytisknout">Tisk</button>
+        <button class="list-bottom-btn oznameni" id="oznameniBtn" title="Stáhnout jako Oznámení přestupku (Word)">Oznámení</button>
+        <button class="list-bottom-btn resolve" id="resolveBtn">Vyřízeno</button>
+        <button class="list-bottom-btn back" id="detailCloseBtn">Zpět</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  // Respektuje volbu tématu nastavenou v index.html (4s podržení loga na
+  // úvodní obrazovce appky) — samotné gesto tady není, jen se drží stejná
+  // paleta jako zbytek appky.
+  try{
+    if(localStorage.getItem('rzTheme') === 'light'){
+      document.documentElement.classList.add('light-theme');
+    }
+  }catch(e){}
+
+  const screens = {
+    login: document.getElementById('loginScreen'),
+    list: document.getElementById('listScreen'),
+    detail: document.getElementById('detailScreen'),
+  };
+  function show(name){
+    Object.values(screens).forEach(s=>s.classList.remove('active'));
+    screens[name].classList.add('active');
+  }
+
+  // ---------- Firebase ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyCXin_qIc785nooY8Qqejt5BU_X6f9it6c",
+    authDomain: "rz-scanner.firebaseapp.com",
+    projectId: "rz-scanner",
+    storageBucket: "rz-scanner.firebasestorage.app",
+    messagingSenderId: "299287620862",
+    appId: "1:299287620862:web:bd3b7b2d7304ecb27149af",
+    measurementId: "G-0V2HSNXW2L"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let allRecords = [];
+
+  // ---------- Auth ----------
+  auth.onAuthStateChanged(user=>{
+    if(user){
+      show('list');
+      loadRecords();
+    } else {
+      show('login');
+    }
+  });
+
+  document.getElementById('loginSubmitBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+    if(!email || !password){
+      errEl.textContent = 'Vyplňte e-mail i heslo.';
+      errEl.style.display = 'block';
+      return;
+    }
+    const btn = document.getElementById('loginSubmitBtn');
+    btn.disabled = true;
+    try{
+      await auth.signInWithEmailAndPassword(email, password);
+      document.getElementById('loginPassword').value = '';
+    }catch(e){
+      errEl.textContent = 'Přihlášení se nezdařilo — zkontrolujte e-mail a heslo.';
+      errEl.style.display = 'block';
+    }finally{
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('loginPassword').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('loginSubmitBtn').click();
+  });
+
+  // Skrytý odhlašovací gesto: podržení nadpisu "Přehled přestupků" 4 s.
+  // Žádné tlačítko odhlášení v UI záměrně není — appka je sdílená mezi
+  // strážníky na jednom telefonu, takže odhlášení nemá být na první pohled
+  // dostupné/omylem stisknutelné.
+  (function setupHiddenLogout(){
+    const titleEl = document.getElementById('listTitle');
+    if(!titleEl) return;
+    let holdTimer = null;
+    function start(){
+      cancel();
+      holdTimer = setTimeout(()=>{ auth.signOut(); }, 4000);
+    }
+    function cancel(){
+      if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
+    }
+    titleEl.addEventListener('touchstart', start, { passive: true });
+    titleEl.addEventListener('touchend', cancel);
+    titleEl.addEventListener('touchcancel', cancel);
+    titleEl.addEventListener('mousedown', start);
+    titleEl.addEventListener('mouseup', cancel);
+    titleEl.addEventListener('mouseleave', cancel);
+  })();
+
+  // ---------- List ----------
+  async function loadRecords(){
+    const statusEl = document.getElementById('listStatus');
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Načítám…';
+    const t0 = performance.now();
+    try{
+      const snap = await db.collection('prestupky').orderBy('createdAt', 'desc').limit(500).get();
+      const t1 = performance.now();
+      allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Temporary diagnostics — helps pin down whether the slowness is the
+      // network fetch itself or something else, and whether older records
+      // still carrying inline photos (from before photos moved to a
+      // subcollection) are the culprit.
+      let legacyPhotoBytes = 0, legacyCount = 0;
+      allRecords.forEach(r=>{
+        if(r.photos && r.photos.length){
+          legacyCount++;
+          legacyPhotoBytes += r.photos.reduce((s,p)=> s + (p ? p.length : 0), 0);
+        } else if(r.photoBase64){
+          legacyCount++;
+          legacyPhotoBytes += r.photoBase64.length;
+        }
+      });
+      const totalKB = Math.round(JSON.stringify(snap.docs.map(d=>d.data())).length / 1024);
+      const legacyKB = Math.round(legacyPhotoBytes / 1024);
+      console.log('[diagnostika] fetch:', Math.round(t1-t0), 'ms, počet záznamů:', allRecords.length,
+        ', celková velikost payloadu:', totalKB, 'KB, z toho staré vložené fotky:', legacyKB, 'KB v', legacyCount, 'záznamech');
+
+      renderList(document.getElementById('searchInput').value);
+
+      const t2 = performance.now();
+      const diag = document.createElement('div');
+      diag.style.cssText = 'text-align:center; color:var(--muted); font-size:10.5px; font-family:monospace; margin-top:14px; opacity:.7; overflow-wrap:anywhere;';
+      diag.textContent = 'Diagnostika: fetch ' + Math.round(t1-t0) + ' ms, render ' + Math.round(t2-t1) + ' ms, ' +
+        allRecords.length + ' záznamů, ' + totalKB + ' KB celkem (' + legacyKB + ' KB staré fotky v ' + legacyCount + ' záznamech)';
+      document.getElementById('listBody').appendChild(diag);
+    }catch(e){
+      console.error('Načtení přehledu selhalo:', e);
+      statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
+      statusEl.style.display = 'block';
+    }
+  }
+
+  function formatCreatedAt(ts){
+    if(!ts || !ts.toDate) return '';
+    const d = ts.toDate();
+    const pad = n => String(n).padStart(2,'0');
+    return pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function formatDateCz(iso){
+    if(!iso) return '—';
+    const parts = iso.split('-');
+    if(parts.length !== 3) return iso;
+    const [y, m, d] = parts.map(Number);
+    if(!y || !m || !d) return iso;
+    return d + '. ' + m + '. ' + y;
+  }
+
+  function escapeHtml(s){
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function buildNoticeHtml(record){
+    const isBoticka = record.docType === 'boticka';
+    const addressBlock = record.address ? `
+      <div class="notice-section">
+        <div class="notice-heading">Místo přestupku</div>
+        <div class="notice-address">${escapeHtml(record.address)}</div>
+      </div>` : '';
+    const offenseBlock = record.offenseLabel ? `
+      <div class="notice-section">
+        <div class="notice-heading">Právní kvalifikace přestupku</div>
+        <div class="notice-offense-label">${escapeHtml(record.offenseLabel)}</div>
+        ${record.offenseCitation ? `<div class="notice-offense-ref">${escapeHtml(record.offenseCitation)}</div>` : ''}
+      </div>` : '';
+    const numberBlock = record.noticeNumber ? `
+      <div class="notice-number"><b>Č. j.: ${escapeHtml(record.noticeNumber)}</b></div>` : '';
+    const officerBlock = record.officerName ? `
+      <div class="notice-officer">str. ${escapeHtml(record.officerName)}</div>` : '';
+    const vehicleBlock = (record.brand || record.color) ? `
+      <div class="notice-vehicle">${escapeHtml([record.brand, record.color].filter(Boolean).join(', '))}</div>` : '';
+    const instructionsHtml = isBoticka ? `
+          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 45a zákona č. 361/2000 Sb., o silničním provozu, a to z důvodu porušení pravidel uvedeného níže.
+          <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
+          <span class="heading-caps">Poučení</span>
+          Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho použitím a odstraněním, a to na Městské policii Blansko, Sadová 2. Neoprávněné odstranění technického prostředku vlastní silou je přestupkem dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.
+        ` : `
+          Dostavte se proto ve vlastním zájmu, <b>a to neprodleně</b> na Městskou policii Blansko, Sadová 2. Tuto výzvu vezměte s sebou.
+          <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
+          <span class="heading-caps">Poučení</span>
+          Dle § 11/odst. 1 a 2, zák. 553/1991 Sb., o obecní policii je osoba povinna výzvě vyhovět. Nedostavíte-li se bez dostatečné omluvy, můžete být dle § 11/odst. 8 výše uvedeného zákona předveden(a) nebo může být přestupek oznámen příslušnému správnímu orgánu k projednání.
+        `;
+    return `
+      <div class="notice-card">
+        <div class="notice-title">${isBoticka ? 'Oznámení' : 'Výzva'}</div>
+        <div class="notice-subtitle${isBoticka ? ' notice-subtitle-boticka' : ''}">${isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku'}</div>
+        ${numberBlock}
+        <div class="notice-label">Registrační značka</div>
+        <div class="notice-platebox">${escapeHtml(record.plate || '')}</div>
+        ${vehicleBlock}
+        <div class="notice-datetime">Datum: ${escapeHtml(formatDateCz(record.date))}&nbsp;&nbsp;&nbsp;Čas: ${escapeHtml(record.time || '—')}</div>
+        ${addressBlock}
+        ${offenseBlock}
+        <div class="notice-instructions">
+          ${instructionsHtml}
+        </div>
+        <div class="notice-footer">
+          ${officerBlock}
+          <div class="authority">Městská policie Blansko</div>
+          <div class="authority-addr">Sadová 149/2, 678 01 Blansko</div>
+          <div class="authority-phone">Tel.: 775 859 486, 516 418 418</div>
+          <div class="generated-by">Vygenerováno aplikací RZ Scanner</div>
+        </div>
+      </div>`;
+  }
+
+  function setDetailNote(text, kind){
+    const note = document.getElementById('detailNote');
+    note.textContent = text;
+    note.className = 'submit-note' + (kind ? ' ' + kind : '');
+    note.style.display = text ? 'block' : 'none';
+  }
+
+  // ---------- Export "Oznámení přestupku" jako skutečný .docx ----------
+  // Skutečný OOXML (.docx) balíček přes JSZip (CDN, žádný build krok) —
+  // ne RTF ani HTML převlečené za .doc. Dvousloupcové rozvržení hlavičky
+  // (adresa úřadu vlevo, č.j./vyřizuje/tel/e-mail/datum vpravo) je běžná
+  // Word tabulka bez viditelných ohraničení.
+  //
+  // Šablona vychází z reálného vzoru "Oznámení přestupku" (Městský úřad
+  // Blansko, odbor dopravy). Appka doplní jen to, co sama zná — číslo
+  // jednací, strážníka, dnešní datum vytvoření, a v textu datum/čas/značku/
+  // adresu (+GPS pokud je uložené)/přestupek. Údaje o provozovateli vozidla
+  // (jméno, datum narození, bydliště) appka nemá k dispozici (zjišťují se
+  // až lustrací na úřadě) — zůstávají prázdné pro ruční doplnění.
+  const OZNAMENI_TEL = '775 859 486, 516 418 418';
+  const OZNAMENI_EMAIL = 'mp@blansko.cz';
+
+  function xmlEscape(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+  }
+
+  function todayCz(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    return pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear();
+  }
+
+  function mmToTwips(mm){ return Math.round(mm * 56.6929); }
+  function mmToEmu(mm){ return Math.round(mm * 36000); }
+
+  function docxRun(text, opts){
+    opts = opts || {};
+    let props = '<w:sz w:val="' + (opts.size || 20) + '"/>';
+    if(opts.bold) props += '<w:b/>';
+    if(opts.italic) props += '<w:i/>';
+    if(opts.underline) props += '<w:u w:val="single"/>';
+    return '<w:r><w:rPr>' + props + '</w:rPr><w:t xml:space="preserve">' + xmlEscape(text) + '</w:t></w:r>';
+  }
+
+  function docxPara(text, opts){
+    opts = opts || {};
+    let pPr = '';
+    if(opts.align) pPr += '<w:jc w:val="' + opts.align + '"/>';
+    if(opts.pageBreakBefore) pPr += '<w:pageBreakBefore/>';
+    pPr += '<w:spacing w:before="' + (opts.spacingBefore != null ? opts.spacingBefore : 0) +
+           '" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 0) + '"/>';
+    const r = text != null ? docxRun(text, opts) : '';
+    return '<w:p><w:pPr>' + pPr + '</w:pPr>' + r + '</w:p>';
+  }
+
+  // Odstavec "štítek" + skutečný tabulátor na pevnou pozici + "hodnota" —
+  // na rozdíl od ručně vyťukaných mezer se tak hodnoty u různě dlouhých
+  // štítků (RZ vs. tovární značka/barva) zarovnají přesně pod sebe.
+  function docxLabelValuePara(label, value, opts){
+    opts = opts || {};
+    const tabPos = opts.tabPos != null ? opts.tabPos : 2600;
+    const pPr = '<w:tabs><w:tab w:val="left" w:pos="' + tabPos + '"/></w:tabs>' +
+      '<w:spacing w:before="' + (opts.spacingBefore != null ? opts.spacingBefore : 0) +
+      '" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 0) + '"/>';
+    const labelRun = docxRun(label, { size: opts.size || 20 });
+    const tabRun = '<w:r><w:rPr><w:sz w:val="' + (opts.size || 20) + '"/></w:rPr><w:tab/></w:r>';
+    const valueRun = docxRun(value, { size: opts.size || 20, bold: opts.valueBold });
+    return '<w:p><w:pPr>' + pPr + '</w:pPr>' + labelRun + tabRun + valueRun + '</w:p>';
+  }
+
+  function docxHeaderTable(leftLines, rightLines){
+    // Mezisloupec (gutter) mezi adresou úřadu a blokem s č.j. — bez něj by
+    // sloupce splývaly těsně vedle sebe. Pravý blok tak začíná výrazně
+    // víc vpravo, blíž k pravému okraji stránky.
+    const leftW = 3600, gutterW = 2200, rightW = 3226;
+    const cell = (lines, w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' +
+      lines.map(t => docxPara(t, { size: 19, spacingAfter: 20 })).join('') + '</w:tc>';
+    const emptyCell = (w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' + docxPara('', { size: 19 }) + '</w:tc>';
+    return '<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblBorders>' +
+      '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>' +
+      '<w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>' +
+      '<w:tblLayout w:type="fixed"/></w:tblPr>' +
+      '<w:tblGrid><w:gridCol w:w="' + leftW + '"/><w:gridCol w:w="' + gutterW + '"/><w:gridCol w:w="' + rightW + '"/></w:tblGrid>' +
+      '<w:tr>' + cell(leftLines, leftW) + emptyCell(gutterW) + cell(rightLines, rightW) + '</w:tr></w:tbl>';
+  }
+
+  function docxNarrowBoxTable(widthMm, innerXml){
+    const w = mmToTwips(widthMm);
+    return '<w:tbl><w:tblPr><w:tblW w:w="' + w + '" w:type="dxa"/><w:jc w:val="center"/><w:tblBorders>' +
+      '<w:top w:val="single" w:sz="8" w:color="000000"/><w:left w:val="single" w:sz="8" w:color="000000"/>' +
+      '<w:bottom w:val="single" w:sz="8" w:color="000000"/><w:right w:val="single" w:sz="8" w:color="000000"/>' +
+      '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>' +
+      '<w:tblGrid><w:gridCol w:w="' + w + '"/></w:tblGrid>' +
+      '<w:tr><w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' + innerXml + '</w:tc></w:tr></w:tbl>';
+  }
+
+  function docxImageParagraph(relId, widthPx, heightPx, maxWmm, maxHmm, docId, pageBreakBefore){
+    const aspect = heightPx / widthPx;
+    let wMm = maxWmm, hMm = wMm * aspect;
+    if(hMm > maxHmm){ hMm = maxHmm; wMm = hMm / aspect; }
+    const emuW = mmToEmu(wMm), emuH = mmToEmu(hMm);
+    const drawing = '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">' +
+      '<wp:extent cx="' + emuW + '" cy="' + emuH + '"/>' +
+      '<wp:docPr id="' + docId + '" name="Photo' + docId + '"/>' +
+      '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+      '<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:nvPicPr><pic:cNvPr id="' + docId + '" name="Photo' + docId + '"/><pic:cNvPicPr/></pic:nvPicPr>' +
+      '<pic:blipFill><a:blip r:embed="rId' + relId + '" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>' +
+      '<a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + emuW + '" cy="' + emuH + '"/></a:xfrm>' +
+      '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>' +
+      '</a:graphicData></a:graphic></wp:inline></w:drawing>';
+    const pPr = '<w:pPr>' + (pageBreakBefore ? '<w:pageBreakBefore/>' : '') + '<w:jc w:val="center"/></w:pPr>';
+    return '<w:p>' + pPr + '<w:r>' + drawing + '</w:r></w:p>';
+  }
+
+  function getImagePixelSize(dataUrl){
+    return new Promise((resolve)=>{
+      const img = new Image();
+      img.onload = ()=> resolve({ w: img.naturalWidth || 800, h: img.naturalHeight || 600 });
+      img.onerror = ()=> resolve({ w: 800, h: 600 });
+      img.src = dataUrl;
+    });
+  }
+
+  function base64ToUint8Array(base64){
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+
+  // Appka ukládá do Firestore jen spojenou citaci (např. "§ 27 odst. 1
+  // písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000
+  // Sb.)"), ne samostatně základní paragraf a sankci. Pro "Popis skutku"
+  // je ale potřeba mít obě části zvlášť (základní paragraf hned za
+  // "ustanovení", sankce až u "dle" na konci) — tahle funkce citaci zpět
+  // rozparsuje. Funguje na starých i nových záznamech (formát citace se
+  // neměnil, jen její použití v textu skutku).
+  function parseOffenseCitation(citation){
+    if(!citation) return null;
+    const m = citation.match(/^(.+?)(?: — přestupek dle (.+?))? \(zákon č\. (.+?)\)$/);
+    if(!m) return null;
+    return { ref: m[1], sankce: m[2] || null, law: m[3] };
+  }
+
+  async function buildOznameniDocx(record, photosB64){
+    const offenseCitation = record.offenseCitation || '';
+    const offenseLabel = record.offenseLabel || '';
+
+    let body = '';
+    body += docxHeaderTable(
+      ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'Nám. Republiky 1', '678 01 BLANSKO'],
+      [
+        'Naše  č. j.: ' + (record.noticeNumber || ''),
+        'Vyřizuje: str. ' + (record.officerName || ''),
+        'Tel.: ' + OZNAMENI_TEL,
+        'E-mail: ' + OZNAMENI_EMAIL,
+        '',
+        'Datum: ' + todayCz()
+      ]
+    );
+    body += docxPara('', { size: 20 });
+    body += docxPara('Oznámení přestupku', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
+
+    const intro = 'Podle § 10 odst. 2 zák. č. 553/91 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
+      'Vám oznamuji podezření ze spáchání přestupku: Zákon č. 361/2000 Sb., o provozu na ' +
+      'pozemních komunikacích – ' + offenseCitation + ', jímž se dopustil(a) jednání – ' + offenseLabel +
+      ', z jehož spáchání je důvodně podezřelý(á):';
+    body += docxPara(intro, { size: 20, spacingAfter: 200 });
+
+    body += docxLabelValuePara('Provozovatel vozidla RZ:', record.plate || '', { size: 20, spacingAfter: 200, valueBold: true });
+    if(record.brand || record.color){
+      body += docxLabelValuePara('Tovární značka, barva:', [record.brand, record.color].filter(Boolean).join(', '), { size: 20, spacingAfter: 200 });
+    }
+    body += docxPara('Příjmení a jméno: ', { size: 20, spacingAfter: 200 });
+    body += docxPara('Datum narození: ', { size: 20, spacingAfter: 200 });
+    body += docxPara('Bydliště: ', { size: 20, spacingAfter: 200 });
+
+    body += docxPara('Popis skutku:', { bold: true, size: 20, spacingAfter: 100 });
+    let gpsPart = '';
+    if(record.lat != null && record.lng != null){
+      gpsPart = ' (GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6) + ')';
+    }
+    // Základní ustanovení (např. § 27 odst. 1 písm. a)) hned za "ustanovení",
+    // sankční ustanovení (§ 125c...) až na konci u "dle" — viz komentář u
+    // parseOffenseCitation výše. Když se citaci z nějakého důvodu nepodaří
+    // rozparsovat (neobvyklý/ruční formát), appka se vrátí k původnímu
+    // chování a použije celou citaci na obou místech.
+    const parsedCitation = parseOffenseCitation(offenseCitation);
+    const baseCite = parsedCitation ? (parsedCitation.ref + ' (zákon č. ' + parsedCitation.law + ')') : offenseCitation;
+    const sankceCite = parsedCitation
+      ? (parsedCitation.sankce ? (parsedCitation.sankce + ' (zákon č. ' + parsedCitation.law + ')') : baseCite)
+      : offenseCitation;
+    const skutek = 'Dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') + ' hodin se dosud neustanovený ' +
+      'řidič vozidla registrační značky ' + (record.plate || '') + '. Na ulici ' + (record.address || '') +
+      gpsPart + ' dopustil porušení ustanovení ' + baseCite + ' – ' + offenseLabel +
+      ', a tím je podezřelý ze spáchání přestupku dle ' + sankceCite;
+    body += docxPara(skutek, { size: 20, spacingAfter: 200 });
+
+
+    body += docxPara('Lustrací byl(a), jako provozovatel výše uvedeného vozidla, zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
+
+    // Podpisový blok + přílohy se odsazují velkou mezerou shora, aby padly
+    // co nejblíž ke spodnímu okraji stránky 1 (přibližné — přesná pozice
+    // závisí na délce textu přestupku u konkrétního záznamu).
+    body += docxPara('Ing. Martin Lepka', { size: 20, spacingBefore: 4120 });
+    body += docxPara('ředitel MP Blansko', { size: 20, spacingAfter: 400 });
+    body += docxPara('Přílohy:', { size: 20 });
+    body += docxPara('- Výzva', { size: 20 });
+    body += docxPara('- fotodokumentace', { size: 20 });
+
+    // Fotky — každá na vlastní A4 stránce v běžné velikosti.
+    const mediaFiles = [];
+    const relEntries = [];
+    let relId = 100;
+    let docId = 1;
+
+    if(photosB64.length){
+      body += docxPara('Fotodokumentace', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
+      for(let i=0;i<photosB64.length;i++){
+        const dims = await getImagePixelSize('data:image/jpeg;base64,' + photosB64[i]);
+        const filename = 'image' + (i + 1) + '.jpeg';
+        mediaFiles.push({ name: filename, bytes: base64ToUint8Array(photosB64[i]) });
+        relEntries.push({ id: relId, target: 'media/' + filename });
+        body += docxImageParagraph(relId, dims.w, dims.h, 170, 240, docId, i > 0);
+        relId++; docId++;
+      }
+    }
+
+    // Výzva — úzký orámovaný blok v šíři 58 mm (odpovídá reálné šířce tiskárny).
+    // Obsah je záměrně stejný jako to, co appka posílá na tepelnou tiskárnu
+    // (viz buildEposPrintXml výše) — jméno strážníka tu ale zůstává celé
+    // (na tisku je jen služební číslo, viz officerPrintLabel).
+    const isBoticka = record.docType === 'boticka';
+    body += docxPara('Výzva', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
+    let inner = '';
+    inner += docxPara(isBoticka ? 'OZNÁMENÍ' : 'VÝZVA', { bold: true, size: 22, align: 'center' });
+    inner += docxPara(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku', { size: 14, align: 'center' });
+    if(record.noticeNumber) inner += docxPara('Č. j.: ' + record.noticeNumber, { size: 12, align: 'center', spacingAfter: 100 });
+    inner += docxPara(record.plate || '', { bold: true, size: 32, align: 'center' });
+    inner += docxPara('Datum: ' + formatDateCz(record.date) + '  Čas: ' + (record.time || '—'), { size: 14, align: 'center', spacingAfter: 100 });
+    if(record.address){
+      inner += docxPara('Místo přestupku', { bold: true, size: 13, align: 'center' });
+      inner += docxPara(record.address, { size: 14, align: 'center', spacingAfter: 100 });
+    }
+    if(offenseLabel){
+      inner += docxPara('Právní kvalifikace', { bold: true, size: 13, align: 'center' });
+      inner += docxPara(offenseLabel, { size: 14, align: 'center' });
+      if(offenseCitation) inner += docxPara(offenseCitation, { size: 11, align: 'center', spacingAfter: 100 });
+    }
+
+    if(isBoticka){
+      inner += docxPara(
+        'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek k zabránění ' +
+        'odjezdu vozidla (TPZOV) dle § 45a zákona č. 361/2000 Sb., o silničním provozu, a to z důvodu ' +
+        'porušení pravidel uvedeného výše.',
+        { size: 14, align: 'center', spacingAfter: 100 }
+      );
+      inner += docxPara('pořízena fotodokumentace', { bold: true, size: 14, align: 'center', spacingAfter: 100 });
+      inner += docxPara('POUČENÍ', { bold: true, size: 13, align: 'center' });
+      inner += docxPara(
+        'Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho použitím a ' +
+        'odstraněním, a to na Městské policii Blansko, Sadová 2. Neoprávněné odstranění technického ' +
+        'prostředku vlastní silou je přestupkem dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.',
+        { size: 14, align: 'center', spacingAfter: 100 }
+      );
+    } else {
+      inner += docxPara(
+        'Dostavte se proto ve vlastním zájmu, a to neprodleně na Městskou policii Blansko, Sadová 2. ' +
+        'Tuto výzvu vezměte s sebou.',
+        { size: 14, align: 'center', spacingAfter: 100 }
+      );
+      inner += docxPara('pořízena fotodokumentace', { bold: true, size: 14, align: 'center', spacingAfter: 100 });
+      inner += docxPara('POUČENÍ', { bold: true, size: 13, align: 'center' });
+      inner += docxPara(
+        'Dle § 11/odst. 1 a 2, zák. 553/1991 Sb., o obecní policii je osoba povinna výzvě vyhovět. ' +
+        'Nedostavíte-li se bez dostatečné omluvy, můžete být dle § 11/odst. 8 výše uvedeného zákona ' +
+        'předveden(a) nebo může být přestupek oznámen příslušnému správnímu orgánu k projednání.',
+        { size: 14, align: 'center', spacingAfter: 100 }
+      );
+    }
+
+    if(record.officerName){
+      inner += docxPara('str. ' + record.officerName, { bold: true, size: 14, align: 'center' });
+    }
+    inner += docxPara('Městská policie Blansko', { bold: true, size: 14, align: 'center' });
+    inner += docxPara('Sadová 149/2, 678 01 Blansko', { size: 13, align: 'center' });
+    inner += docxPara('Tel.: 775 859 486, 516 418 418', { size: 13, align: 'center', spacingAfter: 100 });
+    inner += docxPara('vygenerováno aplikací', { size: 11, align: 'center' });
+    inner += docxPara('RZ Scanner © Šuraj', { size: 11, align: 'center' });
+
+    body += docxNarrowBoxTable(58, inner);
+
+    const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+      'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<w:body>' + body +
+      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>' +
+      '</w:sectPr></w:body></w:document>';
+
+    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '</Types>';
+
+    const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '</Relationships>';
+
+    const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      relEntries.map(e => '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' + e.target + '"/>').join('') +
+      '</Relationships>';
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.file('_rels/.rels', rootRels);
+    zip.file('word/document.xml', documentXml);
+    zip.file('word/_rels/document.xml.rels', docRels);
+    mediaFiles.forEach(m => zip.file('word/media/' + m.name, m.bytes));
+
+    return zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+  }
+
+  async function exportOznameni(record){
+    const btn = document.getElementById('oznameniBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Připravuji…';
+    try{
+      if(typeof JSZip === 'undefined'){
+        setDetailNote('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).', 'err');
+        return;
+      }
+      // Fotky mohly být v této session už dřív načtené (viz openDetail /
+      // loadAndShowPhotos) — jinak je stejným způsobem dotáhneme teď.
+      let photosB64 = record._resolvedPhotos;
+      if(!photosB64 && record.hasPhotos){
+        const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
+        const data = doc.exists ? doc.data() : null;
+        photosB64 = (data && data.photos) || [];
+        record._resolvedPhotos = photosB64;
+        record._resolvedMime = (data && data.photoMime) || 'image/jpeg';
+      }
+      const blob = await buildOznameniDocx(record, photosB64 || []);
+      const filename = 'Oznameni_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx';
+      try{
+        const file = new File([blob], filename, { type: blob.type });
+        if(navigator.canShare && navigator.canShare({ files: [file] })){
+          await navigator.share({ files: [file] });
+          return;
+        }
+      }catch(e){
+        // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
+        // otevření v nové kartě, stejně jako u ukládání fotek.
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(()=> URL.revokeObjectURL(url), 60000);
+    }catch(e){
+      console.error('Export Oznámení selhal:', e);
+      setDetailNote('Vytvoření dokumentu se nezdařilo (' + e.message + ').', 'err');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+
+  // ---------- Tisk na Epson TM-P20II přes Wi-Fi (ePOS-Print XML) ----------
+  // Stejná logika jako v index.html (viz tam podrobný komentář o HTTPS/
+  // certifikátu/CORS) — adresu tiskárny appka bere ze stejného
+  // localStorage klíče ('eposPrinterHost'), který se nastavuje v
+  // index.html (⚙ Nastavit tiskárnu), protože obě stránky běží na stejné
+  // doméně a localStorage si tedy mezi sebou přirozeně sdílí.
+  //
+  // Služební čísla strážníků — na vytištěné výzvě (fyzicky vydávané) se
+  // z bezpečnostních důvodů posílá jen služební číslo, ne celé jméno.
+  // Jméno zůstává beze změny v appce samotné (přehled, detail, export
+  // Oznámení do Wordu) — mění se jen text, co jde do tiskárny.
+  const OFFICER_BADGE_NUMBERS = {
+    'Adámek Jaroslav': '995',
+    'Grénar Martin': '1774',
+    'Havel Radek': '1794',
+    'Hlaváček Michal': '177',
+    'Hofman Radek': '1744',
+    'Chalupa Martin': '1781',
+    'Juračka Lukáš': '1048',
+    'Liška Michal': '2053',
+    'Menšík Jaroslav': '202',
+    'Parolek Antonín': '611',
+    'Přikryl Miroslav': '1996',
+    'Sehnal Petr': '182',
+    'Šenk Kamil': '723',
+    'Škvařil Libor': '1564',
+    'Tesař Libor': '188',
+    'Tóth Ondřej': '2401',
+    'Tóth Pavel': '775',
+    'Vašíček Zdeněk': '1255',
+  };
+
+  function officerPrintLabel(officerName){
+    const badge = OFFICER_BADGE_NUMBERS[officerName];
+    return badge ? ('str. ' + badge) : ('str. ' + officerName);
+  }
+
+  function getPrinterHost(){
+    return (localStorage.getItem('eposPrinterHost') || '').trim();
+  }
+
+  function escapeXml(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // Zalomí text na mezerách po ~32 znacích (šířka řádku na 58mm papíře
+  // TM-P20II), ať tiskárna nedělí slova napůl — viz stejná funkce a
+  // podrobný komentář v index.html.
+  function wrapWords(text, width){
+    width = width || 32;
+    return String(text == null ? '' : text).split('\n').map(function(line){
+      if(line.length <= width) return line;
+      const words = line.split(' ');
+      const lines = [];
+      let cur = '';
+      words.forEach(function(w){
+        if(cur === ''){
+          cur = w;
+        } else if((cur + ' ' + w).length <= width){
+          cur += ' ' + w;
+        } else {
+          lines.push(cur);
+          cur = w;
+        }
+      });
+      if(cur) lines.push(cur);
+      return lines.join('\n');
+    }).join('\n');
+  }
+
+  function textEl(data, opts){
+    opts = opts || {};
+    const align = opts.align || 'left';
+    const em = opts.em ? 'true' : 'false';
+    const width = opts.width || 1;
+    const height = opts.height || 1;
+    return '<text align="' + align + '" em="' + em + '" width="' + width + '" height="' + height + '">' +
+      escapeXml(data) + '</text>';
+  }
+
+  function buildEposPrintXml(record){
+    const isBoticka = record.docType === 'boticka';
+    let x = '';
+
+    x += textEl((isBoticka ? 'OZNÁMENÍ' : 'VÝZVA') + '\n', { align: 'center', width: 2, height: 2, em: true });
+    x += textEl(wrapWords(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku') + '\n', { align: 'center' });
+    if(record.noticeNumber){
+      x += textEl('Č. j.: ' + record.noticeNumber + '\n', { align: 'center', em: true });
+    }
+    x += textEl('\nREGISTRAČNÍ ZNAČKA\n', { align: 'center' });
+    x += textEl((record.plate || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
+    if(record.brand || record.color){
+      x += textEl([record.brand, record.color].filter(Boolean).join(', ') + '\n', { align: 'center' });
+    }
+    x += textEl('--------------------------------\n', { align: 'center' });
+    x += textEl('Datum: ' + formatDateCz(record.date) + '   Čas: ' + (record.time || '—') + '\n\n', { align: 'left' });
+
+    x += textEl('Místo přestupku\n', { align: 'center', em: true });
+    x += textEl(wrapWords(record.address || '') + '\n\n', { align: 'center' });
+
+    x += textEl('Právní kvalifikace přestupku\n', { align: 'center', em: true });
+    if(record.offenseLabel) x += textEl(wrapWords(record.offenseLabel) + '\n', { align: 'center' });
+    if(record.offenseCitation) x += textEl(wrapWords(record.offenseCitation) + '\n', { align: 'center' });
+    x += textEl('\n', { align: 'center' });
+
+    if(isBoticka){
+      x += textEl(
+        wrapWords(
+          'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek ' +
+          'k zabránění odjezdu vozidla (TPZOV) dle § 45a zákona č. 361/2000 Sb., ' +
+          'o silničním provozu, a to z důvodu porušení pravidel uvedeného výše.'
+        ) + '\n\n',
+        { align: 'center' }
+      );
+      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true });
+      x += textEl('POUČENÍ\n', { align: 'center', em: true });
+      x += textEl(
+        wrapWords(
+          'Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho ' +
+          'použitím a odstraněním, a to na Městské policii Blansko, Sadová 2. ' +
+          'Neoprávněné odstranění technického prostředku vlastní silou je přestupkem ' +
+          'dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.'
+        ) + '\n\n',
+        { align: 'center' }
+      );
+    } else {
+      x += textEl(
+        wrapWords(
+          'Dostavte se proto ve vlastním zájmu, a to neprodleně na Městskou policii ' +
+          'Blansko, Sadová 2. Tuto výzvu vezměte s sebou.'
+        ) + '\n\n',
+        { align: 'center' }
+      );
+      x += textEl('pořízena fotodokumentace\n\n', { align: 'center', em: true });
+      x += textEl('POUČENÍ\n', { align: 'center', em: true });
+      x += textEl(
+        wrapWords(
+          'Dle § 11/odst. 1 a 2, zák. 553/1991 Sb., o obecní policii je osoba povinna ' +
+          'výzvě vyhovět. Nedostavíte-li se bez dostatečné omluvy, můžete být dle ' +
+          '§ 11/odst. 8 výše uvedeného zákona předveden(a) nebo může být přestupek ' +
+          'oznámen příslušnému správnímu orgánu k projednání.'
+        ) + '\n\n',
+        { align: 'center' }
+      );
+    }
+
+    if(record.officerName){
+      x += textEl(officerPrintLabel(record.officerName) + '\n', { align: 'center', em: true });
+    }
+    x += textEl('Městská policie Blansko\n', { align: 'center', em: true });
+    x += textEl('Sadová 149/2, 678 01 Blansko\n', { align: 'center' });
+    x += textEl('Tel.: 775 859 486, 516 418 418\n\n', { align: 'center' });
+    x += textEl('vygenerováno aplikací\n', { align: 'center' });
+    x += textEl('RZ Scanner © Šuraj\n', { align: 'center' });
+
+    // TM-P20II má odtrhávací lištu, ne motorizovaný ořez — jen posuneme
+    // papír s rezervou, ať se neodtrhává přímo v textu.
+    x += '<feed unit="130"/>';
+
+    return x;
+  }
+
+  function epsonSoapEnvelope(innerXml){
+    return '<?xml version="1.0" encoding="utf-8"?>' +
+      '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">' +
+      '<s:Body>' +
+      '<epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">' +
+      innerXml +
+      '</epos-print>' +
+      '</s:Body>' +
+      '</s:Envelope>';
+  }
+
+  function epsonPrinterEndpoint(){
+    const host = getPrinterHost();
+    if(!host) return '';
+    const base = /^https?:\/\//i.test(host) ? host.replace(/\/+$/, '') : 'https://' + host;
+    return base + '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=10000';
+  }
+
+  // Vrací Promise<boolean> — true jen když tiskárna potvrdí úspěšný tisk.
+  // Díky tomu může volající (tlačítko Tisk i potvrzovací dialog u tlačítka
+  // zpět) čekat na výsledek a reagovat na něj (např. teprve po úspěchu
+  // opustit obrazovku detailu).
+  function printViaEpson(record){
+    return new Promise(async (resolve)=>{
+      const host = getPrinterHost();
+      if(!host){
+        setDetailNote('Tiskárna není nastavená — otevři index.html appky a nastav IP tiskárny (⚙ Nastavit tiskárnu).', 'err');
+        resolve(false);
+        return;
+      }
+      setDetailNote('Tisknu…', '');
+
+      const endpoint = epsonPrinterEndpoint();
+      const body = epsonSoapEnvelope(buildEposPrintXml(record));
+
+      async function attempt(mode){
+        const controller = new AbortController();
+        const timeoutId = setTimeout(()=>controller.abort(), 12000);
+        try{
+          const resp = await fetch(endpoint, {
+            method: 'POST',
+            mode,
+            headers: { 'Content-Type': 'text/plain' },
+            body,
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          return { ok: true, resp };
+        }catch(e){
+          clearTimeout(timeoutId);
+          return { ok: false, error: e };
+        }
+      }
+
+      let result = await attempt('cors');
+      if(result.ok){
+        try{
+          const text = await result.resp.text();
+          const xml = new DOMParser().parseFromString(text, 'text/xml');
+          const responseEl = xml.getElementsByTagName('response')[0];
+          const success = !!responseEl && /^(1|true)$/i.test(responseEl.getAttribute('success') || '');
+          if(success){
+            setDetailNote('✓ Vytištěno', 'ok');
+            currentRecordPrinted = true;
+            resolve(true);
+            return;
+          }
+          const code = responseEl ? responseEl.getAttribute('code') : null;
+          setDetailNote('Tiskárna nahlásila chybu' + (code ? ' (' + code + ')' : '') + '.', 'err');
+          resolve(false);
+          return;
+        }catch(e){
+          // Odpověď dorazila, ale nešla přečíst (typicky CORS) — spadneme
+          // do "no-cors" pokusu níže.
+        }
+      }
+
+      const fallback = await attempt('no-cors');
+      if(fallback.ok){
+        setDetailNote('⚠ Tisk odeslán, ale tiskárna potvrzení nevrátila (CORS). Zkontroluj výtisk.', 'ok');
+        currentRecordPrinted = true;
+        resolve(true);
+        return;
+      }
+
+      const bareHost = host.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+      const msg = fallback.error && fallback.error.name === 'AbortError'
+        ? 'Tiskárna neodpověděla včas — zkontroluj, že je zapnutá a telefon je připojený na stejnou síť/Wi-Fi Direct.'
+        : 'Spojení s tiskárnou selhalo. Pokud jsi ještě v Safari nenavštívil https://' + bareHost + '/ ' +
+          'a nepotvrdil certifikát tiskárny, udělej to nejdřív (stačí jednou).';
+      setDetailNote(msg, 'err');
+      resolve(false);
+    });
+  }
+
+
+  function renderList(filterText){
+    const container = document.getElementById('listBody');
+    const statusEl = document.getElementById('listStatus');
+    const q = (filterText || '').trim().toLowerCase();
+
+    const filtered = !q ? allRecords : allRecords.filter(r=>
+      (r.plate || '').toLowerCase().includes(q) ||
+      (r.address || '').toLowerCase().includes(q) ||
+      (r.noticeNumber || '').toLowerCase().includes(q) ||
+      (r.officerName || '').toLowerCase().includes(q)
+    );
+
+    container.innerHTML = '';
+    if(allRecords.length === 0){
+      statusEl.textContent = 'Zatím žádné odeslané přestupky.';
+      container.appendChild(statusEl);
+      return;
+    }
+    if(filtered.length === 0){
+      statusEl.textContent = 'Žádná shoda pro „' + filterText + '“.';
+      container.appendChild(statusEl);
+      return;
+    }
+
+    filtered.forEach(r=>{
+      const item = document.createElement('div');
+      item.className = 'record-item' + (r.resolved ? ' resolved' : '') + (r.docType === 'boticka' ? ' boticka' : '');
+
+      const topRow = document.createElement('div');
+      topRow.className = 'record-top-row';
+
+      const plateRow = document.createElement('div');
+      plateRow.className = 'record-plate-row';
+
+      const plate = document.createElement('div');
+      plate.className = 'record-plate';
+      plate.textContent = r.plate || 'NEZNÁMÁ SPZ';
+      plateRow.appendChild(plate);
+
+      const docTypeBadge = document.createElement('div');
+      docTypeBadge.className = 'record-doctype-badge' + (r.docType === 'boticka' ? ' boticka' : '');
+      docTypeBadge.textContent = r.docType === 'boticka' ? 'Botička' : 'Parkovačka';
+      plateRow.appendChild(docTypeBadge);
+
+      if(r.resolved){
+        const badge = document.createElement('div');
+        badge.className = 'record-resolved-badge';
+        badge.textContent = 'Dořešeno';
+        plateRow.appendChild(badge);
+      }
+      topRow.appendChild(plateRow);
+
+      if(r.noticeNumber){
+        const num = document.createElement('div');
+        num.className = 'record-notice-number';
+        num.textContent = r.noticeNumber;
+        topRow.appendChild(num);
+      }
+      item.appendChild(topRow);
+
+      const meta = document.createElement('div');
+      meta.className = 'record-meta';
+      meta.textContent = (r.time || '') + ' · ' + formatDateCz(r.date) + (r.address ? ' · ' + r.address : '');
+      item.appendChild(meta);
+
+      if(r.offenseLabel){
+        const off = document.createElement('div');
+        off.className = 'record-offense';
+        off.textContent = r.offenseLabel;
+        item.appendChild(off);
+      }
+
+      const footer = document.createElement('div');
+      footer.className = 'record-footer';
+
+      if(r.officerName){
+        const officer = document.createElement('div');
+        officer.className = 'record-officer';
+        officer.textContent = 'str. ' + r.officerName;
+        footer.appendChild(officer);
+      }
+
+      const sub = document.createElement('div');
+      sub.className = 'record-submitted';
+      sub.textContent = 'Odesláno ' + formatCreatedAt(r.createdAt) + (r.submittedBy ? ' · ' + r.submittedBy : '');
+      footer.appendChild(sub);
+
+      if(footer.children.length) item.appendChild(footer);
+
+      item.addEventListener('click', ()=> openDetail(r));
+      container.appendChild(item);
+    });
+  }
+
+  document.getElementById('searchInput').addEventListener('input', (e)=> renderList(e.target.value));
+
+  // ---------- Detail ----------
+  let currentDetailRecord = null;
+  let currentRecordPrinted = false;
+
+  // Ukládá skutečnou fotku (ne screenshot obrazovky) do Fotek. Atribut
+  // "download" na <a href="data:..."> je na iOS Safari (obzvlášť v appce
+  // přidané na plochu) nespolehlivý — tap na něj místo staženého souboru
+  // často jen zobrazí obrázek a to, co se pak reálně uloží do Fotek, je
+  // screenshot aktuální obrazovky. Nativní sdílecí okno (Web Share API se
+  // skutečným File objektem) ukládá spolehlivě přímo fotku; když ho telefon
+  // nepodporuje, otevřeme fotku v nové kartě, odkud jde uložit podržením prstu.
+  async function shareOrOpenPhoto(dataUrl, filename){
+    try{
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      if(navigator.canShare && navigator.canShare({ files: [file] })){
+        await navigator.share({ files: [file] });
+        return;
+      }
+    }catch(e){
+      // Uživatel sdílení zrušil, nebo API není k dispozici — zkusíme fallback.
+    }
+    window.open(dataUrl, '_blank');
+  }
+
+  function renderPhotoGallery(record, photos, mime){
+    const gallery = document.getElementById('photoGallery');
+    gallery.innerHTML = '';
+    photos.forEach((b64, idx)=>{
+      const dataUrl = 'data:' + mime + ';base64,' + b64;
+      const filename = (record.plate || 'prestupek') + '_' + (idx + 1) + '.jpg';
+      const item = document.createElement('div');
+      item.className = 'photo-item';
+
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = 'Fotodokumentace';
+      item.appendChild(img);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'download-link';
+      btn.textContent = 'Uložit fotku' + (photos.length > 1 ? ' ' + (idx + 1) : '');
+      btn.addEventListener('click', ()=> shareOrOpenPhoto(dataUrl, filename));
+      item.appendChild(btn);
+
+      gallery.appendChild(item);
+    });
+  }
+
+  function openDetail(record){
+    currentDetailRecord = record;
+    document.getElementById('detailPlateLabel').textContent = record.plate || 'DETAIL';
+    document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(record);
+
+    const photoToggleRow = document.getElementById('photoToggleRow');
+    const photoToggleBtn = document.getElementById('photoToggleBtn');
+    const photoWrap = document.getElementById('photoWrap');
+    document.getElementById('photoGallery').innerHTML = '';
+    photoWrap.classList.remove('open');
+    photoToggleBtn.textContent = 'Foto';
+    photoToggleBtn.disabled = false;
+
+    // Older records still keep photos inline on the main document; newer
+    // ones only have a `hasPhotos` flag and the actual bytes live in a
+    // subcollection, fetched lazily below when "Foto" is tapped — this is
+    // what keeps opening a record (and loading the list before it) fast.
+    const legacyPhotos = record.photos && record.photos.length ? record.photos
+      : (record.photoBase64 ? [record.photoBase64] : []);
+
+    if(record._resolvedPhotos){
+      // Fotky už byly v této session jednou staženy (ze subkolekce nebo
+      // starého formátu) — obnovíme je z cache místo opětovného fetchování
+      // a místo prázdné galerie po návratu do detailu.
+      renderPhotoGallery(record, record._resolvedPhotos, record._resolvedMime || 'image/jpeg');
+      photoToggleBtn.textContent = 'Foto' + (record._resolvedPhotos.length > 1 ? ' (' + record._resolvedPhotos.length + ')' : '');
+      photoToggleRow.style.display = 'block';
+      photoWrap.classList.add('open');
+    } else if(legacyPhotos.length){
+      record._resolvedPhotos = legacyPhotos;
+      record._resolvedMime = record.photoMime || 'image/jpeg';
+      renderPhotoGallery(record, legacyPhotos, record._resolvedMime);
+      photoToggleBtn.textContent = 'Foto' + (legacyPhotos.length > 1 ? ' (' + legacyPhotos.length + ')' : '');
+      photoToggleRow.style.display = 'block';
+      photoWrap.classList.add('open');
+    } else if(record.hasPhotos){
+      // Appka teď fotky rovnou dotáhne a zobrazí, místo aby čekala na
+      // klepnutí na "Foto" — stačí tedy jen zavolat stejnou logiku, kterou
+      // by jinak spustil klik na tlačítko.
+      photoToggleRow.style.display = 'block';
+      loadAndShowPhotos(record);
+    } else {
+      photoToggleRow.style.display = 'none';
+    }
+
+    updateResolveBtn(record);
+    setDetailNote('', '');
+    currentRecordPrinted = false;
+
+    show('detail');
+  }
+
+  function updateResolveBtn(record){
+    const btn = document.getElementById('resolveBtn');
+    if(record.resolved){
+      btn.textContent = '✓ Vyřízeno';
+      btn.disabled = true;
+    } else {
+      btn.textContent = 'Vyřízeno';
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('printBtn').addEventListener('click', ()=>{
+    if(currentDetailRecord) printViaEpson(currentDetailRecord);
+  });
+
+  document.getElementById('oznameniBtn').addEventListener('click', ()=>{
+    if(currentDetailRecord) exportOznameni(currentDetailRecord);
+  });
+
+  document.getElementById('resolveBtn').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record || record.resolved) return;
+    const btn = document.getElementById('resolveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Ukládám…';
+    try{
+      // Shortens this record's Firestore TTL from the default 90 days
+      // (set when it was created) to 60 days from now — the "expireAt"
+      // field is what the TTL policy actually watches, so updating it is
+      // enough; no need to move the document anywhere.
+      const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
+      await db.collection('prestupky').doc(record.id).update({
+        resolved: true,
+        resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        expireAt: expireAt
+      });
+      record.resolved = true;
+      updateResolveBtn(record);
+      renderList(document.getElementById('searchInput').value);
+    }catch(e){
+      console.error('Označení jako dořešeno selhalo:', e);
+      btn.disabled = false;
+      btn.textContent = 'Vyřízeno (chyba, zkuste znovu)';
+    }
+  });
+
+  // Sdílená logika stažení fotek ze subkolekce — volá ji jak automatické
+  // otevření detailu (viz openDetail), tak ruční klik na tlačítko "Foto"
+  // (např. po chybě, kdy je potřeba zkusit znovu).
+  async function loadAndShowPhotos(record){
+    const photoWrap = document.getElementById('photoWrap');
+    const photoToggleBtn = document.getElementById('photoToggleBtn');
+    photoToggleBtn.disabled = true;
+    photoToggleBtn.textContent = 'Načítám…';
+    try{
+      const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
+      const data = doc.exists ? doc.data() : null;
+      const photos = (data && data.photos) || [];
+      const mime = (data && data.photoMime) || 'image/jpeg';
+      record._resolvedPhotos = photos;
+      record._resolvedMime = mime;
+      renderPhotoGallery(record, photos, mime);
+      photoToggleBtn.textContent = 'Foto' + (photos.length > 1 ? ' (' + photos.length + ')' : '');
+      photoToggleBtn.disabled = false;
+      photoWrap.classList.add('open');
+    }catch(e){
+      console.error('Načtení fotek selhalo:', e);
+      photoToggleBtn.textContent = 'Foto (chyba)';
+      photoToggleBtn.disabled = false;
+    }
+  }
+
+  document.getElementById('photoToggleBtn').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record) return;
+    const photoWrap = document.getElementById('photoWrap');
+
+    if(record._resolvedPhotos){
+      photoWrap.classList.toggle('open');
+      return;
+    }
+
+    await loadAndShowPhotos(record);
+  });
+
+  document.getElementById('detailCloseBtn').addEventListener('click', ()=>{
+    show('list');
+  });
+
+})();
+</script>
+<script>
+  // Registrace service workeru jen kvůli instalovatelnosti appky na
+  // Androidu (viz sw.js) — na iOS Safari se appka na plochu přidává
+  // stejně jako dřív.
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    });
+  }
+</script>
+</body>
+</html>
