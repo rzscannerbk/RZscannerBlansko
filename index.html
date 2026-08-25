@@ -519,6 +519,7 @@
 
   <!-- RESULT -->
   <div id="resultScreen" class="screen">
+    <div id="diagBox" style="position:fixed; top:calc(env(safe-area-inset-top,0px) + 4px); left:4px; right:4px; z-index:9999; background:rgba(255,0,0,.85); color:#fff; font-family:monospace; font-size:10px; padding:6px; border-radius:6px; line-height:1.4; pointer-events:none;"></div>
     <div class="result-scroll" id="resultScroll">
       <div class="result-header">
         <h2>Rozpoznaný záznam</h2>
@@ -786,7 +787,33 @@
   function setAppHeight(){
     const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
     document.documentElement.style.setProperty('--app-height', h + 'px');
+    updateDiag();
   }
+  function updateDiag(){
+    const box = document.getElementById('diagBox');
+    if(!box) return;
+    const appEl = document.getElementById('app');
+    const scr = document.querySelector('.screen.active') || document.getElementById('resultScreen');
+    const appRect = appEl ? appEl.getBoundingClientRect() : null;
+    const scrRect = scr ? scr.getBoundingClientRect() : null;
+    const cssVar = getComputedStyle(document.documentElement).getPropertyValue('--app-height');
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed; bottom:0; height:0; padding-bottom:env(safe-area-inset-bottom,0px); visibility:hidden;';
+    document.body.appendChild(probe);
+    const safeBottom = getComputedStyle(probe).paddingBottom;
+    document.body.removeChild(probe);
+    box.textContent =
+      'innerH:' + window.innerHeight +
+      ' vvH:' + (window.visualViewport ? Math.round(window.visualViewport.height) : 'n/a') +
+      ' docClientH:' + document.documentElement.clientHeight +
+      ' screenH:' + window.screen.height + '/' + window.screen.availHeight +
+      ' | --app-h:' + cssVar +
+      ' safeBottom:' + safeBottom +
+      ' | #app rect:' + (appRect ? Math.round(appRect.top)+'-'+Math.round(appRect.bottom)+' (h'+Math.round(appRect.height)+')' : 'n/a') +
+      ' | .screen rect:' + (scrRect ? Math.round(scrRect.top)+'-'+Math.round(scrRect.bottom)+' (h'+Math.round(scrRect.height)+')' : 'n/a') +
+      ' | dpr:' + window.devicePixelRatio;
+  }
+  window.addEventListener('resize', updateDiag);
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
   window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight, 100));
