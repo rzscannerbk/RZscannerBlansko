@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RZ Scanner — Přehled</title>
 <meta name="theme-color" content="#0A0C10">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Přehled">
 <link rel="manifest" href="manifest-prehled.json">
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
@@ -240,7 +238,6 @@
 
   <!-- LIST -->
   <div id="listScreen" class="screen">
-    <div id="diagBox" style="position:fixed; top:calc(env(safe-area-inset-top,0px) + 4px); left:4px; right:4px; z-index:9999; background:rgba(255,0,0,.85); color:#fff; font-family:monospace; font-size:10px; padding:6px; border-radius:6px; line-height:1.4; pointer-events:none;"></div>
     <div class="list-top">
       <h1 id="listTitle">Přehled přestupků</h1>
     </div>
@@ -293,34 +290,7 @@
   function setAppHeight(){
     const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
     document.documentElement.style.setProperty('--app-height', h + 'px');
-    updateDiag();
   }
-  function updateDiag(){
-    const box = document.getElementById('diagBox');
-    if(!box) return;
-    const appEl = document.getElementById('app');
-    const scr = document.querySelector('.screen.active') || document.getElementById('listScreen');
-    const appRect = appEl ? appEl.getBoundingClientRect() : null;
-    const scrRect = scr ? scr.getBoundingClientRect() : null;
-    const cssVar = getComputedStyle(document.documentElement).getPropertyValue('--app-height');
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed; bottom:0; height:0; padding-bottom:env(safe-area-inset-bottom,0px); visibility:hidden;';
-    document.body.appendChild(probe);
-    const safeBottom = getComputedStyle(probe).paddingBottom;
-    document.body.removeChild(probe);
-    box.textContent =
-      'standalone:' + (window.navigator.standalone) + ' displayMode:' + (window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser') +
-      ' | innerH:' + window.innerHeight +
-      ' vvH:' + (window.visualViewport ? Math.round(window.visualViewport.height) : 'n/a') +
-      ' docClientH:' + document.documentElement.clientHeight +
-      ' screenH:' + window.screen.height + '/' + window.screen.availHeight +
-      ' | --app-h:' + cssVar +
-      ' safeBottom:' + safeBottom +
-      ' | #app rect:' + (appRect ? Math.round(appRect.top)+'-'+Math.round(appRect.bottom)+' (h'+Math.round(appRect.height)+')' : 'n/a') +
-      ' | .screen rect:' + (scrRect ? Math.round(scrRect.top)+'-'+Math.round(scrRect.bottom)+' (h'+Math.round(scrRect.height)+')' : 'n/a') +
-      ' | dpr:' + window.devicePixelRatio;
-  }
-  window.addEventListener('resize', updateDiag);
   setAppHeight();
   window.addEventListener('resize', setAppHeight);
   window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight, 100));
