@@ -2093,7 +2093,8 @@
   function populateResult(text, confidence, ocrErrorMessage, location){
     document.getElementById('plateInput').value = formatPlateDisplay(text);
     const now = new Date();
-    document.getElementById('dateInput').value = now.toISOString().slice(0,10);
+    const pad2 = n => String(n).padStart(2,'0');
+    document.getElementById('dateInput').value = now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate());
     document.getElementById('timeInput').value = now.toTimeString().slice(0,5);
 
     applyOfficerLock();
