@@ -350,6 +350,24 @@
   .shift-officer-row .name{color:var(--text); font-weight:600;}
   .shift-officer-row .nums{color:var(--faint); font-family:'Roboto Mono',monospace; font-size:12px;}
   .shift-summary-empty{color:var(--faint); font-size:13px; text-align:center; padding:20px 0;}
+  .new-record-toast{
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--asphalt-3); border:1px solid var(--amber-dim); color:var(--text);
+    padding:11px 20px; border-radius:12px; font-size:13.5px; box-shadow:0 12px 40px rgba(0,0,0,.4);
+    z-index:90; opacity:0; transition:opacity .25s ease, transform .25s ease; pointer-events:none;
+  }
+  .new-record-toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .undo-toast{
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--asphalt-3); border:1px solid var(--line); color:var(--text);
+    padding:11px 14px 11px 18px; border-radius:12px; font-size:13.5px; box-shadow:0 12px 40px rgba(0,0,0,.4);
+    z-index:90; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease;
+    display:flex; align-items:center; gap:14px;
+  }
+  .undo-toast.open{opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto;}
+  .undo-toast button{
+    background:none; border:none; color:#5D9CFF; font-weight:700; font-size:13.5px; cursor:pointer; font-family:inherit;
+  }
 
   .status-line{
     display:flex; align-items:center; gap:9px; margin-top:18px; padding:11px 13px; border-radius:9px;
@@ -579,6 +597,11 @@
     </div>
   </div>
 
+  <div class="undo-toast" id="undoToast">
+    <span id="undoToastText"></span>
+    <button id="undoToastBtn">Zpět</button>
+  </div>
+
   <div class="lightbox-overlay" id="lightboxOverlay">
     <button class="lightbox-close" id="lightboxClose" aria-label="Zavřít">✕</button>
     <button class="lightbox-nav prev" id="lightboxPrev" aria-label="Předchozí fotka">‹</button>
@@ -747,7 +770,18 @@
       .onSnapshot(snap=>{
         allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('[živý přenos]', first ? 'počáteční načtení' : 'změna dat', '—', allRecords.length, 'záznamů');
-        if(first) checkAndGenerateCompletedShiftSummary();
+        if(first){
+          checkAndGenerateCompletedShiftSummary();
+        } else {
+          // Nový přestupek přišel, zatímco appka byla otevřená — přehraje
+          // zvuk a ukáže krátké upozornění. Jen "added" změny (ne úpravy
+          // existujících záznamů typu Dořešit) a jen po počátečním načtení.
+          snap.docChanges().forEach(change=>{
+            if(change.type === 'added'){
+              notifyNewRecord({ id: change.doc.id, ...change.doc.data() });
+            }
+          });
+        }
         first = false;
         rebuildOffenseCatalog();
         renderRail();
@@ -757,6 +791,39 @@
         statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
         statusEl.style.display = 'block';
       });
+  }
+
+  // Zvuk upozornění na nový přestupek — skutečný zvukový soubor (mp3),
+  // vložený přímo do appky jako base64, ať appka zůstane jeden samostatný
+  // soubor a nemusí se kvůli tomu nahrávat na GitHub další soubor navíc.
+  const NOTIFY_SOUND_B64 = "SUQzAwAAAAAfdlBSSVYAAAAOAABQZWFrVmFsdWUA/38AAFBSSVYAAAARAABBdmVyYWdlTGV2ZWwAux8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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uBXAr8TYpvjeDf78V3/w7/+YuwNoG8WJEi2kJWWJOoaoYrEhyu29AgJqAgImBlXYMKOhWbBRQUbCCsQbEFNCmAobiLigrgpgKG4mxQXwrgU/E2KK4FcCvxNim+N4N/vxXf/Dv/5lTEFNRTMuOTNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVRBRwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAM";
+  let notifyAudioEl = null;
+  function playNotifySound(){
+    try{
+      if(!notifyAudioEl){
+        notifyAudioEl = new Audio('data:audio/mpeg;base64,' + NOTIFY_SOUND_B64);
+      }
+      notifyAudioEl.currentTime = 0;
+      notifyAudioEl.play().catch(e=>{
+        console.error('Přehrání zvuku upozornění selhalo:', e);
+      });
+    }catch(e){
+      console.error('Přehrání zvuku upozornění selhalo:', e);
+    }
+  }
+
+  function notifyNewRecord(record){
+    playNotifySound();
+    const toast = document.createElement('div');
+    toast.className = 'new-record-toast';
+    toast.innerHTML = '<b>' + escapeHtml(record.plate || 'Nový přestupek') + '</b>' +
+      (record.address ? ' · ' + escapeHtml(record.address) : '');
+    document.body.appendChild(toast);
+    requestAnimationFrame(()=> toast.classList.add('show'));
+    setTimeout(()=>{
+      toast.classList.remove('show');
+      setTimeout(()=> toast.remove(), 300);
+    }, 4000);
   }
 
   function formatCreatedAt(ts){
@@ -1666,6 +1733,11 @@
     });
     const officers = Object.keys(officerCounts).sort((a,b)=> officerCounts[b]-officerCounts[a]);
 
+    // Počet nevyřešených v title tabu prohlížeče — vidět i na kartě
+    // odsunuté na pozadí, bez nutnosti mít ji zrovna na obrazovce.
+    const baseTitle = 'RZ Scanner — Přehled (desktop)';
+    document.title = statusCounts.pending > 0 ? '(' + statusCounts.pending + ') ' + baseTitle : baseTitle;
+
     function item(label, count, active, onClick, dotColor){
       const el = document.createElement('button');
       el.type = 'button';
@@ -2014,6 +2086,28 @@
   // po zadání filtru.
   let keyboardFocusIndex = -1;
   document.addEventListener('keydown', (e)=>{
+    // Dokud je otevřené libovolné modální okno (detail přestupku, souhrn
+    // směny, nabídka Dořešit, lightbox fotek), šipky nemají procházet
+    // seznam v pozadí — místo toho posouvají obsah otevřeného okna, pokud
+    // je scrollovatelné (lightbox a nabídka Dořešit scroll nemají, tam
+    // šipky prostě nic nedělají).
+    const detailOpen = document.getElementById('detailModalOverlay').classList.contains('open');
+    const summaryOpen = document.getElementById('shiftSummaryOverlay').classList.contains('open');
+    const menuOpen = document.getElementById('resolveMenuOverlay').classList.contains('open');
+    const lightboxOpen = document.getElementById('lightboxOverlay').classList.contains('open');
+    if(detailOpen || summaryOpen || menuOpen || lightboxOpen){
+      if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+        const scrollEl = detailOpen ? document.getElementById('detailPreviewWrap')
+          : summaryOpen ? document.querySelector('.shift-summary-body')
+          : null;
+        if(scrollEl){
+          e.preventDefault();
+          scrollEl.scrollBy({ top: e.key === 'ArrowDown' ? 80 : -80, behavior: 'smooth' });
+        }
+      }
+      return;
+    }
+
     const active = document.activeElement;
     const inSearchField = active === searchInputEl;
     const isTypingElsewhere = active && !inSearchField &&
@@ -2622,7 +2716,54 @@
     record.resolvedMethod = method;
     updateResolveBtn(record);
     refreshView();
+    showUndoToast(record, method);
   }
+
+  // Vrátí přestupek zpět na nevyřešený — používá se jen z tlačítka "Zpět"
+  // v toastu do 5 vteřin po Dořešit, pro omylem kliknuté případy.
+  async function undoResolved(record){
+    await db.collection('prestupky').doc(record.id).update({
+      resolved: false,
+      resolvedMethod: firebase.firestore.FieldValue.delete(),
+      resolvedAt: firebase.firestore.FieldValue.delete(),
+      expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 90*24*60*60*1000))
+    });
+    record.resolved = false;
+    delete record.resolvedMethod;
+    delete record.resolvedAt;
+    updateResolveBtn(record);
+    refreshView();
+  }
+
+  // Toast "Zpět" — zmizí sám po 5 vteřinách; po tu dobu je poslední
+  // dořešený záznam možné jedním klikem vrátit zpět na nevyřešený.
+  let undoTimer = null;
+  let undoRecord = null;
+  const UNDO_METHOD_LABEL = { oznameni: 'Oznámeno', prikaz: 'Dořešeno příkazem', domluva: 'Dořešeno domluvou' };
+  function showUndoToast(record, method){
+    undoRecord = record;
+    clearTimeout(undoTimer);
+    const toast = document.getElementById('undoToast');
+    document.getElementById('undoToastText').textContent = (UNDO_METHOD_LABEL[method] || 'Dořešeno') + ' — ' + (record.plate || '');
+    toast.classList.add('open');
+    undoTimer = setTimeout(()=>{
+      toast.classList.remove('open');
+      undoRecord = null;
+    }, 5000);
+  }
+  document.getElementById('undoToastBtn').addEventListener('click', async ()=>{
+    if(!undoRecord) return;
+    clearTimeout(undoTimer);
+    document.getElementById('undoToast').classList.remove('open');
+    const record = undoRecord;
+    undoRecord = null;
+    try{
+      await undoResolved(record);
+    }catch(e){
+      console.error('Vrácení zpět selhalo:', e);
+      alert('Vrácení zpět se nepodařilo (' + e.message + ').');
+    }
+  });
 
   // Zatím jen placeholder — šablona dokumentu "Výzva" (jiný typ než
   // stávající Oznámení) ještě není připravená. Až Lukáš dodá podklad,
