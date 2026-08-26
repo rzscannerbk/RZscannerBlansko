@@ -287,6 +287,8 @@
   }
   .confirm-no{background:transparent; border:1.5px solid var(--line); color:var(--text);}
   .confirm-yes{background:#2F6FED; border:1.5px solid #2F6FED; color:#fff;}
+  .confirm-yes:disabled{background:#3A3D44; border-color:#3A3D44; color:var(--faint); cursor:default; opacity:.7;}
+  .printer-check-note{font-size:12px; color:var(--faint); margin:-10px 0 14px; text-align:center; line-height:1.4;}
 
   /* ---------- SCREEN: LOGIN ---------- */
   #loginScreen{align-items:center; justify-content:center; padding:32px;}
@@ -688,6 +690,7 @@
       <div class="confirm-box">
         <div class="confirm-success-text" id="printConfirmSuccessText"></div>
         <div class="confirm-text">Vytisknout výzvu?</div>
+        <div class="printer-check-note" id="printerCheckNote"></div>
         <div class="confirm-btns">
           <button class="confirm-btn confirm-no" id="printConfirmNo">Ne</button>
           <button class="confirm-btn confirm-yes" id="printConfirmYes">Ano</button>
@@ -2601,12 +2604,38 @@
     });
   }
 
+  // Lehká kontrola dostupnosti tiskárny — na rozdíl od printViaEpson()
+  // nic netiskne (žádný ePOS-Print XML příkaz, žádné odtržení papíru),
+  // jen zkusí, jestli síťové spojení na danou IP vůbec projde. Používá se
+  // před potvrzením tisku, ať appka ví dřív, než strážník klikne "Ano".
+  function pingPrinter(){
+    return new Promise(async (resolve)=>{
+      const host = getPrinterHost();
+      if(!host){ resolve(false); return; }
+      const bareHost = host.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(()=>controller.abort(), 3000);
+      try{
+        // no-cors: appka nepřečte odpověď, ale request musí síťově projít
+        // (TCP/TLS spojení navázáno) — to samo o sobě stačí jako signál
+        // "tiskárna je na síti dostupná".
+        await fetch('https://' + bareHost + '/', { mode: 'no-cors', signal: controller.signal });
+        clearTimeout(timeoutId);
+        resolve(true);
+      }catch(e){
+        clearTimeout(timeoutId);
+        resolve(false);
+      }
+    });
+  }
+
   function askPrintAfterSubmit(successText){
     return new Promise((resolve)=>{
       const overlay = document.getElementById('printConfirmOverlay');
       document.getElementById('printConfirmSuccessText').innerHTML = successText;
       const yesBtn = document.getElementById('printConfirmYes');
       const noBtn = document.getElementById('printConfirmNo');
+      const note = document.getElementById('printerCheckNote');
       function cleanup(result){
         overlay.classList.remove('open');
         yesBtn.removeEventListener('click', onYes);
@@ -2617,7 +2646,28 @@
       function onNo(){ cleanup(false); }
       yesBtn.addEventListener('click', onYes);
       noBtn.addEventListener('click', onNo);
+
+      // Dokud appka neví, jestli je tiskárna dostupná, je "Ano" zašedlé a
+      // neklikatelné — strážník tak hned vidí, že tisk pravděpodobně
+      // neproběhne, místo aby na to přišel až po kliknutí a čekání na
+      // timeout.
+      yesBtn.disabled = true;
+      note.textContent = '🖨 Kontroluji tiskárnu…';
       overlay.classList.add('open');
+      pingPrinter().then(reachable=>{
+        if(!getPrinterHost()){
+          note.textContent = 'Tiskárna není nastavená (⚙ Nastavit tiskárnu).';
+          yesBtn.disabled = true;
+        } else if(reachable){
+          note.textContent = '✓ Tiskárna dostupná';
+          yesBtn.disabled = false;
+        } else {
+          note.innerHTML = '⚠ Tiskárna nedostupná — zkontroluj Wi-Fi/zapnutí. <span id="printForceLink" style="text-decoration:underline; cursor:pointer;">Zkusit přesto</span>';
+          yesBtn.disabled = true;
+          const forceLink = document.getElementById('printForceLink');
+          if(forceLink) forceLink.addEventListener('click', ()=>{ yesBtn.disabled = false; note.textContent = ''; });
+        }
+      });
     });
   }
 

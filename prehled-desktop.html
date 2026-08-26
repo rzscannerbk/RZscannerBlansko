@@ -171,6 +171,13 @@
     color:var(--faint); border-bottom:1px solid var(--line); gap:0 10px;
   }
   .list-head span{text-align:center;}
+  .list-head span.sortable{cursor:pointer; user-select:none;}
+  .list-head span.sortable:hover{color:var(--text);}
+  .list-head span.sortable.sort-active{color:var(--text);}
+  .list-head span.sortable .sort-arrow{margin-left:3px; display:inline-block;}
+  .record-item.stale .stripe{background:#B5493F;}
+  .record-item.stale .record-plate{color:#E88A80;}
+  .record-item.kbd-focus{outline:1.5px solid var(--faint); outline-offset:-1.5px;}
   .list-head span.head-left{text-align:left;}
   #listBody{flex:1; overflow-y:auto;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
@@ -285,6 +292,35 @@
   #noticeCardContainer{flex:1 1 340px; max-width:400px;}
   .panel-actions{display:flex; justify-content:center; padding:16px 22px; border-top:1px solid var(--line); flex:0 0 auto;}
   .panel-actions .btn{flex:0 0 auto; padding:10px 28px;}
+
+  /* ---------- Souhrn směny ---------- */
+  .shift-summary-overlay{
+    display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.6);
+    align-items:center; justify-content:center; padding:32px;
+  }
+  .shift-summary-overlay.open{display:flex;}
+  .shift-summary-modal{
+    width:100%; max-width:640px; max-height:88vh; display:flex; flex-direction:column;
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 30px 90px rgba(0,0,0,.6); overflow:hidden;
+  }
+  .shift-summary-body{flex:1; overflow-y:auto; padding:26px;}
+  .shift-summary-range{display:flex; gap:8px; margin-bottom:20px;}
+  .shift-summary-range button{
+    flex:1; padding:8px 0; border-radius:8px; border:1px solid var(--line); background:transparent;
+    color:var(--muted); font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .shift-summary-range button.active{background:#2F6FED; border-color:#2F6FED; color:#fff;}
+  .shift-summary-stats{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:24px;}
+  .shift-stat{background:var(--asphalt); border:1px solid var(--line); border-radius:10px; padding:12px 10px; text-align:center;}
+  .shift-stat .num{font-family:'Oswald',sans-serif; font-size:24px; font-weight:700; color:var(--text);}
+  .shift-stat .lbl{font-size:10.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;}
+  .shift-summary-title{font-size:11px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
+  .shift-officer-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
+  .shift-officer-row:last-child{border-bottom:none;}
+  .shift-officer-row .name{color:var(--text); font-weight:600;}
+  .shift-officer-row .nums{color:var(--faint); font-family:'Roboto Mono',monospace; font-size:12px;}
+  .shift-summary-empty{color:var(--faint); font-size:13px; text-align:center; padding:20px 0;}
 
   .status-line{
     display:flex; align-items:center; gap:9px; margin-top:18px; padding:11px 13px; border-radius:9px;
@@ -417,6 +453,7 @@
       <div class="topbar-spacer"></div>
 
       <button class="icon-btn" id="fullscreenBtn" title="Celá obrazovka">⛶</button>
+      <button class="icon-btn" id="shiftSummaryBtn" title="Souhrn směny" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">Souhrn směny</button>
 
       <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="backlink">Zpět na RZ Scanner</a>
 
@@ -434,12 +471,12 @@
       <div class="list-area">
         <div class="list-head">
           <span></span>
-          <span>RZ</span>
-          <span>Typ</span>
-          <span>Ulice</span>
-          <span>Přestupek</span>
-          <span class="head-left">Stav</span>
-          <span>Odesláno</span>
+          <span class="sortable" data-sort="plate">RZ</span>
+          <span class="sortable" data-sort="type">Typ</span>
+          <span class="sortable" data-sort="address">Ulice</span>
+          <span class="sortable" data-sort="offense">Přestupek</span>
+          <span class="head-left sortable" data-sort="status">Stav</span>
+          <span class="sortable" data-sort="sent">Odesláno</span>
           <span></span>
         </div>
         <div id="listBody">
@@ -488,6 +525,26 @@
         <button class="confirm-btn confirm-yes" id="menuVyresenoBtn">Příkaz na místě</button>
         <button class="confirm-btn confirm-no" id="menuDomluvaBtn">Domluva</button>
         <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="shift-summary-overlay" id="shiftSummaryOverlay">
+    <div class="shift-summary-modal">
+      <div class="panel-head">
+        <div class="detail-head-info"><span class="detail-head-plate mono">SOUHRN SMĚNY</span></div>
+        <button id="shiftSummaryCloseBtn" aria-label="Zavřít">✕</button>
+      </div>
+      <div class="shift-summary-body">
+        <div class="shift-summary-range" id="shiftSummaryRange">
+          <button data-range="today" class="active">Dnes</button>
+          <button data-range="week">Týden</button>
+          <button data-range="all">Vše</button>
+        </div>
+        <div id="shiftSummaryContent"></div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn btn-primary" id="shiftSummaryExportBtn">Exportovat jako .docx</button>
       </div>
     </div>
   </div>
@@ -1641,6 +1698,72 @@
     refreshView();
   });
 
+  // Řazení seznamu kliknutím na hlavičku sloupce — null = výchozí pořadí
+  // (podle createdAt sestupně, jak přichází z Firestore dotazu).
+  let sortKey = null;
+  let sortDir = 1;
+  const STATUS_ORDER = ['pending', 'oznameni', 'prikaz', 'domluva'];
+
+  function sortRecords(records){
+    if(!sortKey) return records;
+    const arr = records.slice();
+    arr.sort((a, b)=>{
+      let va, vb;
+      if(sortKey === 'plate'){ va = a.plate || ''; vb = b.plate || ''; }
+      else if(sortKey === 'type'){ va = (a.docType || 'vyzva'); vb = (b.docType || 'vyzva'); }
+      else if(sortKey === 'address'){ va = a.address || ''; vb = b.address || ''; }
+      else if(sortKey === 'offense'){ va = a.offenseLabel || ''; vb = b.offenseLabel || ''; }
+      else if(sortKey === 'status'){ va = STATUS_ORDER.indexOf(recordStatusKey(a)); vb = STATUS_ORDER.indexOf(recordStatusKey(b)); }
+      else if(sortKey === 'sent'){
+        va = (a.createdAt && a.createdAt.toDate) ? a.createdAt.toDate().getTime() : 0;
+        vb = (b.createdAt && b.createdAt.toDate) ? b.createdAt.toDate().getTime() : 0;
+      }
+      if(typeof va === 'string') va = va.toLowerCase();
+      if(typeof vb === 'string') vb = vb.toLowerCase();
+      if(va < vb) return -1 * sortDir;
+      if(va > vb) return 1 * sortDir;
+      return 0;
+    });
+    return arr;
+  }
+
+  document.querySelectorAll('.list-head span.sortable').forEach(span=>{
+    span.addEventListener('click', ()=>{
+      const key = span.dataset.sort;
+      if(sortKey === key){
+        sortDir = -sortDir;
+      } else {
+        sortKey = key;
+        sortDir = 1;
+      }
+      document.querySelectorAll('.list-head span.sortable').forEach(s=>{
+        s.classList.remove('sort-active');
+        const existingArrow = s.querySelector('.sort-arrow');
+        if(existingArrow) existingArrow.remove();
+      });
+      span.classList.add('sort-active');
+      const arrow = document.createElement('span');
+      arrow.className = 'sort-arrow';
+      arrow.textContent = sortDir === 1 ? '▲' : '▼';
+      span.appendChild(arrow);
+      renderList(document.getElementById('searchInput').value);
+    });
+  });
+
+  // Záznamy nevyřešené déle než tento počet dní dostanou v seznamu
+  // červený proužek/SPZ, ať na ně strážník při předávání směny snáz narazí.
+  const STALE_DAYS_THRESHOLD = 3;
+  function isStale(r){
+    if(recordStatusKey(r) !== 'pending') return false;
+    const ts = r.createdAt && r.createdAt.toDate ? r.createdAt.toDate() : null;
+    if(!ts) return false;
+    return (Date.now() - ts.getTime()) > STALE_DAYS_THRESHOLD * 24 * 60 * 60 * 1000;
+  }
+
+  // Aktuálně vykreslené záznamy v pořadí zobrazení — používá klávesová
+  // navigace (šipky/Enter) níže, ať ví, na co ukazuje.
+  let currentRenderedRecords = [];
+
   function renderList(filterText){
     const container = document.getElementById('listBody');
     const statusEl = document.getElementById('listStatus');
@@ -1656,6 +1779,9 @@
         (r.offenseLabel || '').toLowerCase().includes(q)
       );
     }
+    filtered = sortRecords(filtered);
+    currentRenderedRecords = filtered;
+    keyboardFocusIndex = -1;
 
     container.innerHTML = '';
     if(allRecords.length === 0){
@@ -1675,9 +1801,10 @@
     filtered.forEach(r=>{
       const sKey = recordStatusKey(r);
       const isBoticka = (r.docType || 'vyzva') === 'boticka';
+      const stale = isStale(r);
 
       const item = document.createElement('div');
-      item.className = 'record-item' + (isBoticka ? ' boticka' : '') + (sKey !== 'pending' ? ' resolved' : '') + (r.id === (currentDetailRecord && currentDetailRecord.id) ? ' selected' : '');
+      item.className = 'record-item' + (isBoticka ? ' boticka' : '') + (sKey !== 'pending' ? ' resolved' : '') + (stale ? ' stale' : '') + (r.id === (currentDetailRecord && currentDetailRecord.id) ? ' selected' : '');
 
       const stripe = document.createElement('span');
       stripe.className = 'stripe';
@@ -1688,6 +1815,18 @@
       const plate = document.createElement('span');
       plate.className = 'record-plate mono';
       plate.textContent = r.plate || 'NEZNÁMÁ SPZ';
+      if(r.plate){
+        plate.title = 'Kliknutím zkopírovat SPZ';
+        plate.style.cursor = 'pointer';
+        plate.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          navigator.clipboard.writeText(r.plate).then(()=>{
+            const original = plate.textContent;
+            plate.textContent = 'Zkopírováno ✓';
+            setTimeout(()=>{ plate.textContent = original; }, 900);
+          }).catch(()=>{});
+        });
+      }
       plateCol.appendChild(plate);
       if(r.noticeNumber){
         const num = document.createElement('span');
@@ -1705,6 +1844,18 @@
       const addr = document.createElement('span');
       addr.className = 'record-addr';
       addr.textContent = r.address || '—';
+      if(r.address){
+        addr.title = 'Otevřít na Mapy.cz';
+        addr.style.cursor = 'pointer';
+        addr.style.textDecoration = 'underline';
+        addr.style.textDecorationColor = 'transparent';
+        addr.addEventListener('mouseenter', ()=>{ addr.style.textDecorationColor = 'currentColor'; });
+        addr.addEventListener('mouseleave', ()=>{ addr.style.textDecorationColor = 'transparent'; });
+        addr.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          window.open('https://mapy.cz/zakladni?q=' + encodeURIComponent(r.address + ', Blansko'), '_blank');
+        });
+      }
       item.appendChild(addr);
 
       const offense = document.createElement('span');
@@ -1798,6 +1949,221 @@
   searchInputEl.addEventListener('blur', ()=> setTimeout(hideSuggestions, 120));
   searchInputEl.addEventListener('keydown', (e)=>{
     if(e.key === 'Escape') hideSuggestions();
+  });
+
+  // Klávesové zkratky pro pohyb v seznamu — "/" dá focus na vyhledávání,
+  // šipky nahoru/dolů posouvají zvýraznění mezi řádky (bez nutnosti myši),
+  // Enter otevře detail zvýrazněného řádku. Aktivní jen mimo běžné psaní
+  // textu (aby "/" nebo šipky nerozbíjely psaní ve vyhledávání/jinde) —
+  // výjimkou je samotné pole vyhledávání, kde šipky/Enter dávají smysl i
+  // po zadání filtru.
+  let keyboardFocusIndex = -1;
+  document.addEventListener('keydown', (e)=>{
+    const active = document.activeElement;
+    const inSearchField = active === searchInputEl;
+    const isTypingElsewhere = active && !inSearchField &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    if(isTypingElsewhere) return;
+
+    if(e.key === '/' && !inSearchField){
+      e.preventDefault();
+      searchInputEl.focus();
+      return;
+    }
+
+    const items = document.querySelectorAll('#listBody .record-item');
+    if(!items.length) return;
+
+    if(e.key === 'ArrowDown'){
+      e.preventDefault();
+      keyboardFocusIndex = Math.min(keyboardFocusIndex + 1, items.length - 1);
+      items.forEach(el=>el.classList.remove('kbd-focus'));
+      items[keyboardFocusIndex].classList.add('kbd-focus');
+      items[keyboardFocusIndex].scrollIntoView({ block: 'nearest' });
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault();
+      keyboardFocusIndex = Math.max(keyboardFocusIndex - 1, 0);
+      items.forEach(el=>el.classList.remove('kbd-focus'));
+      items[keyboardFocusIndex].classList.add('kbd-focus');
+      items[keyboardFocusIndex].scrollIntoView({ block: 'nearest' });
+    } else if(e.key === 'Enter' && keyboardFocusIndex >= 0 && keyboardFocusIndex < currentRenderedRecords.length){
+      e.preventDefault();
+      items.forEach(el=>el.classList.remove('selected'));
+      items[keyboardFocusIndex].classList.add('selected');
+      openDetail(currentRenderedRecords[keyboardFocusIndex]);
+    }
+  });
+
+  // ---------- Souhrn směny ----------
+  let shiftSummaryRange = 'today';
+
+  // Filtruje čistě podle data (nezávisle na levém panelu filtrů) — souhrn
+  // má vždy ukazovat kompletní obrázek za zvolené období, ne jen to, co
+  // zrovna prochází stavovým/typovým filtrem v hlavním seznamu.
+  function recordsInDateRange(range){
+    if(range === 'all') return allRecords.slice();
+    const today = todayIso();
+    return allRecords.filter(r=>{
+      if(!r.date) return false;
+      if(range === 'today') return r.date === today;
+      if(range === 'week'){
+        const d = new Date(r.date + 'T00:00:00');
+        const now = new Date(); now.setHours(0,0,0,0);
+        const diffDays = Math.round((now - d) / 86400000);
+        return !isNaN(diffDays) && diffDays >= 0 && diffDays <= 6;
+      }
+      return true;
+    });
+  }
+
+  function computeShiftStats(range){
+    const records = recordsInDateRange(range);
+    const statusCounts = { pending:0, oznameni:0, prikaz:0, domluva:0 };
+    const officers = {};
+    records.forEach(r=>{
+      const sKey = recordStatusKey(r);
+      statusCounts[sKey] = (statusCounts[sKey] || 0) + 1;
+      const name = r.officerName || 'Neuvedeno';
+      if(!officers[name]) officers[name] = { total:0, resolved:0, unresolved:0 };
+      officers[name].total++;
+      if(sKey === 'pending') officers[name].unresolved++;
+      else officers[name].resolved++;
+    });
+    const officerRows = Object.keys(officers)
+      .map(name=>({ name, ...officers[name] }))
+      .sort((a,b)=> b.total - a.total || a.name.localeCompare(b.name, 'cs'));
+    return { total: records.length, statusCounts, officerRows };
+  }
+
+  const RANGE_LABEL = { today:'dnes', week:'tento týden', all:'za celou dobu' };
+
+  function renderShiftSummary(){
+    const stats = computeShiftStats(shiftSummaryRange);
+    const content = document.getElementById('shiftSummaryContent');
+    if(stats.total === 0){
+      content.innerHTML = '<div class="shift-summary-empty">Žádné přestupky ' + escapeHtml(RANGE_LABEL[shiftSummaryRange]) + '.</div>';
+      return;
+    }
+    let html = '<div class="shift-summary-stats">' +
+      '<div class="shift-stat"><div class="num">' + stats.total + '</div><div class="lbl">Celkem</div></div>' +
+      '<div class="shift-stat"><div class="num">' + stats.statusCounts.pending + '</div><div class="lbl">Nevyřešeno</div></div>' +
+      '<div class="shift-stat"><div class="num">' + (stats.statusCounts.oznameni + stats.statusCounts.prikaz + stats.statusCounts.domluva) + '</div><div class="lbl">Dořešeno</div></div>' +
+      '<div class="shift-stat"><div class="num">' + stats.statusCounts.domluva + '</div><div class="lbl">Domluvou</div></div>' +
+      '</div>';
+    html += '<div class="shift-summary-title">Podle strážníka</div>';
+    stats.officerRows.forEach(o=>{
+      html += '<div class="shift-officer-row"><span class="name">' + escapeHtml(o.name) + '</span>' +
+        '<span class="nums">' + o.total + ' celkem · ' + o.resolved + ' dořešeno · ' + o.unresolved + ' nevyřešeno</span></div>';
+    });
+    content.innerHTML = html;
+  }
+
+  document.getElementById('shiftSummaryBtn').addEventListener('click', ()=>{
+    document.getElementById('shiftSummaryOverlay').classList.add('open');
+    renderShiftSummary();
+  });
+  document.getElementById('shiftSummaryCloseBtn').addEventListener('click', ()=>{
+    document.getElementById('shiftSummaryOverlay').classList.remove('open');
+  });
+  document.getElementById('shiftSummaryRange').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-range]');
+    if(!btn) return;
+    shiftSummaryRange = btn.dataset.range;
+    document.querySelectorAll('#shiftSummaryRange button').forEach(b=>b.classList.toggle('active', b === btn));
+    renderShiftSummary();
+  });
+
+  // Souhrn jako .docx — jednoduchý textový report (bez fotek/tabulek OOXML),
+  // znovupoužívá stejné docxPara/docxLabelValuePara helpery a stejné
+  // sestavení balíčku (JSZip) jako export Oznámení výše.
+  async function buildShiftSummaryDocx(range){
+    const stats = computeShiftStats(range);
+    let body = '';
+    body += docxPara('Souhrn směny', { bold: true, size: 28, align: 'center', spacingAfter: 100 });
+    body += docxPara('Městská policie Blansko · ' + todayCz() + ' · období: ' + RANGE_LABEL[range], { size: 18, align: 'center', spacingAfter: 300 });
+
+    body += docxPara('Celkem přestupků: ' + stats.total, { size: 22, bold: true, spacingAfter: 100 });
+    body += docxPara('Nevyřešeno: ' + stats.statusCounts.pending, { size: 20, spacingAfter: 40 });
+    body += docxPara('Oznámeno: ' + stats.statusCounts.oznameni, { size: 20, spacingAfter: 40 });
+    body += docxPara('Dořešeno příkazem: ' + stats.statusCounts.prikaz, { size: 20, spacingAfter: 40 });
+    body += docxPara('Dořešeno domluvou: ' + stats.statusCounts.domluva, { size: 20, spacingAfter: 300 });
+
+    body += docxPara('Podle strážníka', { bold: true, size: 22, spacingAfter: 150 });
+    stats.officerRows.forEach(o=>{
+      body += docxLabelValuePara(
+        o.name + ':',
+        o.total + ' celkem, ' + o.resolved + ' dořešeno, ' + o.unresolved + ' nevyřešeno',
+        { size: 20, spacingAfter: 80, tabPos: 3200 }
+      );
+    });
+
+    const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+      'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<w:body>' + body +
+      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>' +
+      '</w:sectPr></w:body></w:document>';
+
+    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '</Types>';
+
+    const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '</Relationships>';
+
+    const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.file('_rels/.rels', rootRels);
+    zip.file('word/document.xml', documentXml);
+    zip.file('word/_rels/document.xml.rels', docRels);
+
+    return zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
+  }
+
+  document.getElementById('shiftSummaryExportBtn').addEventListener('click', async ()=>{
+    const btn = document.getElementById('shiftSummaryExportBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Připravuji…';
+    try{
+      if(typeof JSZip === 'undefined'){
+        alert('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).');
+        return;
+      }
+      const blob = await buildShiftSummaryDocx(shiftSummaryRange);
+      const filename = 'Souhrn_smeny_' + todayIso() + '.docx';
+      try{
+        const file = new File([blob], filename, { type: blob.type });
+        if(navigator.canShare && navigator.canShare({ files: [file] })){
+          await navigator.share({ files: [file] });
+          return;
+        }
+      }catch(e){
+        // Sdílení zrušeno/nedostupné — spadneme na otevření v nové kartě.
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(()=> URL.revokeObjectURL(url), 60000);
+    }catch(e){
+      console.error('Export souhrnu směny selhal:', e);
+      alert('Vytvoření dokumentu se nezdařilo (' + e.message + ').');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   });
 
   // ---------- Detail ----------
