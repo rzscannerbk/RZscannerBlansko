@@ -268,8 +268,11 @@
     background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
     box-shadow:0 30px 90px rgba(0,0,0,.6); overflow:hidden;
   }
-  .panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 22px; border-bottom:1px solid var(--line); flex:0 0 auto;}
+  .panel-head{display:flex; align-items:center; justify-content:space-between; padding:16px 22px; border-bottom:1px solid var(--line); flex:0 0 auto; gap:14px;}
   .panel-head .id{font-size:12px; color:var(--faint);}
+  .detail-head-info{display:flex; align-items:baseline; flex-wrap:wrap; gap:5px 10px; min-width:0;}
+  .detail-head-plate{font-weight:800; font-size:14px; color:var(--text); letter-spacing:.02em;}
+  .detail-head-meta{font-size:12px; color:var(--faint); white-space:nowrap;}
   .panel-head button{background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:13px;}
   .panel-head button:hover{color:var(--text); border-color:var(--faint);}
   #detailPreviewWrap{
@@ -298,7 +301,6 @@
   .notice-subtitle{color:#777; font-size:12px; margin:0 0 17px;}
   .notice-subtitle-boticka{font-size:17px; font-weight:700; color:#333;}
   .notice-number{color:#666; font-size:22px; letter-spacing:.03em; margin:-9px 0 17px; font-weight:800;}
-  .notice-top-offense{font-size:14px; font-weight:700; color:#181818; line-height:1.4; margin:-9px 0 16px;}
   .notice-officer{font-weight:600; font-size:11px; color:#555; margin-bottom:4px;}
   .notice-label{color:#999; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
   .notice-platebox{
@@ -449,7 +451,7 @@
   <div class="detail-modal-overlay" id="detailModalOverlay">
     <div class="detail-modal">
       <div class="panel-head">
-        <span class="id mono" id="detailPlateLabel">DETAIL</span>
+        <div class="detail-head-info" id="detailHeadInfo"><span class="detail-head-plate mono">DETAIL</span></div>
         <button id="detailCloseBtn" aria-label="Zavřít">✕</button>
       </div>
       <div id="detailPreviewWrap">
@@ -687,8 +689,6 @@
       </div>` : '';
     const numberBlock = record.noticeNumber ? `
       <div class="notice-number"><b>${escapeHtml(record.noticeNumber)}</b></div>` : '';
-    const topOffenseBlock = record.offenseLabel ? `
-      <div class="notice-top-offense">${escapeHtml(record.offenseLabel)}</div>` : '';
     const officerBlock = record.officerName ? `
       <div class="notice-officer">str. ${escapeHtml(record.officerName)}</div>` : '';
     const vehicleBlock = (record.brand || record.color) ? `
@@ -709,7 +709,6 @@
         <div class="notice-title">${isBoticka ? 'Oznámení' : 'Výzva'}</div>
         <div class="notice-subtitle${isBoticka ? ' notice-subtitle-boticka' : ''}">${isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku'}</div>
         ${numberBlock}
-        ${topOffenseBlock}
         <div class="notice-label">Registrační značka</div>
         <div class="notice-platebox">${escapeHtml(record.plate || '')}</div>
         ${vehicleBlock}
@@ -1888,9 +1887,20 @@
     });
   }
 
+  function buildDetailHeadHtml(record){
+    const parts = [];
+    parts.push('<span class="detail-head-plate mono">' + escapeHtml(record.plate || 'NEZNÁMÁ SPZ') + '</span>');
+    if(record.noticeNumber) parts.push('<span class="detail-head-meta mono">' + escapeHtml(record.noticeNumber) + '</span>');
+    if(record.address) parts.push('<span class="detail-head-meta">' + escapeHtml(record.address) + '</span>');
+    const dateTime = [record.date ? formatDateCz(record.date) : null, record.time || null].filter(Boolean).join(' ');
+    if(dateTime) parts.push('<span class="detail-head-meta">' + escapeHtml(dateTime) + '</span>');
+    if(record.officerName) parts.push('<span class="detail-head-meta">' + escapeHtml(record.officerName) + '</span>');
+    return parts.join('<span class="detail-head-meta">·</span>');
+  }
+
   function openDetail(record){
     currentDetailRecord = record;
-    document.getElementById('detailPlateLabel').textContent = record.plate || 'DETAIL';
+    document.getElementById('detailHeadInfo').innerHTML = buildDetailHeadHtml(record);
     document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(record);
 
     const photoToggleRow = document.getElementById('photoToggleRow');

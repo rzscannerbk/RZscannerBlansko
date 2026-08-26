@@ -203,7 +203,6 @@
   .notice-subtitle{color:#777; font-size:12.5px; margin:0 0 18px;}
   .notice-subtitle-boticka{font-size:18.75px; font-weight:700; color:#333;}
   .notice-number{color:#666; font-size:22px; letter-spacing:.03em; margin:-10px 0 18px; font-weight:800;}
-  .notice-top-offense{font-size:14px; font-weight:700; color:#181818; line-height:1.4; margin:-10px 0 17px;}
   .notice-officer{font-weight:600; font-size:11px; color:#555; margin-bottom:4px;}
   .notice-label{color:#999; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
   .notice-platebox{
@@ -523,8 +522,6 @@
       </div>` : '';
     const numberBlock = record.noticeNumber ? `
       <div class="notice-number"><b>${escapeHtml(record.noticeNumber)}</b></div>` : '';
-    const topOffenseBlock = record.offenseLabel ? `
-      <div class="notice-top-offense">${escapeHtml(record.offenseLabel)}</div>` : '';
     const officerBlock = record.officerName ? `
       <div class="notice-officer">str. ${escapeHtml(record.officerName)}</div>` : '';
     const vehicleBlock = (record.brand || record.color) ? `
@@ -545,7 +542,6 @@
         <div class="notice-title">${isBoticka ? 'Oznámení' : 'Výzva'}</div>
         <div class="notice-subtitle${isBoticka ? ' notice-subtitle-boticka' : ''}">${isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku'}</div>
         ${numberBlock}
-        ${topOffenseBlock}
         <div class="notice-label">Registrační značka</div>
         <div class="notice-platebox">${escapeHtml(record.plate || '')}</div>
         ${vehicleBlock}
