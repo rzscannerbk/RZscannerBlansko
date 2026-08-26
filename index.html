@@ -325,7 +325,7 @@
   .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:26px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
   .notice-subtitle{color:#777; font-size:12.5px; margin:0 0 18px;}
   .notice-subtitle-boticka{font-size:18.75px; font-weight:700; color:#333;}
-  .notice-number{color:#666; font-size:11px; letter-spacing:.03em; margin:-10px 0 18px; font-weight:800;}
+  .notice-number{color:#666; font-size:22px; letter-spacing:.03em; margin:-10px 0 18px; font-weight:800;}
   .notice-officer{font-weight:600; font-size:11px; color:#555; margin-bottom:4px;}
   .notice-label{color:#999; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
   .notice-platebox{
@@ -922,20 +922,22 @@
     note.style.display = text ? 'block' : 'none';
   }
 
-  // Vytvoří unikátní číslo výzvy z ID dokumentu, které si vygenerujeme na
-  // klientovi ještě před zápisem (Firestore garantuje, že je globálně
-  // jedinečné). Díky tomu nepotřebujeme žádnou další kolekci ani transakci
-  // navíc oproti zápisu do "prestupky" — a tedy ani žádná nová bezpečnostní
-  // pravidla, na což dřívější řešení s čítačem v "meta" naráželo.
-  function noticeNumberFromDocId(docId){
-    const year = new Date().getFullYear();
-    // Firestore doc.id je náhodný řetězec písmen i číslic — pro čistě
-    // číselné číslo jednací se místo něj používá posledních 6 číslic
-    // aktuálního času (v ms od 1970), doplněných nulami zleva. Riziko
-    // shody dvou čísel je zanedbatelné (musely by se odeslat dva
-    // přestupky ve stejné milisekundě).
-    const numericPart = String(Date.now() % 1000000).padStart(6, '0');
-    return `MPB-${year}-${numericPart}`;
+  // Vrací příští chronologické číslo jednací jako čistě šestimístné číslo
+  // (000001, 000002, …). Hodnota se drží v jediném dokumentu
+  // meta/noticeCounter a zvyšuje se transakcí, aby dvě odeslání ve stejnou
+  // chvíli (ze dvou telefonů) nikdy nedostala stejné číslo. Vyžaduje ve
+  // Firestore Security Rules povolit read+write na "meta/noticeCounter" —
+  // viz poznámka u volání.
+  async function getNextNoticeNumber(){
+    const counterRef = db.collection('meta').doc('noticeCounter');
+    const next = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const current = (snap.exists && typeof snap.data().value === 'number') ? snap.data().value : 0;
+      const nextVal = current + 1;
+      tx.set(counterRef, { value: nextVal }, { merge: true });
+      return nextVal;
+    });
+    return String(next).padStart(6, '0');
   }
 
   async function uploadLastPdfToFirestore(docType){
@@ -970,7 +972,21 @@
       // they're fetched only when someone actually opens that record's
       // "Foto" panel.
       const docRef = db.collection('prestupky').doc();
-      const noticeNumber = noticeNumberFromDocId(docRef.id);
+      let noticeNumber;
+      let counterBlocked = false;
+      try{
+        noticeNumber = await getNextNoticeNumber();
+      }catch(e){
+        if(e && e.code === 'permission-denied'){
+          // Firestore pravidla ještě nepovolují meta/noticeCounter — radši
+          // necháme odeslání proběhnout dál s náhradním číslem, než aby
+          // celý přestupek kvůli tomu spadl.
+          counterBlocked = true;
+          noticeNumber = String(Date.now() % 1000000).padStart(6, '0');
+        } else {
+          throw e;
+        }
+      }
       const baseData = {
         plate: lastGeneratedPdf.plate,
         date: lastGeneratedPdf.date,
@@ -1026,6 +1042,10 @@
         submitBtn.disabled = true;
         // Krátká pauza, aby uživatel stihl vidět potvrzení, než appka
         // přeskočí zpět na úvodní obrazovku připravenou na další přestupek.
+        setTimeout(()=>{ show('start'); }, 1200);
+      } else if(counterBlocked){
+        setSubmitNote('✓ Přestupek odeslán, ale s náhradním číslem jednacím — Firestore pravidla zatím neumožňují chronologický čítač. Je potřeba upravit pravidla v konzoli (povolit read+write na "meta/noticeCounter").', 'ok');
+        submitBtn.disabled = true;
         setTimeout(()=>{ show('start'); }, 1200);
       } else {
         submitBtn.disabled = true;
@@ -2349,7 +2369,7 @@
     x += textEl((isBoticka ? 'OZNÁMENÍ' : 'VÝZVA') + '\n', { align: 'center', width: 2, height: 2, em: true });
     x += textEl(wrapWords(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku') + '\n', { align: 'center' });
     if(record.noticeNumber){
-      x += textEl('Č. j.: ' + record.noticeNumber + '\n', { align: 'center', em: true });
+      x += textEl('Č. j.: ' + record.noticeNumber + '\n', { align: 'center', em: true, width: 2, height: 2 });
     }
     x += textEl('\nREGISTRAČNÍ ZNAČKA\n', { align: 'center' });
     x += textEl((record.plate || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
