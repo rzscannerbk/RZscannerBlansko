@@ -482,11 +482,11 @@
 
   <div class="confirm-overlay" id="resolveMenuOverlay">
     <div class="confirm-box">
-      <div class="confirm-text">Co chceš udělat?</div>
       <div class="confirm-btns confirm-btns-col">
         <button class="confirm-btn confirm-no" id="menuOznameniBtn">Oznámení</button>
         <button class="confirm-btn confirm-no" id="menuVyzvaBtn">Výzva</button>
         <button class="confirm-btn confirm-yes" id="menuVyresenoBtn">Příkaz na místě</button>
+        <button class="confirm-btn confirm-no" id="menuDomluvaBtn">Domluva</button>
         <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
       </div>
     </div>
@@ -1520,6 +1520,7 @@
     if(!r.resolved) return 'pending';
     if(r.resolvedMethod === 'oznameni') return 'oznameni';
     if(r.resolvedMethod === 'prikaz') return 'prikaz';
+    if(r.resolvedMethod === 'domluva') return 'domluva';
     return 'prikaz'; // starší záznamy bez uloženého resolvedMethod
   }
 
@@ -1550,7 +1551,7 @@
   function renderRail(){
     const rail = document.getElementById('rail');
     const base = allRecords; // počty vždy z celé sady, ne z aktuálně filtrovaného pohledu
-    const statusCounts = { pending:0, oznameni:0, prikaz:0 };
+    const statusCounts = { pending:0, oznameni:0, prikaz:0, domluva:0 };
     const typeCounts = { vyzva:0, boticka:0 };
     const officerCounts = {};
     base.forEach(r=>{
@@ -1589,6 +1590,7 @@
     gStatus.appendChild(item('Nevyřešené', statusCounts.pending, filterStatus === 'pending', ()=>{ filterStatus='pending'; refreshView(); }, 'var(--faint)'));
     gStatus.appendChild(item('Oznámeno', statusCounts.oznameni, filterStatus === 'oznameni', ()=>{ filterStatus='oznameni'; refreshView(); }, '#8FB6FF'));
     gStatus.appendChild(item('Dořešeno příkazem', statusCounts.prikaz, filterStatus === 'prikaz', ()=>{ filterStatus='prikaz'; refreshView(); }, 'var(--good)'));
+    gStatus.appendChild(item('Dořešeno domluvou', statusCounts.domluva, filterStatus === 'domluva', ()=>{ filterStatus='domluva'; refreshView(); }, '#D9A94E'));
     rail.appendChild(gStatus);
 
     const gType = group('Typ dokumentu');
@@ -1667,8 +1669,8 @@
       return;
     }
 
-    const statusLabel = { pending:'Nevyřešeno', oznameni:'Oznámeno', prikaz:'Dořešeno příkazem' };
-    const statusDot = { pending:'var(--faint)', oznameni:'#8FB6FF', prikaz:'var(--good)' };
+    const statusLabel = { pending:'Nevyřešeno', oznameni:'Oznámeno', prikaz:'Dořešeno příkazem', domluva:'Dořešeno domluvou' };
+    const statusDot = { pending:'var(--faint)', oznameni:'#8FB6FF', prikaz:'var(--good)', domluva:'#D9A94E' };
 
     filtered.forEach(r=>{
       const sKey = recordStatusKey(r);
@@ -1996,6 +1998,7 @@
   function updateResolveBtn(record){
     const menuBtn = document.getElementById('resolveMenuBtn');
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
+    const domluvaBtn = document.getElementById('menuDomluvaBtn');
     const penaltyText = getOffensePenaltyText(record);
     if(record.resolved){
       // Text u horního tlačítka "Dořešit" se liší podle toho, jak byl
@@ -2006,15 +2009,21 @@
         menuBtn.textContent = '✓ Oznámeno';
       } else if(record.resolvedMethod === 'prikaz'){
         menuBtn.textContent = '✓ Dořešeno příkazem';
+      } else if(record.resolvedMethod === 'domluva'){
+        menuBtn.textContent = '✓ Dořešeno domluvou';
       } else {
         menuBtn.textContent = '✓ Dořešeno';
       }
       vyresenoBtn.textContent = '✓ ' + penaltyText;
       vyresenoBtn.disabled = true;
+      domluvaBtn.textContent = record.resolvedMethod === 'domluva' ? '✓ Domluva' : 'Domluva';
+      domluvaBtn.disabled = true;
     } else {
       menuBtn.textContent = 'Dořešit';
       vyresenoBtn.textContent = penaltyText;
       vyresenoBtn.disabled = false;
+      domluvaBtn.textContent = 'Domluva';
+      domluvaBtn.disabled = false;
     }
   }
 
@@ -2085,6 +2094,22 @@
       console.error('Označení jako dořešeno selhalo:', e);
       btn.disabled = false;
       btn.textContent = 'Vyřešeno (chyba, zkuste znovu)';
+    }
+  });
+
+  document.getElementById('menuDomluvaBtn').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record || record.resolved) return;
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    const btn = document.getElementById('menuDomluvaBtn');
+    btn.disabled = true;
+    btn.textContent = 'Ukládám…';
+    try{
+      await markResolved(record, 'domluva');
+    }catch(e){
+      console.error('Označení jako dořešeno selhalo:', e);
+      btn.disabled = false;
+      btn.textContent = 'Domluva (chyba, zkuste znovu)';
     }
   });
 

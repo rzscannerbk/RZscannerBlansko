@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>RZ Scanner — Přehled</title>
 <meta name="theme-color" content="#0A0C10">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Přehled">
 <link rel="manifest" href="manifest-prehled.json">
 <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
@@ -58,8 +56,8 @@
     margin:0; background:var(--asphalt); color:var(--text);
     font-family:'Inter',system-ui,sans-serif;
   }
-  #app{min-height:100%; display:flex; flex-direction:column; overflow-x:hidden;}
-  .screen{position:fixed; inset:0; display:none; flex-direction:column; overflow-x:hidden;}
+  #app{min-height:100dvh; display:flex; flex-direction:column; overflow-x:hidden;}
+  .screen{position:fixed; top:0; left:0; right:0; height:calc(var(--app-height, 100dvh)); display:none; flex-direction:column; overflow-x:hidden;}
   .screen.active{display:flex;}
 
   h1,h2{font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.02em; margin:0;}
@@ -98,7 +96,7 @@
     -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
   }
   .list-bottom-bar{
-    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    flex-shrink:0;
     display:flex; justify-content:space-between; align-items:center; gap:10px;
     padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 14px);
     background:var(--asphalt-2); border-top:1px solid var(--line);
@@ -114,8 +112,27 @@
   .list-bottom-btn.resolve[disabled]{background:var(--good); color:#0A0C10; opacity:1;}
   .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
   .list-bottom-btn:active{transform:scale(.96);}
+  .confirm-overlay{
+    display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55);
+    align-items:center; justify-content:center; padding:24px;
+  }
+  .confirm-overlay.open{display:flex;}
+  .confirm-box{
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
+    padding:22px 20px; max-width:320px; width:100%; text-align:center;
+  }
+  .confirm-text{font-size:15.5px; color:var(--text); margin-bottom:18px; line-height:1.4;}
+  .confirm-btns{display:flex; gap:12px;}
+  .confirm-btns-col{flex-direction:column;}
+  .confirm-btn{
+    flex:1; padding:11px 12px; border-radius:10px; font-family:'Inter',sans-serif;
+    font-weight:600; font-size:14.5px; cursor:pointer; line-height:1.3;
+  }
+  .confirm-no{background:transparent; border:1.5px solid var(--line); color:var(--text);}
+  .confirm-yes{background:#2F6FED; border:1.5px solid #2F6FED; color:#fff;}
+  .confirm-cancel{background:transparent; border:none; color:var(--muted); font-size:13.5px; margin-top:4px;}
   .detail-fixed-bottom{
-    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    flex-shrink:0;
     background:var(--asphalt-2); border-top:1px solid var(--line);
   }
   .detail-fixed-bottom .list-bottom-bar{
@@ -127,7 +144,7 @@
     width:100%; background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px;
     padding:11px 14px; color:var(--text); font-size:14.5px; font-family:inherit; outline:none;
   }
-  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 80px);}
+  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px 20px;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
   .record-item{
     position:relative; background:rgba(91,141,239,.07); border:1.5px solid rgba(91,141,239,.55);
@@ -175,7 +192,7 @@
     border-bottom:1px solid var(--line);
   }
   .detail-top span{font-size:18px !important; letter-spacing:.08em;}
-  #detailPreviewWrap{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 170px;}
+  #detailPreviewWrap{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 22px;}
 
   /* ---------- NOTICE CARD (same look used in the app's own preview) ---------- */
   .notice-card{
@@ -185,7 +202,7 @@
   .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:26px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
   .notice-subtitle{color:#777; font-size:12.5px; margin:0 0 18px;}
   .notice-subtitle-boticka{font-size:18.75px; font-weight:700; color:#333;}
-  .notice-number{color:#666; font-size:11px; letter-spacing:.03em; margin:-10px 0 18px; font-weight:800;}
+  .notice-number{color:#666; font-size:22px; letter-spacing:.03em; margin:-10px 0 18px; font-weight:800;}
   .notice-officer{font-weight:600; font-size:11px; color:#555; margin-bottom:4px;}
   .notice-label{color:#999; font-weight:700; font-size:11px; letter-spacing:.08em; text-transform:uppercase; margin-bottom:8px;}
   .notice-platebox{
@@ -221,6 +238,7 @@
     color:#fff; text-decoration:underline; background:none; border:none;
     font-family:inherit; cursor:pointer; padding:6px 0;
   }
+
 </style>
 </head>
 <body>
@@ -235,6 +253,7 @@
       <div class="field"><label>Heslo</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
       <button class="btn btn-primary" id="loginSubmitBtn" style="width:100%;">Přihlásit se</button>
       <div id="loginError"></div>
+      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="btn btn-ghost" style="width:100%; display:block; box-sizing:border-box; text-align:center; text-decoration:none; margin-top:12px;">Zpět</a>
     </div>
   </div>
 
@@ -250,7 +269,7 @@
       <div class="list-empty" id="listStatus">Načítám…</div>
     </div>
     <div class="list-bottom-bar">
-      <a href="https://kokrsnek.github.io/RZ---scanner/index.html" class="list-bottom-btn back">Zpět</a>
+      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="list-bottom-btn back">Zpět</a>
     </div>
   </div>
 
@@ -272,9 +291,19 @@
       <div class="submit-note" id="detailNote"></div>
       <div class="list-bottom-bar">
         <button class="list-bottom-btn print" id="printBtn" title="Vytisknout">Tisk</button>
-        <button class="list-bottom-btn oznameni" id="oznameniBtn" title="Stáhnout jako Oznámení přestupku (Word)">Oznámení</button>
-        <button class="list-bottom-btn resolve" id="resolveBtn">Vyřízeno</button>
+        <button class="list-bottom-btn resolve" id="resolveMenuBtn">Dořešit</button>
         <button class="list-bottom-btn back" id="detailCloseBtn">Zpět</button>
+      </div>
+    </div>
+    <div class="confirm-overlay" id="resolveMenuOverlay">
+      <div class="confirm-box">
+        <div class="confirm-btns confirm-btns-col">
+          <button class="confirm-btn confirm-no" id="menuOznameniBtn">Oznámení</button>
+          <button class="confirm-btn confirm-no" id="menuVyzvaBtn">Výzva</button>
+          <button class="confirm-btn confirm-yes" id="menuVyresenoBtn">Příkaz na místě</button>
+          <button class="confirm-btn confirm-no" id="menuDomluvaBtn">Domluva</button>
+          <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
+        </div>
       </div>
     </div>
   </div>
@@ -283,6 +312,31 @@
 
 <script>
 (function(){
+  // ---------- Oprava výšky viewportu na iOS Safari ----------
+  // Stejný fix jako v index.html — iOS Safari nespolehlivě počítá výšku
+  // pro position:fixed;inset:0, po sbalení adresního řádku appka
+  // nezaplní celou obrazovku a dole zůstane černá mezera. JS změří
+  // skutečnou výšku viditelné plochy a uloží ji do CSS proměnné
+  // --app-height, na kterou jsou obrazovky (.screen) navázané.
+  function setAppHeight(){
+    const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+    document.documentElement.style.setProperty('--app-height', h + 'px');
+  }
+  setAppHeight();
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', ()=>setTimeout(setAppHeight, 100));
+  window.addEventListener('load', setAppHeight);
+  document.addEventListener('pageshow', setAppHeight);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setAppHeight(); });
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', setAppHeight);
+  }
+  // Appka spuštěná z plochy (standalone) hlásí při startu na iOS občas
+  // ještě neustálenou výšku (probíhá spouštěcí animace) — přeměříme
+  // ještě několikrát s prodlevou, ať se appka doopravdy natáhne na celou
+  // obrazovku i po doběhnutí přechodu.
+  [50, 150, 300, 600, 1000, 1500].forEach(ms => setTimeout(setAppHeight, ms));
+
   // Respektuje volbu tématu nastavenou v index.html (4s podržení loga na
   // úvodní obrazovce appky) — samotné gesto tady není, jen se drží stejná
   // paleta jako zbytek appky.
@@ -304,12 +358,12 @@
 
   // ---------- Firebase ----------
   const firebaseConfig = {
-    apiKey: "AIzaSyBdkI1JIe7cj9EUlzUr2HLGw__abu647bo",
-    authDomain: "rzscanner-9e0ed.firebaseapp.com",
-    projectId: "rzscanner-9e0ed",
-    storageBucket: "rzscanner-9e0ed.firebasestorage.app",
-    messagingSenderId: "881625178698",
-    appId: "1:881625178698:web:e5d87c9c4dda3bf166bcb3",
+    apiKey: "AIzaSyCXin_qIc785nooY8Qqejt5BU_X6f9it6c",
+    authDomain: "rz-scanner.firebaseapp.com",
+    projectId: "rz-scanner",
+    storageBucket: "rz-scanner.firebasestorage.app",
+    messagingSenderId: "299287620862",
+    appId: "1:299287620862:web:bd3b7b2d7304ecb27149af",
     measurementId: "G-0V2HSNXW2L"
   };
   firebase.initializeApp(firebaseConfig);
@@ -379,48 +433,58 @@
   })();
 
   // ---------- List ----------
-  async function loadRecords(){
+  // Real-time listener — appka se sama překreslí, kdykoliv se ve Firestore
+  // něco změní (nový přestupek odeslaný z RZ Scanner, dořešení odjinud,
+  // změna z desktopové appky apod.), bez nutnosti stránku ručně obnovovat.
+  // onSnapshot se navíc jednou zavolá hned na začátku se stávajícími daty,
+  // takže nahrazuje i původní jednorázové načtení.
+  function loadRecords(){
     const statusEl = document.getElementById('listStatus');
     statusEl.style.display = 'block';
     statusEl.textContent = 'Načítám…';
-    const t0 = performance.now();
-    try{
-      const snap = await db.collection('prestupky').orderBy('createdAt', 'desc').limit(500).get();
-      const t1 = performance.now();
-      allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let first = true;
+    let t0 = performance.now();
+    db.collection('prestupky').orderBy('createdAt', 'desc').limit(500)
+      .onSnapshot(snap=>{
+        const t1 = performance.now();
+        allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Temporary diagnostics — helps pin down whether the slowness is the
-      // network fetch itself or something else, and whether older records
-      // still carrying inline photos (from before photos moved to a
-      // subcollection) are the culprit.
-      let legacyPhotoBytes = 0, legacyCount = 0;
-      allRecords.forEach(r=>{
-        if(r.photos && r.photos.length){
-          legacyCount++;
-          legacyPhotoBytes += r.photos.reduce((s,p)=> s + (p ? p.length : 0), 0);
-        } else if(r.photoBase64){
-          legacyCount++;
-          legacyPhotoBytes += r.photoBase64.length;
-        }
+        // Temporary diagnostics — helps pin down whether the slowness is
+        // the network fetch itself or something else, and whether older
+        // records still carrying inline photos (from before photos moved
+        // to a subcollection) are the culprit.
+        let legacyPhotoBytes = 0, legacyCount = 0;
+        allRecords.forEach(r=>{
+          if(r.photos && r.photos.length){
+            legacyCount++;
+            legacyPhotoBytes += r.photos.reduce((s,p)=> s + (p ? p.length : 0), 0);
+          } else if(r.photoBase64){
+            legacyCount++;
+            legacyPhotoBytes += r.photoBase64.length;
+          }
+        });
+        const totalKB = Math.round(JSON.stringify(snap.docs.map(d=>d.data())).length / 1024);
+        const legacyKB = Math.round(legacyPhotoBytes / 1024);
+        console.log('[živý přenos]', first ? 'počáteční načtení' : 'změna dat', '—',
+          Math.round(t1-t0), 'ms, počet záznamů:', allRecords.length,
+          ', celková velikost payloadu:', totalKB, 'KB, z toho staré vložené fotky:', legacyKB, 'KB v', legacyCount, 'záznamech');
+        first = false;
+
+        renderList(document.getElementById('searchInput').value);
+
+        const t2 = performance.now();
+        const diag = document.createElement('div');
+        diag.style.cssText = 'text-align:center; color:var(--muted); font-size:10.5px; font-family:monospace; margin-top:14px; opacity:.7; overflow-wrap:anywhere;';
+        diag.textContent = 'Diagnostika: fetch ' + Math.round(t1-t0) + ' ms, render ' + Math.round(t2-t1) + ' ms, ' +
+          allRecords.length + ' záznamů, ' + totalKB + ' KB celkem (' + legacyKB + ' KB staré fotky v ' + legacyCount + ' záznamech)';
+        document.getElementById('listBody').appendChild(diag);
+
+        t0 = performance.now();
+      }, e=>{
+        console.error('Načtení přehledu selhalo:', e);
+        statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
+        statusEl.style.display = 'block';
       });
-      const totalKB = Math.round(JSON.stringify(snap.docs.map(d=>d.data())).length / 1024);
-      const legacyKB = Math.round(legacyPhotoBytes / 1024);
-      console.log('[diagnostika] fetch:', Math.round(t1-t0), 'ms, počet záznamů:', allRecords.length,
-        ', celková velikost payloadu:', totalKB, 'KB, z toho staré vložené fotky:', legacyKB, 'KB v', legacyCount, 'záznamech');
-
-      renderList(document.getElementById('searchInput').value);
-
-      const t2 = performance.now();
-      const diag = document.createElement('div');
-      diag.style.cssText = 'text-align:center; color:var(--muted); font-size:10.5px; font-family:monospace; margin-top:14px; opacity:.7; overflow-wrap:anywhere;';
-      diag.textContent = 'Diagnostika: fetch ' + Math.round(t1-t0) + ' ms, render ' + Math.round(t2-t1) + ' ms, ' +
-        allRecords.length + ' záznamů, ' + totalKB + ' KB celkem (' + legacyKB + ' KB staré fotky v ' + legacyCount + ' záznamech)';
-      document.getElementById('listBody').appendChild(diag);
-    }catch(e){
-      console.error('Načtení přehledu selhalo:', e);
-      statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
-      statusEl.style.display = 'block';
-    }
   }
 
   function formatCreatedAt(ts){
@@ -457,16 +521,16 @@
         ${record.offenseCitation ? `<div class="notice-offense-ref">${escapeHtml(record.offenseCitation)}</div>` : ''}
       </div>` : '';
     const numberBlock = record.noticeNumber ? `
-      <div class="notice-number"><b>Č. j.: ${escapeHtml(record.noticeNumber)}</b></div>` : '';
+      <div class="notice-number"><b>${escapeHtml(record.noticeNumber)}</b></div>` : '';
     const officerBlock = record.officerName ? `
       <div class="notice-officer">str. ${escapeHtml(record.officerName)}</div>` : '';
     const vehicleBlock = (record.brand || record.color) ? `
       <div class="notice-vehicle">${escapeHtml([record.brand, record.color].filter(Boolean).join(', '))}</div>` : '';
     const instructionsHtml = isBoticka ? `
-          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 45a zákona č. 361/2000 Sb., o silničním provozu, a to z důvodu porušení pravidel uvedeného níže.
+          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedeného níže.
           <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
           <span class="heading-caps">Poučení</span>
-          Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho použitím a odstraněním, a to na Městské policii Blansko, Sadová 2. Neoprávněné odstranění technického prostředku vlastní silou je přestupkem dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.
+          Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho použitím a odstraněním, a to na Městské policii Blansko, Sadová 2.
         ` : `
           Dostavte se proto ve vlastním zájmu, <b>a to neprodleně</b> na Městskou policii Blansko, Sadová 2. Tuto výzvu vezměte s sebou.
           <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
@@ -725,7 +789,11 @@
         const filename = 'image' + (i + 1) + '.jpeg';
         mediaFiles.push({ name: filename, bytes: base64ToUint8Array(photosB64[i]) });
         relEntries.push({ id: relId, target: 'media/' + filename });
-        body += docxImageParagraph(relId, dims.w, dims.h, 170, 240, docId, i > 0);
+        // První fotka má o něco nižší povolenou výšku než ostatní (220 mm
+        // místo 240 mm) — jinak by se v plné výšce nevešla pod nadpis
+        // "Fotodokumentace" na stejnou stránku a Word by ji sám přesunul
+        // na další (prázdný nadpis nahoře, fotka sama o stránku dál).
+        body += docxImageParagraph(relId, dims.w, dims.h, 170, i === 0 ? 220 : 240, docId, i > 0);
         relId++; docId++;
       }
     }
@@ -739,7 +807,7 @@
     let inner = '';
     inner += docxPara(isBoticka ? 'OZNÁMENÍ' : 'VÝZVA', { bold: true, size: 22, align: 'center' });
     inner += docxPara(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku', { size: 14, align: 'center' });
-    if(record.noticeNumber) inner += docxPara('Č. j.: ' + record.noticeNumber, { size: 12, align: 'center', spacingAfter: 100 });
+    if(record.noticeNumber) inner += docxPara(record.noticeNumber, { size: 24, align: 'center', spacingAfter: 100 });
     inner += docxPara(record.plate || '', { bold: true, size: 32, align: 'center' });
     inner += docxPara('Datum: ' + formatDateCz(record.date) + '  Čas: ' + (record.time || '—'), { size: 14, align: 'center', spacingAfter: 100 });
     if(record.address){
@@ -755,7 +823,7 @@
     if(isBoticka){
       inner += docxPara(
         'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek k zabránění ' +
-        'odjezdu vozidla (TPZOV) dle § 45a zákona č. 361/2000 Sb., o silničním provozu, a to z důvodu ' +
+        'odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu ' +
         'porušení pravidel uvedeného výše.',
         { size: 14, align: 'center', spacingAfter: 100 }
       );
@@ -763,8 +831,7 @@
       inner += docxPara('POUČENÍ', { bold: true, size: 13, align: 'center' });
       inner += docxPara(
         'Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho použitím a ' +
-        'odstraněním, a to na Městské policii Blansko, Sadová 2. Neoprávněné odstranění technického ' +
-        'prostředku vlastní silou je přestupkem dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.',
+        'odstraněním, a to na Městské policii Blansko, Sadová 2.',
         { size: 14, align: 'center', spacingAfter: 100 }
       );
     } else {
@@ -835,14 +902,14 @@
   }
 
   async function exportOznameni(record){
-    const btn = document.getElementById('oznameniBtn');
+    const btn = document.getElementById('menuOznameniBtn');
     const originalText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Připravuji…';
     try{
       if(typeof JSZip === 'undefined'){
         setDetailNote('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).', 'err');
-        return;
+        return false;
       }
       // Fotky mohly být v této session už dřív načtené (viz openDetail /
       // loadAndShowPhotos) — jinak je stejným způsobem dotáhneme teď.
@@ -860,7 +927,7 @@
         const file = new File([blob], filename, { type: blob.type });
         if(navigator.canShare && navigator.canShare({ files: [file] })){
           await navigator.share({ files: [file] });
-          return;
+          return true;
         }
       }catch(e){
         // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
@@ -869,9 +936,11 @@
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(()=> URL.revokeObjectURL(url), 60000);
+      return true;
     }catch(e){
       console.error('Export Oznámení selhal:', e);
       setDetailNote('Vytvoření dokumentu se nezdařilo (' + e.message + ').', 'err');
+      return false;
     }finally{
       btn.disabled = false;
       btn.textContent = originalText;
@@ -969,7 +1038,7 @@
     x += textEl((isBoticka ? 'OZNÁMENÍ' : 'VÝZVA') + '\n', { align: 'center', width: 2, height: 2, em: true });
     x += textEl(wrapWords(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku') + '\n', { align: 'center' });
     if(record.noticeNumber){
-      x += textEl('Č. j.: ' + record.noticeNumber + '\n', { align: 'center', em: true });
+      x += textEl(record.noticeNumber + '\n', { align: 'center', em: true, width: 2, height: 2 });
     }
     x += textEl('\nREGISTRAČNÍ ZNAČKA\n', { align: 'center' });
     x += textEl((record.plate || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
@@ -991,8 +1060,8 @@
       x += textEl(
         wrapWords(
           'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek ' +
-          'k zabránění odjezdu vozidla (TPZOV) dle § 45a zákona č. 361/2000 Sb., ' +
-          'o silničním provozu, a to z důvodu porušení pravidel uvedeného výše.'
+          'k zabránění odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., ' +
+          'o obecní policii, a to z důvodu porušení pravidel uvedeného výše.'
         ) + '\n\n',
         { align: 'center' }
       );
@@ -1001,9 +1070,7 @@
       x += textEl(
         wrapWords(
           'Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho ' +
-          'použitím a odstraněním, a to na Městské policii Blansko, Sadová 2. ' +
-          'Neoprávněné odstranění technického prostředku vlastní silou je přestupkem ' +
-          'dle § 125c odst. 1 písm. k) zákona č. 361/2000 Sb.'
+          'použitím a odstraněním, a to na Městské policii Blansko, Sadová 2.'
         ) + '\n\n',
         { align: 'center' }
       );
@@ -1187,7 +1254,10 @@
       if(r.resolved){
         const badge = document.createElement('div');
         badge.className = 'record-resolved-badge';
-        badge.textContent = 'Dořešeno';
+        badge.textContent = r.resolvedMethod === 'oznameni' ? 'Oznámeno'
+          : r.resolvedMethod === 'prikaz' ? 'Dořešeno příkazem'
+          : r.resolvedMethod === 'domluva' ? 'Dořešeno domluvou'
+          : 'Dořešeno';
         plateRow.appendChild(badge);
       }
       topRow.appendChild(plateRow);
@@ -1239,6 +1309,52 @@
   // ---------- Detail ----------
   let currentDetailRecord = null;
   let currentRecordPrinted = false;
+
+  // Sazby pokut ukládaných příkazem na místě (§ 125c odst. 7 zákona
+  // č. 361/2000 Sb., ve znění od 1. 1. 2026, pro položky 1-32; položka 33
+  // je podle § 5 odst. 1 písm. g) zákona č. 251/2016 Sb., o některých
+  // přestupcích). Klíč = přesný text label z OFFENSES v index.html
+  // (uložený v record.offenseLabel), ať appka umí dohledat částku ke
+  // konkrétnímu záznamu bez nutnosti ukládat nové pole do Firestore.
+  const OFFENSE_PENALTIES = {
+    'Řidič nesmí zastavit a stát v nepřehledné zatáčce a v její těsné blízkosti.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát před nepřehledným vrcholem stoupání, na něm a za ním.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na přechodu pro chodce / přejezdu pro cyklisty nebo do 5 m před nimi.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na křižovatce nebo do 5 m před a za její hranicí.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát v připojovacím nebo odbočovacím pruhu.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát v prostoru zastávky tramvaje, autobusu nebo trolejbusu.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na železničním přejezdu, v podjezdu/tunelu nebo do 15 m od nich.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát v místě, kde vozidlo zakrývá dopravní značku.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát ve vyhrazeném jízdním pruhu nebo pruhu pro cyklisty.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát v jízdních pruzích mimo pravého jízdního pruhu.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát do 5 m od souvislé čáry nebo nástupního ostrůvku.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na mostě.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát v tunelu (mimo vyznačené nouzové stání).': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát před vjezdem na komunikaci z polní nebo lesní cesty.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na vyhrazeném parkovišti (jiné vozidlo, než pro které je vyhrazeno).': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na tramvajovém pásu.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na silniční vegetaci.': 'do 1 500 Kč',
+    'Řidič nesmí zastavit a stát na jiném místě, kde je tím ohrožena bezpečnost provozu.': 'do 1 500 Kč',
+    'Stání bez volného pruhu 3,5 m od tramvajové koleje (5:00–19:00)': 'do 1 500 Kč',
+    'Mimo obec na silnici I., II. nebo III. třídy mimo vyznačené parkoviště': 'do 1 500 Kč',
+    'Stání na dopravním okruhu ("Okruh" / "Změna směru okruhu")': 'do 1 500 Kč',
+    'Řidič smí zastavit a stát jen vpravo ve směru jízdy co nejblíže k okraji pozemní komunikace.': 'do 1 500 Kč',
+    'Řidič smí zastavit a stát jen v jedné řadě a rovnoběžně s okrajem pozemní komunikace.': 'do 1 500 Kč',
+    'Nedodržení volného jízdního pruhu 3 m při zastavení/stání': 'do 1 500 Kč',
+    'Stání na chodníku bez povolení dopravní značkou (IP 11d–IP 11g)': 'do 1 500 Kč',
+    'Neoprávněné stání na parkovišti vyhrazeném pro ZTP (invalidy)': '2 500–3 500 Kč',
+    'Zastavení nebo stání a způsobení překážky provozu': '2 500–3 500 Kč',
+    'Porušení zákazu zastavení — B28': 'do 1 500 Kč',
+    'Porušení zákazu stání — B29': 'do 1 500 Kč',
+    'Nedovolené zastavení nebo stání vozidla (obecná kategorie)': 'do 1 500 Kč',
+    'Porušení zákazu vjezdu — B1 (zákaz vjezdu všech vozidel)': 'do 1 500 Kč',
+    'Porušení zákazu vjezdu — B2 (zákaz vjezdu všech motorových vozidel)': 'do 1 500 Kč',
+    'Poškození nebo neoprávněný zábor veřejného prostranství': 'do 10 000 Kč',
+  };
+  function getOffensePenaltyText(record){
+    const penalty = record && record.offenseLabel ? OFFENSE_PENALTIES[record.offenseLabel] : null;
+    return penalty ? ('Příkaz na místě (' + penalty + ')') : 'Příkaz na místě';
+  }
 
   // Ukládá skutečnou fotku (ne screenshot obrazovky) do Fotek. Atribut
   // "download" na <a href="data:..."> je na iOS Safari (obzvlášť v appce
@@ -1340,48 +1456,124 @@
   }
 
   function updateResolveBtn(record){
-    const btn = document.getElementById('resolveBtn');
+    const menuBtn = document.getElementById('resolveMenuBtn');
+    const vyresenoBtn = document.getElementById('menuVyresenoBtn');
+    const domluvaBtn = document.getElementById('menuDomluvaBtn');
+    const penaltyText = getOffensePenaltyText(record);
     if(record.resolved){
-      btn.textContent = '✓ Vyřízeno';
-      btn.disabled = true;
+      // Text u horního tlačítka "Dořešit" se liší podle toho, jak byl
+      // přestupek doopravdy vyřešen — starší záznamy bez uloženého
+      // resolvedMethod (z appky před touhle úpravou) spadnou na obecné
+      // "Dořešeno".
+      if(record.resolvedMethod === 'oznameni'){
+        menuBtn.textContent = '✓ Oznámeno';
+      } else if(record.resolvedMethod === 'prikaz'){
+        menuBtn.textContent = '✓ Dořešeno příkazem';
+      } else if(record.resolvedMethod === 'domluva'){
+        menuBtn.textContent = '✓ Dořešeno domluvou';
+      } else {
+        menuBtn.textContent = '✓ Dořešeno';
+      }
+      vyresenoBtn.textContent = '✓ ' + penaltyText;
+      vyresenoBtn.disabled = true;
+      domluvaBtn.textContent = record.resolvedMethod === 'domluva' ? '✓ Domluva' : 'Domluva';
+      domluvaBtn.disabled = true;
     } else {
-      btn.textContent = 'Vyřízeno';
-      btn.disabled = false;
+      menuBtn.textContent = 'Dořešit';
+      vyresenoBtn.textContent = penaltyText;
+      vyresenoBtn.disabled = false;
+      domluvaBtn.textContent = 'Domluva';
+      domluvaBtn.disabled = false;
     }
+  }
+
+  // Sdílené označení přestupku jako vyřešeného — volá se jak po úspěšném
+  // otevření dokumentu "Oznámení", tak po klepnutí na "Příkaz na místě".
+  // "method" rozlišuje, jaký text appka pak zobrazí (viz updateResolveBtn
+  // a vykreslení odznaku v seznamu).
+  async function markResolved(record, method){
+    if(!record || record.resolved) return;
+    // Shortens this record's Firestore TTL from the default 90 days
+    // (set when it was created) to 60 days from now — the "expireAt"
+    // field is what the TTL policy actually watches, so updating it is
+    // enough; no need to move the document anywhere.
+    const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
+    await db.collection('prestupky').doc(record.id).update({
+      resolved: true,
+      resolvedMethod: method,
+      resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      expireAt: expireAt
+    });
+    record.resolved = true;
+    record.resolvedMethod = method;
+    updateResolveBtn(record);
+    renderList(document.getElementById('searchInput').value);
+  }
+
+  // Zatím jen placeholder — šablona dokumentu "Výzva" (jiný typ než
+  // stávající Oznámení) ještě není připravená. Až Lukáš dodá podklad,
+  // nahradí se tělo této funkce skutečným generováním .docx stejně jako
+  // u exportOznameni().
+  async function exportVyzva(record){
+    setDetailNote('Dokument „Výzva" zatím není připravený — tahle možnost bude funkční později.', 'err');
   }
 
   document.getElementById('printBtn').addEventListener('click', ()=>{
     if(currentDetailRecord) printViaEpson(currentDetailRecord);
   });
 
-  document.getElementById('oznameniBtn').addEventListener('click', ()=>{
-    if(currentDetailRecord) exportOznameni(currentDetailRecord);
+  document.getElementById('resolveMenuBtn').addEventListener('click', ()=>{
+    document.getElementById('resolveMenuOverlay').classList.add('open');
   });
 
-  document.getElementById('resolveBtn').addEventListener('click', async ()=>{
+  document.getElementById('menuCancelBtn').addEventListener('click', ()=>{
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+  });
+
+  document.getElementById('menuOznameniBtn').addEventListener('click', async ()=>{
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    const record = currentDetailRecord;
+    if(!record) return;
+    const opened = await exportOznameni(record);
+    // Jen když se dokument doopravdy otevřel/stáhnul (ne při chybě) a jen
+    // pokud přestupek ještě nebyl vyřešený jiným způsobem dřív.
+    if(opened) markResolved(record, 'oznameni');
+  });
+
+  document.getElementById('menuVyzvaBtn').addEventListener('click', ()=>{
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    if(currentDetailRecord) exportVyzva(currentDetailRecord);
+  });
+
+  document.getElementById('menuVyresenoBtn').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
     if(!record || record.resolved) return;
-    const btn = document.getElementById('resolveBtn');
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    const btn = document.getElementById('menuVyresenoBtn');
     btn.disabled = true;
     btn.textContent = 'Ukládám…';
     try{
-      // Shortens this record's Firestore TTL from the default 90 days
-      // (set when it was created) to 60 days from now — the "expireAt"
-      // field is what the TTL policy actually watches, so updating it is
-      // enough; no need to move the document anywhere.
-      const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
-      await db.collection('prestupky').doc(record.id).update({
-        resolved: true,
-        resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        expireAt: expireAt
-      });
-      record.resolved = true;
-      updateResolveBtn(record);
-      renderList(document.getElementById('searchInput').value);
+      await markResolved(record, 'prikaz');
     }catch(e){
       console.error('Označení jako dořešeno selhalo:', e);
       btn.disabled = false;
-      btn.textContent = 'Vyřízeno (chyba, zkuste znovu)';
+      btn.textContent = 'Vyřešeno (chyba, zkuste znovu)';
+    }
+  });
+
+  document.getElementById('menuDomluvaBtn').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record || record.resolved) return;
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    const btn = document.getElementById('menuDomluvaBtn');
+    btn.disabled = true;
+    btn.textContent = 'Ukládám…';
+    try{
+      await markResolved(record, 'domluva');
+    }catch(e){
+      console.error('Označení jako dořešeno selhalo:', e);
+      btn.disabled = false;
+      btn.textContent = 'Domluva (chyba, zkuste znovu)';
     }
   });
 
