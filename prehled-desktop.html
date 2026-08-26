@@ -36,6 +36,21 @@
     --line:#262B33;
     --line-soft:#1B1F27;
   }
+  /* Světlý režim — přepisuje stejné CSS proměnné, takže se sám promítne
+     do všech pravidel v souboru (ta jsou skoro výhradně psaná přes
+     var(--...)), bez nutnosti duplikovat každé pravidlo zvlášť. */
+  body.light-theme{
+    --asphalt:#F3F4F6;
+    --asphalt-2:#FFFFFF;
+    --asphalt-3:#EEF0F3;
+    --asphalt-4:#E3E6EB;
+    --ink:#FFFFFF;
+    --text:#14171D;
+    --muted:#5A6270;
+    --faint:#8B92A0;
+    --line:#DDE1E7;
+    --line-soft:#E9EBEF;
+  }
   *{box-sizing:border-box;}
   html,body{height:100%; margin:0; overflow:hidden;}
   body{
@@ -278,10 +293,10 @@
   .panel-head{position:relative; display:flex; align-items:center; justify-content:center; padding:16px 48px; border-bottom:1px solid var(--line); flex:0 0 auto; gap:14px;}
   .panel-head .id{font-size:12px; color:var(--faint);}
   .detail-head-info{display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; text-align:center;}
-  .detail-head-line1{display:flex; align-items:baseline; justify-content:center; flex-wrap:wrap; gap:5px 10px; color:#fff; font-weight:700;}
-  .detail-head-plate{font-weight:800; font-size:14px; color:#fff; letter-spacing:.02em;}
-  .detail-head-meta{font-size:12px; color:#fff; font-weight:700; white-space:nowrap;}
-  .detail-head-offense{font-size:12px; color:#fff; font-weight:600; line-height:1.35;}
+  .detail-head-line1{display:flex; align-items:baseline; justify-content:center; flex-wrap:wrap; gap:5px 10px; color:var(--text); font-weight:700;}
+  .detail-head-plate{font-weight:800; font-size:14px; color:var(--text); letter-spacing:.02em;}
+  .detail-head-meta{font-size:12px; color:var(--text); font-weight:700; white-space:nowrap;}
+  .detail-head-offense{font-size:12px; color:var(--text); font-weight:600; line-height:1.35;}
   .panel-head button{position:absolute; right:22px; top:50%; transform:translateY(-50%); background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:13px;}
   .panel-head button:hover{color:var(--text); border-color:var(--faint);}
   #detailPreviewWrap{
@@ -311,6 +326,20 @@
     color:var(--muted); font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer;
   }
   .shift-summary-range button.active{background:#2F6FED; border-color:#2F6FED; color:#fff;}
+  .shift-summary-date{
+    width:100%; background:var(--asphalt); border:1px solid var(--line); border-radius:8px;
+    padding:8px 10px; color:var(--text); font-family:'Inter',sans-serif; font-size:13px; margin-bottom:20px;
+  }
+  .rail-summary-item{
+    display:flex; align-items:center; gap:8px; width:100%; padding:7px 10px; border-radius:8px;
+    background:transparent; border:none; color:var(--muted); font-family:inherit; font-size:12.5px;
+    cursor:pointer; text-align:left;
+  }
+  .rail-summary-item:hover{background:var(--asphalt-3); color:var(--text);}
+  .rail-summary-item .badge{
+    margin-left:auto; font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--faint);
+    background:var(--asphalt-4); border-radius:10px; padding:1px 7px; flex:0 0 auto;
+  }
   .shift-summary-stats{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:24px;}
   .shift-stat{background:var(--asphalt); border:1px solid var(--line); border-radius:10px; padding:12px 10px; text-align:center;}
   .shift-stat .num{font-family:'Oswald',sans-serif; font-size:24px; font-weight:700; color:var(--text);}
@@ -453,6 +482,7 @@
       <div class="topbar-spacer"></div>
 
       <button class="icon-btn" id="fullscreenBtn" title="Celá obrazovka">⛶</button>
+      <button class="icon-btn" id="themeToggleBtn" title="Světlý/tmavý režim">☾</button>
       <button class="icon-btn" id="shiftSummaryBtn" title="Souhrn směny" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">Souhrn směny</button>
 
       <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="backlink">Zpět na RZ Scanner</a>
@@ -537,10 +567,10 @@
       </div>
       <div class="shift-summary-body">
         <div class="shift-summary-range" id="shiftSummaryRange">
-          <button data-range="today" class="active">Dnes</button>
-          <button data-range="week">Týden</button>
-          <button data-range="all">Vše</button>
+          <button data-type="denni" class="active">Denní (7:00–19:00)</button>
+          <button data-type="nocni">Noční (19:00–7:00)</button>
         </div>
+        <input type="date" id="shiftSummaryDate" class="shift-summary-date">
         <div id="shiftSummaryContent"></div>
       </div>
       <div class="panel-actions">
@@ -687,6 +717,21 @@
     fullscreenBtn.title = on ? 'Ukončit celou obrazovku' : 'Celá obrazovka';
   });
 
+  // Světlý/tmavý režim — volba se pamatuje v localStorage, ať appka po
+  // znovunačtení zůstane v tom, co si strážník naposledy zvolil.
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  function applyTheme(light){
+    document.body.classList.toggle('light-theme', light);
+    themeToggleBtn.textContent = light ? '☀' : '☾';
+    themeToggleBtn.title = light ? 'Přepnout na tmavý režim' : 'Přepnout na světlý režim';
+  }
+  applyTheme(localStorage.getItem('rzPrehledTheme') === 'light');
+  themeToggleBtn.addEventListener('click', ()=>{
+    const light = !document.body.classList.contains('light-theme');
+    applyTheme(light);
+    try{ localStorage.setItem('rzPrehledTheme', light ? 'light' : 'dark'); }catch(e){}
+  });
+
   // ---------- List ----------
   // Real-time listener — appka se sama překreslí, kdykoliv se ve Firestore
   // něco změní (nový přestupek odeslaný z RZ Scanner, dořešení odjinud
@@ -702,6 +747,7 @@
       .onSnapshot(snap=>{
         allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('[živý přenos]', first ? 'počáteční načtení' : 'změna dat', '—', allRecords.length, 'záznamů');
+        if(first) checkAndGenerateCompletedShiftSummary();
         first = false;
         rebuildOffenseCatalog();
         renderRail();
@@ -753,7 +799,7 @@
     const vehicleBlock = (record.brand || record.color) ? `
       <div class="notice-vehicle">${escapeHtml([record.brand, record.color].filter(Boolean).join(', '))}</div>` : '';
     const instructionsHtml = isBoticka ? `
-          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedeného níže.
+          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedených výše.
           <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
           <span class="heading-caps">Poučení</span>
           Technický prostředek bude odstraněn po projednání přestupku, nebo po zjištění totožnosti osoby, která vozidlo na místě ponechala, nebo po provedení nezbytných úkonů ke zjištění totožnosti této osoby.
@@ -1050,7 +1096,7 @@
       inner += docxPara(
         'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek k zabránění ' +
         'odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu ' +
-        'porušení pravidel uvedeného výše.',
+        'porušení pravidel uvedených výše.',
         { size: 14, align: 'center', spacingAfter: 100 }
       );
       inner += docxPara('pořízena fotodokumentace', { bold: true, size: 14, align: 'center', spacingAfter: 100 });
@@ -1288,7 +1334,7 @@
         wrapWords(
           'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek ' +
           'k zabránění odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., ' +
-          'o obecní policii, a to z důvodu porušení pravidel uvedeného výše.'
+          'o obecní policii, a to z důvodu porušení pravidel uvedených výše.'
         ) + '\n\n',
         { align: 'center' }
       );
@@ -1669,6 +1715,13 @@
       });
     }
     rail.appendChild(gOfficer);
+
+    const gSummaries = group('Souhrny směn');
+    const summariesContainer = document.createElement('div');
+    summariesContainer.id = 'shiftSummaryFolder';
+    gSummaries.appendChild(summariesContainer);
+    rail.appendChild(gSummaries);
+    renderShiftSummaryFolder(shiftSummaryDocsCache);
   }
 
   // Katalog přestupků pro našeptávač ve vyhledávání — sestavený z toho, co
@@ -1997,29 +2050,64 @@
   });
 
   // ---------- Souhrn směny ----------
-  let shiftSummaryRange = 'today';
+  // Dvě pevné směny: denní 7:00–19:00 a noční 19:00–7:00 (přechází přes
+  // půlnoc — vždy se datuje dnem, kdy směna ZAČALA, ne kdy skončila).
+  const SHIFT_DAY_START_HOUR = 7;
+  const SHIFT_NIGHT_START_HOUR = 19;
+  const SHIFT_TYPE_LABEL = { denni: 'denní', nocni: 'noční' };
 
-  // Filtruje čistě podle data (nezávisle na levém panelu filtrů) — souhrn
-  // má vždy ukazovat kompletní obrázek za zvolené období, ne jen to, co
-  // zrovna prochází stavovým/typovým filtrem v hlavním seznamu.
-  function recordsInDateRange(range){
-    if(range === 'all') return allRecords.slice();
-    const today = todayIso();
+  function pad2(n){ return String(n).padStart(2, '0'); }
+  function dateToIso(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+
+  // Vrátí přesné hranice (Date) směny daného typu, která začíná v den dateStr.
+  function shiftWindowForDate(type, dateStr){
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if(type === 'denni'){
+      const start = new Date(y, m-1, d, SHIFT_DAY_START_HOUR, 0, 0, 0);
+      const end = new Date(y, m-1, d, SHIFT_NIGHT_START_HOUR, 0, 0, 0);
+      return { type, dateStr, start, end };
+    }
+    const start = new Date(y, m-1, d, SHIFT_NIGHT_START_HOUR, 0, 0, 0);
+    const end = new Date(start); end.setDate(end.getDate() + 1); end.setHours(SHIFT_DAY_START_HOUR, 0, 0, 0);
+    return { type, dateStr, start, end };
+  }
+
+  // Zjistí, do jaké směny patří zadaný okamžik (výchozí: teď) — používá se
+  // pro výchozí výběr v dialogu a pro dopočítání "poslední právě skončivší
+  // směny" při automatickém generování níže.
+  function shiftWindowContaining(now){
+    const h = now.getHours();
+    if(h >= SHIFT_DAY_START_HOUR && h < SHIFT_NIGHT_START_HOUR){
+      return shiftWindowForDate('denni', dateToIso(now));
+    }
+    const startDate = new Date(now);
+    if(h < SHIFT_DAY_START_HOUR) startDate.setDate(startDate.getDate() - 1);
+    return shiftWindowForDate('nocni', dateToIso(startDate));
+  }
+
+  function previousShiftWindow(now){
+    const current = shiftWindowContaining(now);
+    return shiftWindowContaining(new Date(current.start.getTime() - 60000));
+  }
+
+  // Přestupek zařadí do směny podle skutečného času spáchání (record.date +
+  // record.time), ne podle toho, kdy se stihl odeslat do Firestore — u
+  // noční směny těsně po půlnoci to může být rozdíl v řádu minut, ale
+  // typicky ne víc.
+  function recordDateTime(r){
+    if(!r.date) return null;
+    const d = new Date(r.date + 'T' + (r.time || '00:00') + ':00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function recordsInWindow(win){
     return allRecords.filter(r=>{
-      if(!r.date) return false;
-      if(range === 'today') return r.date === today;
-      if(range === 'week'){
-        const d = new Date(r.date + 'T00:00:00');
-        const now = new Date(); now.setHours(0,0,0,0);
-        const diffDays = Math.round((now - d) / 86400000);
-        return !isNaN(diffDays) && diffDays >= 0 && diffDays <= 6;
-      }
-      return true;
+      const d = recordDateTime(r);
+      return d && d >= win.start && d < win.end;
     });
   }
 
-  function computeShiftStats(range){
-    const records = recordsInDateRange(range);
+  function computeStatsForRecords(records){
     const statusCounts = { pending:0, oznameni:0, prikaz:0, domluva:0 };
     const officers = {};
     records.forEach(r=>{
@@ -2037,13 +2125,25 @@
     return { total: records.length, statusCounts, officerRows };
   }
 
-  const RANGE_LABEL = { today:'dnes', week:'tento týden', all:'za celou dobu' };
+  function formatShiftHeading(win){
+    const [y, m, d] = win.dateStr.split('-');
+    return d + '.' + m + '.' + y + ' · ' + (win.type === 'denni' ? 'denní služba 7:00 – 19:00' : 'noční služba 19:00 – 7:00');
+  }
+
+  // ---- Ruční dialog "Souhrn směny" ----
+  let shiftSummaryType = 'denni';
+
+  function currentModalWindow(){
+    const dateStr = document.getElementById('shiftSummaryDate').value || todayIso();
+    return shiftWindowForDate(shiftSummaryType, dateStr);
+  }
 
   function renderShiftSummary(){
-    const stats = computeShiftStats(shiftSummaryRange);
+    const win = currentModalWindow();
+    const stats = computeStatsForRecords(recordsInWindow(win));
     const content = document.getElementById('shiftSummaryContent');
     if(stats.total === 0){
-      content.innerHTML = '<div class="shift-summary-empty">Žádné přestupky ' + escapeHtml(RANGE_LABEL[shiftSummaryRange]) + '.</div>';
+      content.innerHTML = '<div class="shift-summary-empty">Žádné přestupky za ' + escapeHtml(formatShiftHeading(win)) + '.</div>';
       return;
     }
     let html = '<div class="shift-summary-stats">' +
@@ -2060,7 +2160,17 @@
     content.innerHTML = html;
   }
 
+  // Výchozí datum v dialogu = datum směny, ve které je aktuální okamžik
+  // (u noční směny je to den, kdy začala, i po půlnoci).
+  function resetShiftSummaryModalDefaults(){
+    const win = shiftWindowContaining(new Date());
+    shiftSummaryType = win.type;
+    document.querySelectorAll('#shiftSummaryRange button').forEach(b=>b.classList.toggle('active', b.dataset.type === win.type));
+    document.getElementById('shiftSummaryDate').value = win.dateStr;
+  }
+
   document.getElementById('shiftSummaryBtn').addEventListener('click', ()=>{
+    resetShiftSummaryModalDefaults();
     document.getElementById('shiftSummaryOverlay').classList.add('open');
     renderShiftSummary();
   });
@@ -2068,21 +2178,24 @@
     document.getElementById('shiftSummaryOverlay').classList.remove('open');
   });
   document.getElementById('shiftSummaryRange').addEventListener('click', (e)=>{
-    const btn = e.target.closest('button[data-range]');
+    const btn = e.target.closest('button[data-type]');
     if(!btn) return;
-    shiftSummaryRange = btn.dataset.range;
+    shiftSummaryType = btn.dataset.type;
     document.querySelectorAll('#shiftSummaryRange button').forEach(b=>b.classList.toggle('active', b === btn));
     renderShiftSummary();
   });
+  document.getElementById('shiftSummaryDate').addEventListener('change', renderShiftSummary);
 
   // Souhrn jako .docx — jednoduchý textový report (bez fotek/tabulek OOXML),
   // znovupoužívá stejné docxPara/docxLabelValuePara helpery a stejné
-  // sestavení balíčku (JSZip) jako export Oznámení výše.
-  async function buildShiftSummaryDocx(range){
-    const stats = computeShiftStats(range);
+  // sestavení balíčku (JSZip) jako export Oznámení výše. Používá se jak
+  // z ručního dialogu, tak z automaticky vygenerovaných záznamů v levém
+  // panelu (viz níže).
+  async function buildShiftSummaryDocxForWindow(win, records){
+    const stats = computeStatsForRecords(records);
     let body = '';
     body += docxPara('Souhrn směny', { bold: true, size: 28, align: 'center', spacingAfter: 100 });
-    body += docxPara('Městská policie Blansko · ' + todayCz() + ' · období: ' + RANGE_LABEL[range], { size: 18, align: 'center', spacingAfter: 300 });
+    body += docxPara('Městská policie Blansko · ' + formatShiftHeading(win), { size: 18, align: 'center', spacingAfter: 300 });
 
     body += docxPara('Celkem přestupků: ' + stats.total, { size: 22, bold: true, spacingAfter: 100 });
     body += docxPara('Nevyřešeno: ' + stats.statusCounts.pending, { size: 20, spacingAfter: 40 });
@@ -2091,6 +2204,9 @@
     body += docxPara('Dořešeno domluvou: ' + stats.statusCounts.domluva, { size: 20, spacingAfter: 300 });
 
     body += docxPara('Podle strážníka', { bold: true, size: 22, spacingAfter: 150 });
+    if(stats.officerRows.length === 0){
+      body += docxPara('Žádné záznamy.', { size: 20 });
+    }
     stats.officerRows.forEach(o=>{
       body += docxLabelValuePara(
         o.name + ':',
@@ -2135,18 +2251,20 @@
     });
   }
 
-  document.getElementById('shiftSummaryExportBtn').addEventListener('click', async ()=>{
-    const btn = document.getElementById('shiftSummaryExportBtn');
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Připravuji…';
+  function shiftSummaryFilename(win){
+    return win.dateStr + ' - ' + SHIFT_TYPE_LABEL[win.type] + '.docx';
+  }
+
+  async function downloadShiftSummaryDocx(win, records, btn){
+    const originalText = btn ? btn.textContent : null;
+    if(btn){ btn.disabled = true; btn.textContent = 'Připravuji…'; }
     try{
       if(typeof JSZip === 'undefined'){
         alert('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).');
         return;
       }
-      const blob = await buildShiftSummaryDocx(shiftSummaryRange);
-      const filename = 'Souhrn_smeny_' + todayIso() + '.docx';
+      const blob = await buildShiftSummaryDocxForWindow(win, records);
+      const filename = shiftSummaryFilename(win);
       try{
         const file = new File([blob], filename, { type: blob.type });
         if(navigator.canShare && navigator.canShare({ files: [file] })){
@@ -2163,9 +2281,85 @@
       console.error('Export souhrnu směny selhal:', e);
       alert('Vytvoření dokumentu se nezdařilo (' + e.message + ').');
     }finally{
-      btn.disabled = false;
-      btn.textContent = originalText;
+      if(btn){ btn.disabled = false; btn.textContent = originalText; }
     }
+  }
+
+  document.getElementById('shiftSummaryExportBtn').addEventListener('click', function(){
+    const win = currentModalWindow();
+    downloadShiftSummaryDocx(win, recordsInWindow(win), this);
+  });
+
+  // ---- Automatické generování po skončení směny + složka "Souhrny směn" ----
+  //
+  // DŮLEŽITÉ OMEZENÍ: appka běží čistě v prohlížeči na GitHub Pages, bez
+  // vlastního serveru/Cloud Function na pozadí. "Automaticky" tedy značí:
+  // jakmile někdo (kdokoli ze strážníků) příště otevře tenhle desktopový
+  // přehled PO skončení směny, appka si všimne, že za tu směnu ještě není
+  // záznam, dopočítá ho a uloží do Firestore (kolekce shiftSummaries) — ne
+  // že by se to spustilo úplně samo v pozadí, když má appka zavřenou úplně
+  // každý. Kontrola běží při načtení appky a pak každých 5 minut, dokud
+  // je přehled otevřený.
+  async function checkAndGenerateCompletedShiftSummary(){
+    try{
+      const win = previousShiftWindow(new Date());
+      const docId = win.dateStr + '_' + win.type;
+      const ref = db.collection('shiftSummaries').doc(docId);
+      const snap = await ref.get();
+      if(snap.exists) return;
+      const records = recordsInWindow(win);
+      const stats = computeStatsForRecords(records);
+      await ref.set({
+        dateStr: win.dateStr,
+        type: win.type,
+        generatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        total: stats.total,
+        statusCounts: stats.statusCounts,
+        officerRows: stats.officerRows
+      });
+    }catch(e){
+      console.error('Automatické vygenerování souhrnu směny selhalo:', e);
+    }
+  }
+
+  // Kontrola běží i periodicky, dokud je appka otevřená — ať se souhrn
+  // objeví krátce po skončení směny, ne až když někdo příště appku znovu
+  // otevře (může to samozřejmě být klidně o pár hodin/dny později, pokud
+  // appka mezitím zavřená nebyla).
+  setInterval(checkAndGenerateCompletedShiftSummary, 5 * 60 * 1000);
+
+  // Vykreslí složku "Souhrny směn" v levém panelu — samostatný onSnapshot
+  // posluchač (kolekce je malá, řádově desítky záznamů do roka, není
+  // potřeba nic filtrovat/stránkovat).
+  function renderShiftSummaryFolder(docs){
+    const container = document.getElementById('shiftSummaryFolder');
+    if(!container) return;
+    if(docs.length === 0){
+      container.innerHTML = '<div class="rail-empty">Zatím žádné souhrny</div>';
+      return;
+    }
+    container.innerHTML = '';
+    docs.forEach(data=>{
+      const win = shiftWindowForDate(data.type, data.dateStr);
+      const btn = document.createElement('button');
+      btn.className = 'rail-summary-item';
+      const [y, m, d] = data.dateStr.split('-');
+      btn.innerHTML = '<span>' + d + '.' + m + '. ' + escapeHtml(SHIFT_TYPE_LABEL[data.type]) + '</span>' +
+        '<span class="badge">' + data.total + '</span>';
+      btn.title = 'Stáhnout ' + shiftSummaryFilename(win);
+      btn.addEventListener('click', ()=>{
+        downloadShiftSummaryDocx(win, recordsInWindow(win), null);
+      });
+      container.appendChild(btn);
+    });
+  }
+
+  let shiftSummaryDocsCache = [];
+  db.collection('shiftSummaries').orderBy('dateStr', 'desc').limit(60).onSnapshot(snap=>{
+    shiftSummaryDocsCache = snap.docs.map(d=>d.data());
+    renderShiftSummaryFolder(shiftSummaryDocsCache);
+  }, e=>{
+    console.error('Načtení souhrnů směn selhalo:', e);
   });
 
   // ---------- Detail ----------
