@@ -756,7 +756,7 @@
           Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedeného níže.
           <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
           <span class="heading-caps">Poučení</span>
-          Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho použitím a odstraněním, a to na Městské policii Blansko, Sadová 2.
+          Technický prostředek bude odstraněn po projednání přestupku, nebo po zjištění totožnosti osoby, která vozidlo na místě ponechala, nebo po provedení nezbytných úkonů ke zjištění totožnosti této osoby.
         ` : `
           Dostavte se proto ve vlastním zájmu, <b>a to neprodleně</b> na Městskou policii Blansko, Sadová 2. Tuto výzvu vezměte s sebou.
           <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
@@ -1056,8 +1056,9 @@
       inner += docxPara('pořízena fotodokumentace', { bold: true, size: 14, align: 'center', spacingAfter: 100 });
       inner += docxPara('POUČENÍ', { bold: true, size: 13, align: 'center' });
       inner += docxPara(
-        'Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho použitím a ' +
-        'odstraněním, a to na Městské policii Blansko, Sadová 2.',
+        'Technický prostředek bude odstraněn po projednání přestupku, nebo po zjištění totožnosti ' +
+        'osoby, která vozidlo na místě ponechala, nebo po provedení nezbytných úkonů ke zjištění ' +
+        'totožnosti této osoby.',
         { size: 14, align: 'center', spacingAfter: 100 }
       );
     } else {
@@ -1295,8 +1296,9 @@
       x += textEl('POUČENÍ\n', { align: 'center', em: true });
       x += textEl(
         wrapWords(
-          'Technický prostředek bude odstraněn po zaplacení nákladů spojených s jeho ' +
-          'použitím a odstraněním, a to na Městské policii Blansko, Sadová 2.'
+          'Technický prostředek bude odstraněn po projednání přestupku, nebo po zjištění ' +
+          'totožnosti osoby, která vozidlo na místě ponechala, nebo po provedení nezbytných ' +
+          'úkonů ke zjištění totožnosti této osoby.'
         ) + '\n\n',
         { align: 'center' }
       );
