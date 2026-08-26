@@ -527,7 +527,7 @@
     const vehicleBlock = (record.brand || record.color) ? `
       <div class="notice-vehicle">${escapeHtml([record.brand, record.color].filter(Boolean).join(', '))}</div>` : '';
     const instructionsHtml = isBoticka ? `
-          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedeného níže.
+          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedených výše.
           <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
           <span class="heading-caps">Poučení</span>
           Technický prostředek bude odstraněn po projednání přestupku, nebo po zjištění totožnosti osoby, která vozidlo na místě ponechala, nebo po provedení nezbytných úkonů ke zjištění totožnosti této osoby.
@@ -824,7 +824,7 @@
       inner += docxPara(
         'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek k zabránění ' +
         'odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu ' +
-        'porušení pravidel uvedeného výše.',
+        'porušení pravidel uvedených výše.',
         { size: 14, align: 'center', spacingAfter: 100 }
       );
       inner += docxPara('pořízena fotodokumentace', { bold: true, size: 14, align: 'center', spacingAfter: 100 });
@@ -1062,7 +1062,7 @@
         wrapWords(
           'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek ' +
           'k zabránění odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., ' +
-          'o obecní policii, a to z důvodu porušení pravidel uvedeného výše.'
+          'o obecní policii, a to z důvodu porušení pravidel uvedených výše.'
         ) + '\n\n',
         { align: 'center' }
       );
