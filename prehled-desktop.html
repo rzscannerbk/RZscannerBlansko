@@ -2216,6 +2216,14 @@
     return penalty ? ('Příkaz na místě (' + penalty + ')') : 'Příkaz na místě';
   }
 
+  // Přestupky s finančním rozmezím (např. "2 500–3 500 Kč") jsou závažnější
+  // — u nich domluva jako způsob řešení nepřipadá v úvahu, jen u přestupků
+  // s pevným stropem ("do X Kč").
+  function offenseHasPenaltyRange(record){
+    const penalty = record && record.offenseLabel ? OFFENSE_PENALTIES[record.offenseLabel] : null;
+    return !!(penalty && penalty.indexOf('–') !== -1);
+  }
+
   // Na desktopu funguje běžné stažení přes <a download> spolehlivě (na
   // rozdíl od mobilního Safari, kde appka RZ Scanner / Přehled kvůli
   // tomu používá Web Share API) — soubor tak jde rovnou do složky
@@ -2366,6 +2374,10 @@
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     const domluvaBtn = document.getElementById('menuDomluvaBtn');
     const penaltyText = getOffensePenaltyText(record);
+    // U přestupků s finančním rozmezím (viz offenseHasPenaltyRange výše)
+    // domluva jako způsob řešení nepřipadá v úvahu — tlačítko se v nabídce
+    // vůbec nezobrazí, aby si ho strážník nemohl omylem zvolit.
+    domluvaBtn.style.display = offenseHasPenaltyRange(record) ? 'none' : '';
     if(record.resolved){
       // Text u horního tlačítka "Dořešit" se liší podle toho, jak byl
       // přestupek doopravdy vyřešen — starší záznamy bez uloženého

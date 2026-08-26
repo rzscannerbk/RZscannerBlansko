@@ -1356,6 +1356,14 @@
     return penalty ? ('Příkaz na místě (' + penalty + ')') : 'Příkaz na místě';
   }
 
+  // Přestupky s finančním rozmezím (např. "2 500–3 500 Kč") jsou závažnější
+  // — u nich domluva jako způsob řešení nepřipadá v úvahu, jen u přestupků
+  // s pevným stropem ("do X Kč").
+  function offenseHasPenaltyRange(record){
+    const penalty = record && record.offenseLabel ? OFFENSE_PENALTIES[record.offenseLabel] : null;
+    return !!(penalty && penalty.indexOf('–') !== -1);
+  }
+
   // Ukládá skutečnou fotku (ne screenshot obrazovky) do Fotek. Atribut
   // "download" na <a href="data:..."> je na iOS Safari (obzvlášť v appce
   // přidané na plochu) nespolehlivý — tap na něj místo staženého souboru
@@ -1460,6 +1468,10 @@
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     const domluvaBtn = document.getElementById('menuDomluvaBtn');
     const penaltyText = getOffensePenaltyText(record);
+    // U přestupků s finančním rozmezím (viz offenseHasPenaltyRange výše)
+    // domluva jako způsob řešení nepřipadá v úvahu — tlačítko se v nabídce
+    // vůbec nezobrazí, aby si ho strážník nemohl omylem zvolit.
+    domluvaBtn.style.display = offenseHasPenaltyRange(record) ? 'none' : '';
     if(record.resolved){
       // Text u horního tlačítka "Dořešit" se liší podle toho, jak byl
       // přestupek doopravdy vyřešen — starší záznamy bez uloženého
