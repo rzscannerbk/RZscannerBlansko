@@ -1082,8 +1082,7 @@
       show('login');
       return;
     }
-    const docType = await askDocType();
-    uploadLastPdfToFirestore(docType);
+    uploadLastPdfToFirestore(lastGeneratedPdf.docType);
   });
 
   document.getElementById('loginCancelBtn').addEventListener('click', ()=>{
@@ -1110,8 +1109,7 @@
       show('result');
       if(pendingSubmitAfterLogin){
         pendingSubmitAfterLogin = false;
-        const docType = await askDocType();
-        uploadLastPdfToFirestore(docType);
+        uploadLastPdfToFirestore(lastGeneratedPdf ? lastGeneratedPdf.docType : null);
       }
     }catch(e){
       errEl.textContent = 'Přihlášení se nezdařilo — zkontrolujte e-mail a heslo.';
@@ -2201,7 +2199,7 @@
     // výslovně o "nějaký random text") — než se reálně použije v terénu,
     // doporučuju znění projít a upravit dle skutečné praxe/pokynů.
     const instructionsHtml = isBoticka ? `
-          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedeného níže.
+          Oznamuji Vám, že na výše uvedeném vozidle byl <b>umístěn technický prostředek k zabránění odjezdu vozidla (TPZOV)</b> dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu porušení pravidel uvedených výše.
           <b style="display:block; margin:10px 0 6px;">pořízena fotodokumentace</b>
           <span class="heading-caps">Poučení</span>
           Technický prostředek bude odstraněn po projednání přestupku, nebo po zjištění totožnosti osoby, která vozidlo na místě ponechala, nebo po provedení nezbytných úkonů ke zjištění totožnosti této osoby.
@@ -2398,7 +2396,7 @@
         wrapWords(
           'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek ' +
           'k zabránění odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., ' +
-          'o obecní policii, a to z důvodu porušení pravidel uvedeného výše.'
+          'o obecní policii, a to z důvodu porušení pravidel uvedených výše.'
         ) + '\n\n',
         { align: 'center' }
       );
@@ -2733,6 +2731,13 @@
       return;
     }
 
+    // Typ dokumentu (Parkovačka → Výzva, Botička → Oznámení) se vybírá
+    // hned tady, než se náhled vůbec sestaví — ať se v náhledu rovnou
+    // ukáže ten správný dokument, ne vždycky jen Výzva. Odeslat pak už
+    // tenhle výběr znovu nezpochybňuje, jen použije to, co bylo zvoleno
+    // tady.
+    const docType = await askDocType();
+
     const makeBtn = document.getElementById('makePdfBtn');
     const originalBtnText = makeBtn.textContent;
     makeBtn.disabled = true;
@@ -2751,6 +2756,7 @@
       lastGeneratedPdf = {
         plate, date, time, address, offenseLabel, offenseCitation, officerName,
         brand: brand || null, color: color || null,
+        docType,
         lat: lastResolvedGps ? lastResolvedGps.lat : null,
         lng: lastResolvedGps ? lastResolvedGps.lng : null,
         photos: allPhotoDataUrls.map(u => u.split(',')[1])
