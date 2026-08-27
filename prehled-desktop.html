@@ -35,6 +35,8 @@
     --bad:#FF6058;
     --line:#262B33;
     --line-soft:#1B1F27;
+    --resolved-bg:rgba(0,0,0,.3);
+    --resolved-hover-bg:rgba(0,0,0,.16);
   }
   /* Světlý režim — přepisuje stejné CSS proměnné, takže se sám promítne
      do všech pravidel v souboru (ta jsou skoro výhradně psaná přes
@@ -50,6 +52,8 @@
     --faint:#6B7280;
     --line:#DDE1E7;
     --line-soft:#E9EBEF;
+    --resolved-bg:rgba(0,0,0,.045);
+    --resolved-hover-bg:rgba(0,0,0,.08);
   }
   *{box-sizing:border-box;}
   html,body{height:100%; margin:0; overflow:hidden;}
@@ -168,7 +172,7 @@
   .rail{width:230px; flex:0 0 230px; border-right:1px solid var(--line); background:var(--asphalt-2); padding:20px 14px; overflow-y:auto;}
   .rail-group{margin-bottom:24px;}
   .rail-title{font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); padding:0 10px 8px;}
-  .rail-item{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:7px; cursor:pointer; font-size:13.5px; color:#D7DAE1; margin-bottom:1px; border:none; background:none; width:100%; font-family:inherit; text-align:left;}
+  .rail-item{display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:7px; cursor:pointer; font-size:13.5px; color:var(--muted); margin-bottom:1px; border:none; background:none; width:100%; font-family:inherit; text-align:left;}
   .rail-item:hover{background:var(--asphalt-3);}
   .rail-item.active{background:var(--amber-glow); color:var(--amber); font-weight:600;}
   .rail-item .label{display:flex; align-items:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
@@ -205,8 +209,8 @@
   }
   .record-item:hover{background:var(--asphalt-2);}
   .record-item.selected{background:var(--asphalt-3);}
-  .record-item.resolved{background:rgba(0,0,0,.3);}
-  .record-item.resolved:hover{background:rgba(0,0,0,.16);}
+  .record-item.resolved{background:var(--resolved-bg);}
+  .record-item.resolved:hover{background:var(--resolved-hover-bg);}
   .record-item.resolved .record-plate,
   .record-item.resolved .record-addr,
   .record-item.resolved .record-offense,
@@ -225,7 +229,7 @@
   .record-addr{font-size:12.5px; color:var(--muted); line-height:1.4; padding-top:3px; padding-right:10px; text-align:center;}
 
   .record-offense{
-    font-size:12.5px; color:#C7CBD3; line-height:1.4; padding-right:16px; padding-top:3px;
+    font-size:12.5px; color:var(--muted); line-height:1.4; padding-right:16px; padding-top:3px;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:help;
   }
 
@@ -380,7 +384,7 @@
   .notice-card{
     background:#ffffff; color:#141414; border-radius:14px; padding:28px 22px 24px;
     font-family:'Inter',sans-serif; text-align:center; width:100%; margin:0;
-    box-shadow:0 14px 34px rgba(0,0,0,.35);
+    box-shadow:0 14px 34px rgba(0,0,0,.35); border:1px solid rgba(0,0,0,.08);
   }
   .notice-title{font-family:'Oswald',sans-serif; font-weight:700; font-size:25px; letter-spacing:.03em; margin:0 0 4px; text-transform:uppercase;}
   .notice-subtitle{color:#777; font-size:12px; margin:0 0 17px;}
