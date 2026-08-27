@@ -1797,13 +1797,18 @@
   function updateBatchCounterUI(){
     const chip = document.getElementById('batchCounterChip');
     const finishBtn = document.getElementById('batchFinishBtn');
+    const startBtn = document.getElementById('batchStartBtn');
     if(batchCapturing){
       chip.style.display = 'inline-flex';
       chip.textContent = 'Ve frontě: ' + batchQueue.length;
       finishBtn.style.display = 'inline-flex';
+      // Dávka už běží (je to jasné z "Dokončit dávku" a počítadla nahoře),
+      // takže tlačítko pro její spuštění vedle spouště je teď zbytečné.
+      if(startBtn) startBtn.style.display = 'none';
     } else {
       chip.style.display = 'none';
       finishBtn.style.display = 'none';
+      if(startBtn) startBtn.style.display = 'flex';
     }
   }
 
