@@ -1873,6 +1873,16 @@
   }
 
   function showBatchQueueScreen(){
+    // Prázdná fronta (žádná fotka nebyla pořízena) — obrazovku fronty
+    // vůbec neukazovat, jen by to bylo zbytečné mezikroku, appka jde
+    // rovnou na úvodní obrazovku.
+    if(batchQueue.length === 0){
+      batchOffense = null;
+      batchDocType = null;
+      currentBatchIndex = null;
+      show('start');
+      return;
+    }
     renderBatchQueueList();
     show('batchQueue');
   }
