@@ -98,12 +98,12 @@
   .list-bottom-bar{
     flex-shrink:0;
     display:flex; justify-content:space-between; align-items:center; gap:10px;
-    padding:6px 18px calc(env(safe-area-inset-bottom,0px) + 6px);
+    padding:14px 18px calc(env(safe-area-inset-bottom,0px) + 14px);
     background:var(--asphalt-2); border-top:1px solid var(--line);
   }
   .list-bottom-btn{
-    flex:1 1 0; padding:6px 10px; border-radius:10px; font-family:'Inter',sans-serif;
-    font-weight:600; font-size:13px; cursor:pointer; text-decoration:none; text-align:center;
+    flex:1 1 0; padding:12px 10px; border-radius:10px; font-family:'Inter',sans-serif;
+    font-weight:600; font-size:14px; cursor:pointer; text-decoration:none; text-align:center;
     border:1.5px solid var(--line); color:var(--text); background:transparent;
   }
   .list-bottom-btn.print{color:#5B8DEF; border-color:#5B8DEF;}
@@ -112,6 +112,12 @@
   .list-bottom-btn.resolve[disabled]{background:var(--good); color:#0A0C10; opacity:1;}
   .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
   .list-bottom-btn:active{transform:scale(.96);}
+  /* Na seznamu (na rozdíl od detailu, kde je "Zpět" jedno ze tří tlačítek
+     vedle sebe) je "Zpět" jediné tlačítko v liště — nemá tedy smysl ho
+     roztahovat na celou šířku jako v detailu, stačí na velikost textu,
+     na střed, s menší mezerou od spodního okraje. */
+  #listScreen .list-bottom-bar{justify-content:center; padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 10px);}
+  #listScreen .list-bottom-btn.back{flex:0 0 auto; padding:10px 32px;}
   .confirm-overlay{
     display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55);
     align-items:center; justify-content:center; padding:24px;
