@@ -308,7 +308,7 @@
     border-bottom:1px solid var(--line);
   }
   .pdf-preview-top span{font-size:18px !important; letter-spacing:.08em;}
-  .pdf-preview-scroll{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 100px;}
+  .pdf-preview-scroll{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 22px;}
   .float-fab{
     position:fixed; right:20px; bottom:calc(env(safe-area-inset-bottom,0px) + 20px); z-index:20;
     width:64px; height:64px; border-radius:50%; border:none; background:var(--amber);
@@ -778,9 +778,9 @@
         <div id="photoGallery"></div>
       </div>
     </div>
-    <div class="btn-row" style="padding:16px 20px calc(env(safe-area-inset-bottom,0px) + 16px); gap:16px;">
-      <button class="btn btn-primary" id="pdfPreviewBackBtn">Zpět</button>
-      <button class="btn btn-submit" id="pdfPreviewPrintBtn">Tisk</button>
+    <div class="btn-row" style="padding:0; margin:0; gap:0; padding-bottom:env(safe-area-inset-bottom,0px); flex-shrink:0;">
+      <button class="btn btn-primary" id="pdfPreviewBackBtn" style="border-radius:0; margin:0;">Zpět</button>
+      <button class="btn btn-submit" id="pdfPreviewPrintBtn" style="border-radius:0; margin:0;">Tisk</button>
     </div>
   </div>
 
