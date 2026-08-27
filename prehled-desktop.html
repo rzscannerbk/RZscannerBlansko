@@ -197,6 +197,7 @@
   .record-item.stale .stripe{background:#B5493F;}
   .record-item.stale .record-plate{color:#E88A80;}
   .record-item.kbd-focus{outline:1.5px solid var(--faint); outline-offset:-1.5px;}
+  .confirm-btn.kbd-focus{outline:2px solid var(--faint); outline-offset:2px;}
   .list-head span.head-left{text-align:left;}
   #listBody{flex:1; overflow-y:auto;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
@@ -2100,6 +2101,36 @@
     const menuOpen = document.getElementById('resolveMenuOverlay').classList.contains('open');
     const lightboxOpen = document.getElementById('lightboxOverlay').classList.contains('open');
     if(detailOpen || summaryOpen || menuOpen || lightboxOpen){
+      if(menuOpen){
+        // Nabídka "Co chceš udělat?" — šipky přepínají mezi viditelnými
+        // a aktivními tlačítky (Domluva se třeba pro některé přestupky
+        // skrývá, viz offenseHasPenaltyRange výše, a "vyřešená" tlačítka
+        // bývají disabled), Enter potvrdí zvýrazněnou volbu, Escape zavře
+        // stejně jako Zrušit.
+        const menuButtons = Array.from(document.querySelectorAll('#resolveMenuOverlay .confirm-btn'))
+          .filter(b => b.offsetParent !== null && !b.disabled);
+        if(e.key === 'Escape'){
+          e.preventDefault();
+          document.getElementById('menuCancelBtn').click();
+          return;
+        }
+        if(!menuButtons.length) return;
+        if(e.key === 'ArrowDown'){
+          e.preventDefault();
+          menuFocusIndex = Math.min(menuFocusIndex + 1, menuButtons.length - 1);
+          menuButtons.forEach(b=>b.classList.remove('kbd-focus'));
+          menuButtons[menuFocusIndex].classList.add('kbd-focus');
+        } else if(e.key === 'ArrowUp'){
+          e.preventDefault();
+          menuFocusIndex = Math.max(menuFocusIndex - 1, 0);
+          menuButtons.forEach(b=>b.classList.remove('kbd-focus'));
+          menuButtons[menuFocusIndex].classList.add('kbd-focus');
+        } else if(e.key === 'Enter' && menuFocusIndex >= 0 && menuFocusIndex < menuButtons.length){
+          e.preventDefault();
+          menuButtons[menuFocusIndex].click();
+        }
+        return;
+      }
       if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
         const scrollEl = detailOpen ? document.getElementById('detailPreviewWrap')
           : summaryOpen ? document.querySelector('.shift-summary-body')
@@ -2777,8 +2808,10 @@
     setDetailNote('Dokument „Výzva" zatím není připravený — tahle možnost bude funkční později.', 'err');
   }
 
+  let menuFocusIndex = -1;
   document.getElementById('resolveMenuBtn').addEventListener('click', ()=>{
     document.getElementById('resolveMenuOverlay').classList.add('open');
+    menuFocusIndex = -1;
   });
 
   document.getElementById('menuCancelBtn').addEventListener('click', ()=>{
