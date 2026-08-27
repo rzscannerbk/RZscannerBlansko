@@ -141,7 +141,7 @@
     background:rgba(255,255,255,.15); display:inline-block; padding:8px 18px; border-radius:12px;
     left:50%; position:relative; transform:translateX(-50%);
   }
-  .cam-bottom{display:flex; align-items:center; justify-content:center; padding:0 0 calc(env(safe-area-inset-bottom,0px) + 30px);}
+  .cam-bottom{position:relative; display:flex; align-items:center; justify-content:center; padding:0 0 calc(env(safe-area-inset-bottom,0px) + 30px);}
   .cam-bottom .shutter-btn{pointer-events:all;}
 
   /* ---------- SCREEN: PROCESSING ---------- */
@@ -479,13 +479,6 @@
     <button class="fallback-link" id="printerHostLink">⚙ Nastavit tiskárnu (Epson TM-P20II)</button>
     <button class="fallback-link" id="printerTestLink">🖨 Otestovat tiskárnu</button>
     <div class="submit-note" id="printerTestNote"></div>
-    <button class="btn btn-primary" id="batchStartBtn" title="Dávka (více aut)" aria-label="Dávka (více aut)" style="display:flex; align-items:center; justify-content:center; flex:none; width:52px; height:52px; margin:22px auto 0; padding:0;">
-      <svg viewBox="0 0 24 24" fill="none" style="width:26px; height:26px;">
-        <rect x="2" y="9" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.5"/>
-        <rect x="5.5" y="5.5" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.5"/>
-        <rect x="9" y="2" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.7"/>
-      </svg>
-    </button>
     <a class="fallback-link" id="historyLink" href="https://rzscannerbk.github.io/RZscannerBlansko/prehled.html" target="_blank" rel="noopener" style="display:inline-block;">Odeslané přestupky</a>
     <div id="camError"></div>
     <div class="confirm-overlay" id="settingsOverlay">
@@ -532,6 +525,13 @@
           <div class="shutter-btn" id="captureBtn">
             <svg viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="#241a00" stroke-width="1.8"/><circle cx="12" cy="13" r="3.4" stroke="#241a00" stroke-width="1.8"/></svg>
           </div>
+          <button class="btn btn-primary" id="batchStartBtn" title="Dávka (více aut)" aria-label="Dávka (více aut)" style="position:absolute; left:calc(50% + 76px); top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center; flex:none; width:48px; height:48px; padding:0; pointer-events:all;">
+            <svg viewBox="0 0 24 24" fill="none" style="width:24px; height:24px;">
+              <rect x="2" y="9" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.5"/>
+              <rect x="5.5" y="5.5" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.5"/>
+              <rect x="9" y="2" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.7"/>
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -3556,7 +3556,11 @@
   document.getElementById('offenseBackBtn').addEventListener('click', ()=>{
     if(pickingOffenseForBatch){
       pickingOffenseForBatch = false;
-      show('start');
+      // Tlačítko dávky teď žije na obrazovce kamery, takže zrušení výběru
+      // přestupku pro dávku vrací zpátky tam — ne na úvodní obrazovku.
+      // Kamera zůstává "zahřátá" na pozadí (viz komentář u openCamera),
+      // takže se znovu otevře okamžitě.
+      openCamera();
       return;
     }
     show('result');
