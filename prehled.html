@@ -1352,6 +1352,17 @@
 
   document.getElementById('searchInput').addEventListener('input', (e)=> renderList(e.target.value));
 
+  // Plovoucí "Zpět" by jinak zůstávalo viditelné i nad vysunutou
+  // klávesnicí a překrývalo výsledky hledání — dokud je pole aktivní
+  // (klávesnice nahoře), appka ho schová; po opuštění pole se zase objeví.
+  (function(){
+    const searchInputEl = document.getElementById('searchInput');
+    const listBackBtnEl = document.getElementById('listBackBtn');
+    if(!searchInputEl || !listBackBtnEl) return;
+    searchInputEl.addEventListener('focus', ()=>{ listBackBtnEl.style.display = 'none'; });
+    searchInputEl.addEventListener('blur', ()=>{ listBackBtnEl.style.display = ''; });
+  })();
+
   // ---------- Detail ----------
   let currentDetailRecord = null;
   let currentRecordPrinted = false;
