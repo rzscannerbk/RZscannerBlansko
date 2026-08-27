@@ -1808,7 +1808,9 @@
   }
 
   async function startBatchAfterOffensePicked(){
-    batchDocType = await askDocType();
+    // V dávce se appka na typ dokumentu neptá — hromadné botičky se
+    // prakticky nedělají, vždycky se použije Výzva (parkovačka).
+    batchDocType = 'vyzva';
     batchQueue = [];
     currentBatchIndex = null;
     batchCapturing = true;
@@ -2522,6 +2524,33 @@
 
   function escapeHtml(s){
     return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Klepnutí na položku v seznamu pod aktivně zaostřeným textovým polem
+  // (výběr přestupku/značky/adresy, kde appka má nahoře vyhledávání a
+  // klávesnici) — na iOS Safari první klepnutí mimo pole jen schová
+  // klávesnici a "click" se nespustí, dokud se neklepne podruhé. Tenhle
+  // helper místo "click" poslouchá "touchend" (ten se nepolyká), s
+  // rozeznáním tap vs. scroll podle posunu prstu, ať to nerozbije
+  // scrollování v seznamu. Na neklepacích zařízeních (myš) zůstává "click"
+  // jako záloha.
+  function attachTapHandler(el, handler){
+    let startX = 0, startY = 0, moved = false;
+    el.addEventListener('touchstart', (e)=>{
+      const t = e.touches[0];
+      startX = t.clientX; startY = t.clientY; moved = false;
+    }, { passive: true });
+    el.addEventListener('touchmove', (e)=>{
+      const t = e.touches[0];
+      if(Math.abs(t.clientX - startX) > 10 || Math.abs(t.clientY - startY) > 10) moved = true;
+    }, { passive: true });
+    el.addEventListener('touchend', (e)=>{
+      if(!moved){
+        e.preventDefault();
+        handler();
+      }
+    });
+    el.addEventListener('click', handler);
   }
 
   function buildNoticeHtml(record){
@@ -3455,7 +3484,7 @@
       ref.className = 'offense-item-ref';
       ref.textContent = o.ref;
       item.appendChild(ref);
-      item.addEventListener('click', ()=>{
+      attachTapHandler(item, ()=>{
         if(pickingOffenseForBatch){
           pickingOffenseForBatch = false;
           batchOffense = o;
@@ -3529,7 +3558,12 @@
     search.value = '';
     renderOffenseList('');
     show('offense');
-    search.focus();
+    // V dávce klávesnice automaticky nevyjíždí — jen seznam přestupků k
+    // výběru. Kdyby appka pole rovnou zaostřila, klávesnice by první
+    // klepnutí na položku "sežrala" jen na svoje schování (známá vlastnost
+    // iOS Safari), takže by šlo vybrat až na druhé klepnutí. Klávesnice
+    // se tak v dávce ukáže, jen když se do vyhledávání skutečně klepne.
+    if(!pickingOffenseForBatch) search.focus();
   }
 
   document.getElementById('batchStartBtn').addEventListener('click', ()=>{
@@ -3645,7 +3679,7 @@
       const clearItem = document.createElement('div');
       clearItem.className = 'az-list-item clear';
       clearItem.textContent = 'Neuvedeno';
-      clearItem.addEventListener('click', ()=> selectBrand(''));
+      attachTapHandler(clearItem, ()=> selectBrand(''));
       container.appendChild(clearItem);
 
       const top = getTopBrands(5);
@@ -3658,7 +3692,7 @@
           const item = document.createElement('div');
           item.className = 'az-list-item';
           item.textContent = name;
-          item.addEventListener('click', ()=> selectBrand(name));
+          attachTapHandler(item, ()=> selectBrand(name));
           container.appendChild(item);
         });
         const allH = document.createElement('div');
@@ -3677,7 +3711,7 @@
       const item = document.createElement('div');
       item.className = 'az-list-item';
       item.textContent = name;
-      item.addEventListener('click', ()=> selectBrand(name));
+      attachTapHandler(item, ()=> selectBrand(name));
       container.appendChild(item);
     });
   }
@@ -3866,7 +3900,7 @@
       lbl.className = 'offense-item-label';
       lbl.textContent = streetLabel;
       item.appendChild(lbl);
-      item.addEventListener('click', ()=>{
+      attachTapHandler(item, ()=>{
         document.getElementById('addressInput').value = streetLabel;
         show('result');
       });
