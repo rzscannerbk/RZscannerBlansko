@@ -472,7 +472,7 @@
     <button class="fallback-link" id="printerHostLink">⚙ Nastavit tiskárnu (Epson TM-P20II)</button>
     <button class="fallback-link" id="printerTestLink">🖨 Otestovat tiskárnu</button>
     <div class="submit-note" id="printerTestNote"></div>
-    <button class="fallback-link" id="batchStartBtn">📸 Dávka (více aut)</button>
+    <button class="btn btn-primary" id="batchStartBtn" style="display:block; width:auto; margin:22px auto 0; padding:12px 32px;">Dávka</button>
     <a class="fallback-link" id="historyLink" href="https://rzscannerbk.github.io/RZscannerBlansko/prehled.html" target="_blank" rel="noopener" style="display:inline-block;">Odeslané přestupky</a>
     <div id="camError"></div>
     <div class="confirm-overlay" id="settingsOverlay">
@@ -778,7 +778,10 @@
         <div id="photoGallery"></div>
       </div>
     </div>
-    <button class="float-fab" id="pdfPreviewCloseBtn">OK</button>
+    <div class="btn-row" style="padding:16px 20px calc(env(safe-area-inset-bottom,0px) + 16px); gap:16px;">
+      <button class="btn btn-primary" id="pdfPreviewBackBtn">Zpět</button>
+      <button class="btn btn-submit" id="pdfPreviewPrintBtn">Tisk</button>
+    </div>
   </div>
 
   <!-- LOGIN -->
@@ -969,6 +972,10 @@
   let lastResolvedGps = null;
   // If a submit was requested while logged out, resume it right after login.
   let pendingSubmitAfterLogin = false;
+  // Když se tlačítko "Tisk" na obrazovce Kontrola údajů zeptá na
+  // přihlášení (appka nebyla přihlášená), potřebuje appka po úspěšném
+  // přihlášení vědět, že má rovnou i vytisknout, ne jen odeslat.
+  let pendingAutoPrintAfterLogin = false;
 
   function setSubmitNote(text, kind){
     const note = document.getElementById('submitNote');
@@ -995,7 +1002,7 @@
     return String(next).padStart(6, '0');
   }
 
-  async function uploadLastPdfToFirestore(docType){
+  async function uploadLastPdfToFirestore(docType, forcePrint){
     docType = docType || 'vyzva';
     if(!lastGeneratedPdf){
       setSubmitNote('Nejdřív zobrazte náhled.', 'err');
@@ -1106,11 +1113,20 @@
         setTimeout(()=>{ finishBatchItemOrGoHome(); }, 1200);
       } else {
         submitBtn.disabled = true;
-        // Místo automatického přeskočení zpět appka nabídne rovnou tisk
-        // výzvy — číslo jednací i všechna pole už jsou v tuhle chvíli
-        // hotová, takže je to nejpřirozenější okamžik se zeptat.
         const submittedRecord = { ...lastGeneratedPdf, noticeNumber, docType };
-        const wantsPrint = await askPrintAfterSubmit(`✓ Přestupek odeslán do přehledu<br>Č. j.: ${noticeNumber}`);
+        let wantsPrint;
+        if(forcePrint){
+          // Tlačítko "Tisk" na Kontrole údajů — záměr tisknout je už jasný
+          // ze samotného tlačítka, appka se tedy neptá znovu a jen krátce
+          // potvrdí, že se odeslání i tisk povedly.
+          setSubmitNote(`✓ Přestupek odeslán do přehledu · Č. j.: ${noticeNumber} · tiskne se výzva…`, 'ok');
+          wantsPrint = true;
+        } else {
+          // Jinak appka nabídne tisk až po odeslání — číslo jednací i
+          // všechna pole už jsou v tuhle chvíli hotová, takže je to
+          // nejpřirozenější okamžik se zeptat.
+          wantsPrint = await askPrintAfterSubmit(`✓ Přestupek odeslán do přehledu<br>Č. j.: ${noticeNumber}`);
+        }
         if(wantsPrint){
           await printViaEpson(submittedRecord);
           setTimeout(()=>{ finishBatchItemOrGoHome(); }, 1200);
@@ -1132,6 +1148,7 @@
     }
     if(!auth.currentUser){
       pendingSubmitAfterLogin = true;
+      pendingAutoPrintAfterLogin = false;
       document.getElementById('loginError').style.display = 'none';
       show('login');
       return;
@@ -1139,8 +1156,39 @@
     uploadLastPdfToFirestore(lastGeneratedPdf.docType);
   });
 
+  // Tlačítko "Zpět" na Kontrole údajů — jen se vrátí ke kontrole záznamu,
+  // stejné chování jako dřívější plovoucí "OK".
+  document.getElementById('pdfPreviewBackBtn').addEventListener('click', ()=>{
+    document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
+    const note = document.getElementById('savedNote');
+    note.style.display = 'block';
+    note.textContent = '✓ Náhled zkontrolován, připraveno k odeslání';
+    show('result');
+  });
+
+  // Tlačítko "Tisk" na Kontrole údajů — odešle přestupek na pozadí a rovnou
+  // (bez ptaní) vytiskne výzvu/oznámení, jakmile odeslání proběhne.
+  document.getElementById('pdfPreviewPrintBtn').addEventListener('click', ()=>{
+    if(!lastGeneratedPdf){
+      show('result');
+      setSubmitNote('Nejdřív zobrazte náhled.', 'err');
+      return;
+    }
+    document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
+    show('result');
+    if(!auth.currentUser){
+      pendingSubmitAfterLogin = true;
+      pendingAutoPrintAfterLogin = true;
+      document.getElementById('loginError').style.display = 'none';
+      show('login');
+      return;
+    }
+    uploadLastPdfToFirestore(lastGeneratedPdf.docType, true);
+  });
+
   document.getElementById('loginCancelBtn').addEventListener('click', ()=>{
     pendingSubmitAfterLogin = false;
+    pendingAutoPrintAfterLogin = false;
     show('result');
   });
 
@@ -1163,7 +1211,9 @@
       show('result');
       if(pendingSubmitAfterLogin){
         pendingSubmitAfterLogin = false;
-        uploadLastPdfToFirestore(lastGeneratedPdf ? lastGeneratedPdf.docType : null);
+        const forcePrint = pendingAutoPrintAfterLogin;
+        pendingAutoPrintAfterLogin = false;
+        uploadLastPdfToFirestore(lastGeneratedPdf ? lastGeneratedPdf.docType : null, forcePrint);
       }
     }catch(e){
       errEl.textContent = 'Přihlášení se nezdařilo — zkontrolujte e-mail a heslo.';
@@ -3047,14 +3097,6 @@
 
   document.getElementById('photoToggleBtn').addEventListener('click', ()=>{
     document.getElementById('photoWrap').classList.toggle('open');
-  });
-
-  document.getElementById('pdfPreviewCloseBtn').addEventListener('click', ()=>{
-    document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
-    const note = document.getElementById('savedNote');
-    note.style.display = 'block';
-    note.textContent = '✓ Náhled zkontrolován, připraveno k odeslání';
-    show('result');
   });
 
 
