@@ -752,6 +752,15 @@
     </div>
     <p style="text-align:center; color:var(--muted); font-size:13.5px; padding:0 20px; margin:6px 0 14px;">Klepnutím na položku zkontrolujte SPZ a odešlete. Po vytištění appka automaticky otevře další.</p>
     <div id="batchQueueList"></div>
+    <div class="confirm-overlay" id="batchLeaveConfirmOverlay">
+      <div class="confirm-box">
+        <div class="confirm-text">Odejít?<br><span style="font-size:13px; color:var(--muted); font-weight:400;">Nafocené RZ budou ztraceny.</span></div>
+        <div class="confirm-btns">
+          <button class="confirm-btn confirm-no" id="batchLeaveNoBtn">Ne</button>
+          <button class="confirm-btn confirm-yes" id="batchLeaveYesBtn">Ano</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- OFFENSE PICKER -->
@@ -3584,6 +3593,25 @@
   });
 
   document.getElementById('batchQueueBackBtn').addEventListener('click', ()=>{
+    // Pokud ve frontě zbývá aspoň jedna nevyřízená položka, appka se
+    // nejdřív zeptá — jinak by šlo nechtěným/neopatrným klepnutím na
+    // šipku zpět nenávratně přijít o všechny zatím nafocené přestupky.
+    const hasPending = batchQueue.some(it => !it.done);
+    if(!hasPending){
+      batchQueue = [];
+      batchOffense = null;
+      batchDocType = null;
+      currentBatchIndex = null;
+      show('start');
+      return;
+    }
+    document.getElementById('batchLeaveConfirmOverlay').classList.add('open');
+  });
+  document.getElementById('batchLeaveNoBtn').addEventListener('click', ()=>{
+    document.getElementById('batchLeaveConfirmOverlay').classList.remove('open');
+  });
+  document.getElementById('batchLeaveYesBtn').addEventListener('click', ()=>{
+    document.getElementById('batchLeaveConfirmOverlay').classList.remove('open');
     batchQueue = [];
     batchOffense = null;
     batchDocType = null;
