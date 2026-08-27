@@ -115,9 +115,19 @@
   /* Na seznamu (na rozdíl od detailu, kde je "Zpět" jedno ze tří tlačítek
      vedle sebe) je "Zpět" jediné tlačítko v liště — nemá tedy smysl ho
      roztahovat na celou šířku jako v detailu, stačí na velikost textu,
-     na střed, s menší mezerou od spodního okraje. */
-  #listScreen .list-bottom-bar{justify-content:center; padding:10px 18px calc(env(safe-area-inset-bottom,0px) + 10px);}
-  #listScreen .list-bottom-btn.back{flex:0 0 auto; padding:10px 32px;}
+     na střed. Navíc plave přímo nad obsahem (bez vlastního pozadí/pruhu),
+     ať pod ním není zbytečný černý pás — seznam pod ním prosvítá a jde
+     skrz něj i normálně scrollovat. */
+  #listScreen .list-bottom-bar{
+    justify-content:center; position:absolute; left:0; right:0; bottom:0;
+    background:none; border-top:none; pointer-events:none;
+    padding:0 18px calc(env(safe-area-inset-bottom,0px) + 14px);
+  }
+  #listScreen .list-bottom-btn.back{
+    flex:0 0 auto; padding:12px 34px; pointer-events:all;
+    box-shadow:0 8px 24px rgba(0,0,0,.45);
+  }
+  #listScreen{position:relative;}
   .confirm-overlay{
     display:none; position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.55);
     align-items:center; justify-content:center; padding:24px;
@@ -150,7 +160,7 @@
     width:100%; background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px;
     padding:11px 14px; color:var(--text); font-size:14.5px; font-family:inherit; outline:none;
   }
-  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px 20px;}
+  #listBody{flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding:14px 18px 76px;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
   .record-item{
     position:relative; background:rgba(91,141,239,.07); border:1.5px solid rgba(91,141,239,.55);
