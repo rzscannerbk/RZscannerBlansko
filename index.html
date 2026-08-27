@@ -290,6 +290,13 @@
   .confirm-yes{background:#2F6FED; border:1.5px solid #2F6FED; color:#fff;}
   .confirm-yes:disabled{background:#3A3D44; border-color:#3A3D44; color:var(--faint); cursor:default; opacity:.7;}
   .printer-check-note{font-size:12px; color:var(--faint); margin:-10px 0 14px; text-align:center; line-height:1.4;}
+  .duplicate-dialog-box{max-width:420px; text-align:left;}
+  .duplicate-match-item{border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+  .duplicate-match-item:last-child{margin-bottom:0;}
+  .duplicate-match-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; color:var(--text); letter-spacing:.03em;}
+  .duplicate-match-number{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--muted); margin-left:8px;}
+  .duplicate-match-offense{font-size:13px; color:var(--text); margin-top:6px; line-height:1.35;}
+  .duplicate-match-meta{font-size:11.5px; color:var(--muted); margin-top:6px; font-family:'Roboto Mono',monospace;}
 
   /* ---------- SCREEN: LOGIN ---------- */
   #loginScreen{align-items:center; justify-content:center; padding:32px;}
@@ -708,6 +715,15 @@
         <div class="confirm-btns">
           <button class="confirm-btn confirm-no" id="printConfirmNo">Ne</button>
           <button class="confirm-btn confirm-yes" id="printConfirmYes">Ano</button>
+        </div>
+      </div>
+    </div>
+    <div class="confirm-overlay" id="duplicateMatchesOverlay">
+      <div class="confirm-box duplicate-dialog-box">
+        <div class="confirm-text" style="margin-bottom:14px;">Nevyřešené záznamy s touhle RZ</div>
+        <div id="duplicateMatchesList" style="max-height:52vh; overflow-y:auto; margin-bottom:16px;"></div>
+        <div class="confirm-btns">
+          <button class="confirm-btn confirm-no" id="duplicateMatchesCloseBtn" style="flex:1;">Zavřít</button>
         </div>
       </div>
     </div>
@@ -2414,11 +2430,14 @@
 
   // Upozorní, pokud stejná RZ už dnes má nevyřešený záznam — nezakazuje
   // nic, jen informuje, aby se snáz předešlo dvojímu řešení stejného auta.
-  // Hláška je klikací — otevře přehled s předvyplněným hledáním podle RZ,
-  // ať se dá ten (nebo ty) starší záznam(y) rovnou zkontrolovat. Volá se
-  // pokaždé, když se v poli objeví nová/jiná RZ (po OCR, po ručním
-  // přepsání, po otevření položky z dávky ke kontrole).
+  // Hláška je klikací — otevře dialog přímo v appce se seznamem všech
+  // nevyřešených záznamů té RZ (RZ, číslo, kvalifikace, místo, datum,
+  // čas), ať appka neopouští rozpracovaný přestupek kvůli tomu, že by se
+  // muselo přecházet na samostatnou stránku přehledu. Volá se pokaždé,
+  // když se v poli objeví nová/jiná RZ (po OCR, po ručním přepsání, po
+  // otevření položky z dávky ke kontrole).
   let duplicateCheckToken = 0;
+  let lastDuplicateMatches = [];
   async function checkDuplicatePlateWarning(){
     const banner = document.getElementById('duplicateWarning');
     const myToken = ++duplicateCheckToken;
@@ -2428,6 +2447,7 @@
     banner.onclick = null;
     banner.style.cursor = 'default';
     banner.style.textDecoration = 'none';
+    lastDuplicateMatches = [];
     if(!plate) return;
     try{
       const now = new Date();
@@ -2441,25 +2461,45 @@
       if(myToken !== duplicateCheckToken) return; // mezitím se RZ v poli změnila, zahodit zastaralý výsledek
       const unresolved = snap.docs.map(d=>d.data()).filter(d => !d.resolved);
       if(unresolved.length > 0){
+        lastDuplicateMatches = unresolved;
         const first = unresolved[0];
         let text = '⚠ Tahle RZ už dnes má nevyřešený záznam';
         if(first.noticeNumber) text += ' č. ' + first.noticeNumber;
         if(first.time) text += ' (' + first.time + (first.address ? ', ' + first.address : '') + ')';
         text += '.';
-        if(unresolved.length > 1) text += ' (celkem ' + unresolved.length + '×)';
+        if(unresolved.length > 1) text += ' (celkem ' + unresolved.length + '×) — klepnutím zobrazíte všechny';
+        else text += ' — klepnutím zobrazíte detail';
         banner.textContent = text;
         banner.style.display = 'block';
         banner.style.cursor = 'pointer';
         banner.style.textDecoration = 'underline';
-        banner.onclick = ()=>{
-          window.open('https://rzscannerbk.github.io/RZscannerBlansko/prehled.html?q=' + encodeURIComponent(plate), '_blank');
-        };
+        banner.onclick = openDuplicateMatchesDialog;
       }
     }catch(e){
       console.error('Kontrola duplicity RZ selhala:', e);
     }
   }
   document.getElementById('plateInput').addEventListener('blur', checkDuplicatePlateWarning);
+
+  function openDuplicateMatchesDialog(){
+    const list = document.getElementById('duplicateMatchesList');
+    list.innerHTML = '';
+    lastDuplicateMatches.forEach(r=>{
+      const item = document.createElement('div');
+      item.className = 'duplicate-match-item';
+      item.innerHTML =
+        '<div><span class="duplicate-match-plate">' + escapeHtml(formatPlateDisplay(r.plate || '')) + '</span>' +
+        (r.noticeNumber ? '<span class="duplicate-match-number">č. ' + escapeHtml(r.noticeNumber) + '</span>' : '') + '</div>' +
+        (r.offenseLabel ? '<div class="duplicate-match-offense">' + escapeHtml(r.offenseLabel) + '</div>' : '') +
+        '<div class="duplicate-match-meta">' + escapeHtml(r.address || '—') + ' · ' +
+        escapeHtml(formatDateCz(r.date)) + ' ' + escapeHtml(r.time || '') + '</div>';
+      list.appendChild(item);
+    });
+    document.getElementById('duplicateMatchesOverlay').classList.add('open');
+  }
+  document.getElementById('duplicateMatchesCloseBtn').addEventListener('click', ()=>{
+    document.getElementById('duplicateMatchesOverlay').classList.remove('open');
+  });
 
   // ---------- Notice preview (plain HTML/CSS — no PDF, no raster) ----------
   // Real text is always crisp at any zoom/screen size, unlike the earlier
