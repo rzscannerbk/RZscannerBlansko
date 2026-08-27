@@ -3026,10 +3026,10 @@
           note.textContent = '✓ Tiskárna dostupná';
           yesBtn.disabled = false;
         } else {
-          note.innerHTML = '⚠ Tiskárna nedostupná — zkontroluj Wi-Fi/zapnutí. <span id="printForceLink" style="text-decoration:underline; cursor:pointer;">Zkusit přesto</span>';
+          note.innerHTML = '⚠ Tiskárna nedostupná<br>Zkontroluj Wi-Fi/zapnutí<br><span id="printForceLink" style="text-decoration:underline; cursor:pointer;">Zkusit přesto</span>';
           yesBtn.disabled = true;
           const forceLink = document.getElementById('printForceLink');
-          if(forceLink) forceLink.addEventListener('click', ()=>{ yesBtn.disabled = false; note.textContent = ''; });
+          if(forceLink) forceLink.addEventListener('click', ()=>{ yesBtn.disabled = false; note.innerHTML = ''; });
         }
       });
     });
