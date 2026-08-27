@@ -112,6 +112,11 @@
   .list-bottom-btn.resolve[disabled]{background:var(--good); color:#000; opacity:1;}
   .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
   .list-bottom-btn:active{transform:scale(.96);}
+  /* "Zpět" na seznamu je <a href>, ne <button> — bez tohohle by iOS po
+     zhruba půl vteřině podržení sám spustil svoje kontextové menu
+     (Otevřít v nové kartě / Kopírovat odkaz / Sdílet), dřív než by stihlo
+     naběhnout těch 4 s pro skryté odhlášení, a rozbilo by to celé gesto. */
+  #listBackBtn{-webkit-touch-callout:none; -webkit-user-select:none; user-select:none;}
   /* Na seznamu (na rozdíl od detailu, kde je "Zpět" jedno ze tří tlačítek
      vedle sebe) je "Zpět" jediné tlačítko v liště — nemá tedy smysl ho
      roztahovat na celou šířku jako v detailu, stačí na velikost textu,
@@ -280,17 +285,14 @@
 
   <!-- LIST -->
   <div id="listScreen" class="screen">
-    <div class="list-top">
-      <h1 id="listTitle">Přehled přestupků</h1>
-    </div>
     <div class="search-row">
-      <input type="text" id="searchInput" placeholder="Hledat podle RZ nebo ulice…" autocomplete="off">
+      <input type="text" id="searchInput" placeholder="Hledat podle RZ, čísla, kvalifikace, strážníka, data…" autocomplete="off">
     </div>
     <div id="listBody">
       <div class="list-empty" id="listStatus">Načítám…</div>
     </div>
     <div class="list-bottom-bar">
-      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="list-bottom-btn back">Zpět</a>
+      <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="list-bottom-btn back" id="listBackBtn">Zpět</a>
     </div>
   </div>
 
@@ -438,27 +440,37 @@
     if(e.key === 'Enter') document.getElementById('loginSubmitBtn').click();
   });
 
-  // Skrytý odhlašovací gesto: podržení nadpisu "Přehled přestupků" 4 s.
+  // Skryté odhlašovací gesto: podržení tlačítka "Zpět" na seznamu 4 s.
   // Žádné tlačítko odhlášení v UI záměrně není — appka je sdílená mezi
   // strážníky na jednom telefonu, takže odhlášení nemá být na první pohled
-  // dostupné/omylem stisknutelné.
+  // dostupné/omylem stisknutelné. Tlačítko "Zpět" je normálně odkaz (běžný
+  // klik/tap appku opustí zpátky na RZ Scanner) — dlouhé podržení tenhle
+  // odkaz "překryje" a místo přechodu appku rovnou odhlásí.
   (function setupHiddenLogout(){
-    const titleEl = document.getElementById('listTitle');
-    if(!titleEl) return;
+    const btn = document.getElementById('listBackBtn');
+    if(!btn) return;
     let holdTimer = null;
+    let triggered = false;
     function start(){
+      triggered = false;
       cancel();
-      holdTimer = setTimeout(()=>{ auth.signOut(); }, 4000);
+      holdTimer = setTimeout(()=>{ triggered = true; auth.signOut(); }, 4000);
     }
     function cancel(){
       if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
     }
-    titleEl.addEventListener('touchstart', start, { passive: true });
-    titleEl.addEventListener('touchend', cancel);
-    titleEl.addEventListener('touchcancel', cancel);
-    titleEl.addEventListener('mousedown', start);
-    titleEl.addEventListener('mouseup', cancel);
-    titleEl.addEventListener('mouseleave', cancel);
+    btn.addEventListener('touchstart', start, { passive: true });
+    btn.addEventListener('touchend', cancel);
+    btn.addEventListener('touchcancel', cancel);
+    btn.addEventListener('mousedown', start);
+    btn.addEventListener('mouseup', cancel);
+    btn.addEventListener('mouseleave', cancel);
+    btn.addEventListener('click', (e)=>{
+      if(triggered){
+        e.preventDefault();
+        triggered = false;
+      }
+    });
   })();
 
   // ---------- List ----------
@@ -1247,7 +1259,10 @@
       (r.plate || '').toLowerCase().includes(q) ||
       (r.address || '').toLowerCase().includes(q) ||
       (r.noticeNumber || '').toLowerCase().includes(q) ||
-      (r.officerName || '').toLowerCase().includes(q)
+      (r.officerName || '').toLowerCase().includes(q) ||
+      (r.offenseLabel || '').toLowerCase().includes(q) ||
+      (r.date || '').toLowerCase().includes(q) ||
+      formatDateCz(r.date).toLowerCase().includes(q)
     );
 
     container.innerHTML = '';
