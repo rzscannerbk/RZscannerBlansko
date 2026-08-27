@@ -379,6 +379,14 @@
   let allRecords = [];
 
   // ---------- Auth ----------
+  // Proklik z RZ Scanneru (upozornění na duplicitní RZ) může appku otevřít
+  // s parametrem ?q=<RZ> v URL — předvyplní pole hledání, ať se rovnou
+  // zobrazí ten (nebo ty) záznam(y), na které se to upozornění vztahovalo.
+  try{
+    const q = new URLSearchParams(window.location.search).get('q');
+    if(q) document.getElementById('searchInput').value = q;
+  }catch(e){}
+
   auth.onAuthStateChanged(user=>{
     if(user){
       show('list');

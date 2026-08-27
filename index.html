@@ -778,9 +778,12 @@
         <div id="photoGallery"></div>
       </div>
     </div>
-    <div class="btn-row" style="padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px); margin:0; gap:12px; flex-shrink:0;">
+    <div class="btn-row" style="padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px); margin:0; gap:12px; flex-shrink:0; align-items:flex-start;">
       <button class="btn btn-primary" id="pdfPreviewBackBtn">Zpět</button>
-      <button class="btn btn-submit" id="pdfPreviewPrintBtn">Tisk</button>
+      <div style="flex:1; display:flex; flex-direction:column;">
+        <button class="btn btn-submit" id="pdfPreviewPrintBtn" style="width:100%;">Tisk</button>
+        <div id="pdfPreviewPrinterNote" style="display:none; text-align:center; font-size:10.5px; color:var(--muted); margin-top:5px; font-family:'Roboto Mono',monospace;"></div>
+      </div>
     </div>
   </div>
 
@@ -2409,10 +2412,12 @@
     setSubmitNote('', '');
   }
 
-  // Upozorní, pokud stejná SPZ už dnes má nevyřešený záznam — nezakazuje
+  // Upozorní, pokud stejná RZ už dnes má nevyřešený záznam — nezakazuje
   // nic, jen informuje, aby se snáz předešlo dvojímu řešení stejného auta.
-  // Volá se pokaždé, když se v poli objeví nová/jiná SPZ (po OCR, po
-  // ručním přepsání, po otevření položky z dávky ke kontrole).
+  // Hláška je klikací — otevře přehled s předvyplněným hledáním podle RZ,
+  // ať se dá ten (nebo ty) starší záznam(y) rovnou zkontrolovat. Volá se
+  // pokaždé, když se v poli objeví nová/jiná RZ (po OCR, po ručním
+  // přepsání, po otevření položky z dávky ke kontrole).
   let duplicateCheckToken = 0;
   async function checkDuplicatePlateWarning(){
     const banner = document.getElementById('duplicateWarning');
@@ -2420,6 +2425,9 @@
     const plate = document.getElementById('plateInput').value.trim();
     banner.style.display = 'none';
     banner.textContent = '';
+    banner.onclick = null;
+    banner.style.cursor = 'default';
+    banner.style.textDecoration = 'none';
     if(!plate) return;
     try{
       const now = new Date();
@@ -2430,16 +2438,25 @@
         .where('date', '==', todayStr)
         .limit(5)
         .get();
-      if(myToken !== duplicateCheckToken) return; // mezitím se SPZ v poli změnila, zahodit zastaralý výsledek
+      if(myToken !== duplicateCheckToken) return; // mezitím se RZ v poli změnila, zahodit zastaralý výsledek
       const unresolved = snap.docs.map(d=>d.data()).filter(d => !d.resolved);
       if(unresolved.length > 0){
         const first = unresolved[0];
-        banner.textContent = '⚠ Tahle SPZ už dnes má nevyřešený záznam' +
-          (first.time ? ' (' + first.time + (first.address ? ', ' + first.address : '') + ')' : '') + '.';
+        let text = '⚠ Tahle RZ už dnes má nevyřešený záznam';
+        if(first.noticeNumber) text += ' č. ' + first.noticeNumber;
+        if(first.time) text += ' (' + first.time + (first.address ? ', ' + first.address : '') + ')';
+        text += '.';
+        if(unresolved.length > 1) text += ' (celkem ' + unresolved.length + '×)';
+        banner.textContent = text;
         banner.style.display = 'block';
+        banner.style.cursor = 'pointer';
+        banner.style.textDecoration = 'underline';
+        banner.onclick = ()=>{
+          window.open('https://rzscannerbk.github.io/RZscannerBlansko/prehled.html?q=' + encodeURIComponent(plate), '_blank');
+        };
       }
     }catch(e){
-      console.error('Kontrola duplicity SPZ selhala:', e);
+      console.error('Kontrola duplicity RZ selhala:', e);
     }
   }
   document.getElementById('plateInput').addEventListener('blur', checkDuplicatePlateWarning);
@@ -2915,6 +2932,27 @@
     });
   }
 
+  // Zkontroluje tiskárnu hned při otevření Kontroly údajů — tlačítko
+  // "Tisk" zůstane šedé/neaktivní s malou nápovědou pod sebou, dokud
+  // appka nepotvrdí, že se na tiskárnu dá přes síť dosáhnout. Zabrání to
+  // situaci, kdy strážník klikne na Tisk, appka mezitím odešle přestupek
+  // do přehledu, a tisk samotný pak spadne na nedostupnou tiskárnu.
+  async function updatePrintButtonAvailability(){
+    const btn = document.getElementById('pdfPreviewPrintBtn');
+    const note = document.getElementById('pdfPreviewPrinterNote');
+    btn.disabled = true;
+    note.textContent = '🖨 Kontroluji tiskárnu…';
+    note.style.display = 'block';
+    const reachable = await pingPrinter();
+    btn.disabled = !reachable;
+    if(reachable){
+      note.style.display = 'none';
+    } else {
+      note.textContent = 'připoj tiskárnu';
+      note.style.display = 'block';
+    }
+  }
+
   function askPrintAfterSubmit(successText){
     return new Promise((resolve)=>{
       const overlay = document.getElementById('printConfirmOverlay');
@@ -3084,6 +3122,7 @@
       // interferes with the camera UI).
       document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5');
       show('pdfPreview');
+      updatePrintButtonAvailability();
 
       saveCurrentToHistory({ plate, date, time, address, offense: selectedOffense });
     }catch(e){
