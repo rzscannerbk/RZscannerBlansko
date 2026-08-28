@@ -1,29 +1,22 @@
 (function(){
-  var AWAIT_KEY = 'rzScannerAwaitingRsvRz';
-
-  // Krok 2: záložka spuštěná podruhé po přenačtení stránky. Značka v
-  // sessionStorage nese i RZ vozidla, které se ukládalo — porovnáme ji
-  // s aktuálním obsahem pole RZ na stránce. Sedí-li, jsme na správné,
-  // právě uložené události a klikneme na "Ověřit v RSV". Nesedí-li
-  // (nebo je pole prázdné, jako na čerstvém "Událost - nová"), jde o
-  // jinou/novou událost — starou značku zahodíme a pokračujeme rovnou
-  // do běžného vyplňování ze schránky níže.
-  var awaitingRz = sessionStorage.getItem(AWAIT_KEY);
-  if(awaitingRz){
-    var currentRzEl = document.getElementById('tSPZ');
-    var currentRz = currentRzEl ? currentRzEl.value : '';
-    if(currentRz && currentRz === awaitingRz){
-      sessionStorage.removeItem(AWAIT_KEY);
-      var rsvBtn = document.getElementById('tFindRSV');
-      if(rsvBtn){
-        rsvBtn.click();
-      } else {
-        alert('Nenašel jsem tlačítko "Ověřit v RSV" na téhle stránce.');
-      }
-      return;
+  // Krok 2 (nebo jakékoliv další kliknutí): pozná se podle skrytého pole
+  // EventID, které MP Manager sám vyplní po prvním uložení. Na čerstvém,
+  // ještě neuloženém "Událost - nová" má EventID hodnotu "0". Jakmile má
+  // libovolnou jinou hodnotu, event je uložený — appka pak UŽ NIKDY
+  // znovu nevyplňuje (aby nevznikaly duplicitní záznamy strážníků apod.),
+  // jen zkusí kliknout na "Ověřit v RSV". Tohle je spolehlivější než
+  // dřívější odhad podle sessionStorage/porovnávání RZ, který mohl
+  // selhat kvůli přesměrování na URL s ?ID=... po uložení.
+  var eventIdEl = document.getElementById('EventID');
+  var eventId = eventIdEl ? eventIdEl.value : '0';
+  if(eventId && eventId !== '0'){
+    var rsvBtn = document.getElementById('tFindRSV');
+    if(rsvBtn){
+      rsvBtn.click();
     } else {
-      sessionStorage.removeItem(AWAIT_KEY);
+      alert('Událost je už uložená (RZ Scanner data byla vyplněna dřív) — tlačítko "Ověřit v RSV" jsem na téhle stránce nenašel, zkontroluj ručně.');
     }
+    return;
   }
 
   if(window.__rzScannerMPMFilled){
@@ -98,12 +91,11 @@
     window.__rzScannerMPMFilled = true;
 
     // Rovnou uložit a pokračovat — jakmile se stránka po uložení
-    // přenačte a událost dostane číslo jednací, klepni na tuhle
-    // záložku znovu: pozná se podle sessionStorage značky a rovnou
-    // klikne na "Ověřit v RSV".
+    // přenačte a dostane reálné EventID, klepni na tuhle záložku znovu:
+    // pozná se podle EventID (viz začátek souboru) a rovnou klikne na
+    // "Ověřit v RSV".
     var saveBtn = document.getElementById('tSubmitContinue');
     if(saveBtn){
-      sessionStorage.setItem(AWAIT_KEY, d.rz || '');
       saveBtn.click();
     } else {
       alert(d.udalostId
