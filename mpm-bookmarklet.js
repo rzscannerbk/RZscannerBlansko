@@ -64,6 +64,11 @@
     if(d.authorizationIds){ d.authorizationIds.forEach(function(id){ addOnce(id,'Opr'); }); }
     if(d.solutionIds){ d.solutionIds.forEach(function(id){ addOnce(id,'Rej'); }); }
 
+    // Přidat aktuálně přihlášeného strážníka jedním kliknutím (stejné
+    // tlačítko, jaké má formulář sám u seznamu STRÁŽNÍCI).
+    var addStraznikBtn = document.getElementById('tAddS');
+    if(addStraznikBtn) addStraznikBtn.click();
+
     window.__rzScannerMPMFilled = true;
 
     // Rovnou uložit a pokračovat — jakmile se stránka po uložení
