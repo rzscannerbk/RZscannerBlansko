@@ -187,7 +187,7 @@
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
   .list-head{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 150px 130px 64px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 84px 150px 130px 64px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
     font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
     color:var(--faint); border-bottom:1px solid var(--line); gap:0 10px;
@@ -243,9 +243,9 @@
   .record-status{display:flex; align-items:center; gap:8px; padding-top:5px; font-size:12px; color:var(--muted);}
   .record-status .dot{width:10px; height:10px; border-radius:50%; flex:0 0 auto; background:var(--faint); cursor:help;}
   .record-status.st-oznameno .dot,
-  .record-status.st-vyzva .dot,
   .record-status.st-prikaz .dot,
   .record-status.st-domluva .dot{background:var(--good);}
+  .record-status.st-vyzva .dot{background:var(--bad);}
 
   .record-sent-col{display:flex; flex-direction:column; align-items:center; gap:3px; padding-top:1px; text-align:center;}
   .record-sent-date{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint);}
@@ -2074,7 +2074,7 @@
     gStatus.appendChild(item('Vše', base.length, filterStatus === 'all', ()=>{ filterStatus='all'; refreshView(); }));
     gStatus.appendChild(item('Nevyřešené', statusCounts.pending, filterStatus === 'pending', ()=>{ filterStatus='pending'; refreshView(); }, 'var(--faint)'));
     gStatus.appendChild(item('Oznámeno', statusCounts.oznameni, filterStatus === 'oznameni', ()=>{ filterStatus='oznameni'; refreshView(); }, 'var(--good)'));
-    gStatus.appendChild(item('Odeslána výzva', statusCounts.vyzva, filterStatus === 'vyzva', ()=>{ filterStatus='vyzva'; refreshView(); }, 'var(--good)'));
+    gStatus.appendChild(item('Odeslána výzva', statusCounts.vyzva, filterStatus === 'vyzva', ()=>{ filterStatus='vyzva'; refreshView(); }, 'var(--bad)'));
     gStatus.appendChild(item('Dořešeno příkazem', statusCounts.prikaz, filterStatus === 'prikaz', ()=>{ filterStatus='prikaz'; refreshView(); }, 'var(--good)'));
     gStatus.appendChild(item('Dořešeno domluvou', statusCounts.domluva, filterStatus === 'domluva', ()=>{ filterStatus='domluva'; refreshView(); }, 'var(--good)'));
     rail.appendChild(gStatus);
