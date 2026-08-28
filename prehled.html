@@ -2003,7 +2003,11 @@
 
   // Rozparsuje syrový OCR text na jméno/příjmení/datum narození/číslo
   // dokladu — viz podrobný komentář u stejné funkce v prehled-desktop.html.
+  // Řádek se jmény se pozná podle absence číslic (ne jen podle "<<" —
+  // to se objevuje i v paddingu za číslem dokladu).
   function parseMrz(rawText){
+    console.log('MRZ OCR raw text:', rawText); // pro ladění při špatném rozpoznání — viz DevTools konzole
+
     const lines = rawText
       .toUpperCase()
       .split('\n')
@@ -2012,9 +2016,9 @@
 
     if(lines.length < 2) return null;
 
-    const nameLineIdx = lines.findIndex(l => l.includes('<<'));
-    const nameLine = nameLineIdx >= 0 ? lines[nameLineIdx] : null;
-    const dataLines = lines.filter((_, i) => i !== nameLineIdx);
+    const noDigitLines = lines.filter(l => !/\d/.test(l));
+    const nameLine = noDigitLines.find(l => l.includes('<<')) || noDigitLines[0] || null;
+    const dataLines = lines.filter(l => l !== nameLine);
 
     let jmeno = '', prijmeni = '';
     if(nameLine){
@@ -2087,8 +2091,8 @@
       const note = document.getElementById('prikazScanNote');
       note.style.display = 'block';
       note.textContent = parsed.checksOk
-        ? 'Načteno ze skenu OP — zkontroluj prosím správnost před uložením.'
-        : 'Načteno ze skenu OP, ale kontrolní číslice nesedí — hodnoty pečlivě zkontroluj nebo zkus sken znovu.';
+        ? 'Načteno ze skenu OP — OCR není 100% spolehlivé, VŽDY prosím pečlivě zkontroluj všechny hodnoty (zvlášť čísla) před uložením.'
+        : 'Načteno ze skenu OP, ale kontrolní číslice nesedí — datum narození je pravděpodobně špatně, oprav ho ručně nebo zkus sken znovu.';
 
       closeMrzCamera();
     }catch(e){
