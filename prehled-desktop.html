@@ -3321,22 +3321,21 @@
       const rawText = (result && result.data && result.data.text) || '';
       const parsed = parseMrz(rawText);
 
-      if(!parsed){
-        status.textContent = 'Nepodařilo se rozpoznat MRZ zónu — zkus to znovu, blíž a rovněji na doklad.';
+      // Jméno/příjmení/datum narození se ukázaly v praxi nespolehlivé
+      // (OCR obecného modelu na fontu MRZ zóny často chybuje) — appka
+      // proto teď z fotky bere jen číslo dokladu, které se dosud čte
+      // spolehlivě, a zbytek nechává na ručním vyplnění.
+      if(!parsed || !parsed.cisloDokladu){
+        status.textContent = 'Nepodařilo se rozpoznat číslo dokladu — zkus to znovu, blíž a rovněji na doklad.';
         shootBtn.disabled = false;
         return;
       }
 
-      document.getElementById('prikazJmeno').value = parsed.jmeno || '';
-      document.getElementById('prikazPrijmeni').value = parsed.prijmeni || '';
-      document.getElementById('prikazNarozeni').value = parsed.datumNarozeni || '';
-      document.getElementById('prikazDoklad').value = parsed.cisloDokladu || '';
+      document.getElementById('prikazDoklad').value = parsed.cisloDokladu;
 
       const note = document.getElementById('prikazScanNote');
       note.style.display = 'block';
-      note.textContent = parsed.checksOk
-        ? 'Načteno ze skenu OP — OCR není 100% spolehlivé, VŽDY prosím pečlivě zkontroluj všechny hodnoty (zvlášť čísla) před uložením.'
-        : 'Načteno ze skenu OP, ale kontrolní číslice nesedí — datum narození je pravděpodobně špatně, oprav ho ručně nebo zkus sken znovu.';
+      note.textContent = 'Číslo dokladu načteno ze skenu — zkontroluj prosím správnost. Jméno, příjmení a datum narození appka zatím nespolehlivě rozpoznává, doplň je prosím ručně.';
 
       closeMrzCamera();
     }catch(e){
