@@ -1,17 +1,29 @@
 (function(){
-  var AWAIT_KEY = 'rzScannerAwaitingRsv';
+  var AWAIT_KEY = 'rzScannerAwaitingRsvRz';
 
-  // Krok 2: záložka spuštěná podruhé po přenačtení stránky (událost už je
-  // uložená a má číslo jednací) — jen klikne na "Ověřit v RSV" a končí.
-  if(sessionStorage.getItem(AWAIT_KEY)){
-    sessionStorage.removeItem(AWAIT_KEY);
-    var rsvBtn = document.getElementById('tFindRSV');
-    if(rsvBtn){
-      rsvBtn.click();
+  // Krok 2: záložka spuštěná podruhé po přenačtení stránky. Značka v
+  // sessionStorage nese i RZ vozidla, které se ukládalo — porovnáme ji
+  // s aktuálním obsahem pole RZ na stránce. Sedí-li, jsme na správné,
+  // právě uložené události a klikneme na "Ověřit v RSV". Nesedí-li
+  // (nebo je pole prázdné, jako na čerstvém "Událost - nová"), jde o
+  // jinou/novou událost — starou značku zahodíme a pokračujeme rovnou
+  // do běžného vyplňování ze schránky níže.
+  var awaitingRz = sessionStorage.getItem(AWAIT_KEY);
+  if(awaitingRz){
+    var currentRzEl = document.getElementById('tSPZ');
+    var currentRz = currentRzEl ? currentRzEl.value : '';
+    if(currentRz && currentRz === awaitingRz){
+      sessionStorage.removeItem(AWAIT_KEY);
+      var rsvBtn = document.getElementById('tFindRSV');
+      if(rsvBtn){
+        rsvBtn.click();
+      } else {
+        alert('Nenašel jsem tlačítko "Ověřit v RSV" na téhle stránce.');
+      }
+      return;
     } else {
-      alert('Nenašel jsem tlačítko "Ověřit v RSV" na téhle stránce.');
+      sessionStorage.removeItem(AWAIT_KEY);
     }
-    return;
   }
 
   if(window.__rzScannerMPMFilled){
@@ -41,6 +53,10 @@
     if(d.department){ set('tDepartment', d.department.name); set('tDepartmentN', d.department.id); }
     if(d.eventTypeRadioId){ var r = document.getElementById(d.eventTypeRadioId); if(r) r.click(); }
 
+    // "Oznámení přijal" — vždy strážník.
+    var oznamPrijalS = document.getElementById('tOznameniPrijalS');
+    if(oznamPrijalS) oznamPrijalS.checked = true;
+
     if(d.udalostId && d.udalostText){
       set('tUdalost', d.udalostText);
       set('tUdalostN', d.udalostId);
@@ -69,6 +85,16 @@
     var addStraznikBtn = document.getElementById('tAddS');
     if(addStraznikBtn) addStraznikBtn.click();
 
+    // Nastavit povinnou "Roli strážníka" na první přidaný řádek (index 0)
+    // — select se jmenuje tTypyStrL0 a jeho onchange volá globální
+    // SetHiddenTypy(), kterou zavoláme rovnou, ať se nemusíme spoléhat
+    // na dispatchování change eventu. value="6" = "hlídka".
+    var straznikRoleSel = document.getElementsByName('tTypyStrL0')[0];
+    if(straznikRoleSel){
+      straznikRoleSel.value = '6';
+      try{ SetHiddenTypy(straznikRoleSel.value, 'tTypyStr', 0); }catch(e){}
+    }
+
     window.__rzScannerMPMFilled = true;
 
     // Rovnou uložit a pokračovat — jakmile se stránka po uložení
@@ -77,7 +103,7 @@
     // klikne na "Ověřit v RSV".
     var saveBtn = document.getElementById('tSubmitContinue');
     if(saveBtn){
-      sessionStorage.setItem(AWAIT_KEY, '1');
+      sessionStorage.setItem(AWAIT_KEY, d.rz || '');
       saveBtn.click();
     } else {
       alert(d.udalostId

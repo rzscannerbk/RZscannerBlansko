@@ -79,6 +79,9 @@
   }
   .btn-primary{background:var(--amber); border-color:var(--amber); color:#241a00;}
   .btn-ghost{background:transparent;}
+  .btn.copied{background:var(--good); border-color:var(--good); color:#000;}
+  .btn.copy-err{background:var(--bad); border-color:var(--bad); color:#fff;}
+  .btn.mpm-busy{pointer-events:none;}
   .btn:hover{border-color:var(--faint);}
   .btn-primary:hover{opacity:.92; border-color:var(--amber);}
   .btn[disabled]{opacity:.5; pointer-events:none;}
@@ -983,8 +986,10 @@
     try{
       await navigator.clipboard.writeText(JSON.stringify(data));
       setDetailNote('Údaje zkopírovány. V MP Manageru spusť záložku „Vyplnit z RZ Scanneru“.', 'ok');
+      return true;
     }catch(e){
       setDetailNote('Nepodařilo se zkopírovat do schránky — appka k tomu potřebuje HTTPS a oprávnění prohlížeče.', 'err');
+      return false;
     }
   }
 
@@ -2681,6 +2686,14 @@
     document.getElementById('detailHeadInfo').innerHTML = buildDetailHeadHtml(record);
     document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(record);
 
+    // Reset tlačítka MPM na výchozí stav (kdyby na předchozím záznamu
+    // zůstalo zabarvené po úspěšném/neúspěšném kopírování).
+    const mpmBtn = document.getElementById('mpmExportBtn');
+    if(mpmBtn){
+      mpmBtn.textContent = 'MPM';
+      mpmBtn.classList.remove('copied', 'copy-err', 'mpm-busy');
+    }
+
     const photoToggleRow = document.getElementById('photoToggleRow');
     const photoToggleBtn = document.getElementById('photoToggleBtn');
     const photoWrap = document.getElementById('photoWrap');
@@ -2890,8 +2903,21 @@
     menuFocusIndex = -1;
   });
 
-  document.getElementById('mpmExportBtn').addEventListener('click', ()=>{
-    if(currentDetailRecord) exportToMPManager(currentDetailRecord);
+  document.getElementById('mpmExportBtn').addEventListener('click', async ()=>{
+    if(!currentDetailRecord) return;
+    const btn = document.getElementById('mpmExportBtn');
+    if(btn.classList.contains('mpm-busy')) return;
+    btn.classList.add('mpm-busy');
+    btn.classList.remove('copied', 'copy-err');
+    btn.textContent = '...';
+    const ok = await exportToMPManager(currentDetailRecord);
+    btn.classList.remove('mpm-busy');
+    btn.textContent = ok ? 'Zkopírováno ✓' : 'Nezdařilo se';
+    btn.classList.add(ok ? 'copied' : 'copy-err');
+    // Zůstává zabarvené a s textem "Zkopírováno ✓" trvale, dokud se
+    // neotevře jiný záznam (viz reset v openDetail) nebo se znovu
+    // neklikne na MPM — ať je vidět, že kopírování proběhlo, i s
+    // odstupem (např. při focení obrazovky).
   });
 
   document.getElementById('menuCancelBtn').addEventListener('click', ()=>{
