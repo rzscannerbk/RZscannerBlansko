@@ -1107,7 +1107,9 @@
         lng: lastGeneratedPdf.lng != null ? lastGeneratedPdf.lng : null,
         brand: lastGeneratedPdf.brand || null,
         color: lastGeneratedPdf.color || null,
-        docType: docType || 'vyzva'
+        docType: docType || 'vyzva',
+        mpmUdalostId: lastGeneratedPdf.mpmUdalostId || null,
+        mpmUdalostText: lastGeneratedPdf.mpmUdalostText || null
       };
       let extrasBlocked = false;
       try{
@@ -3184,6 +3186,8 @@
         plate, date, time, address, offenseLabel, offenseCitation, officerName,
         brand: brand || null, color: color || null,
         docType,
+        mpmUdalostId: selectedOffense ? (selectedOffense.mpmId || null) : null,
+        mpmUdalostText: selectedOffense ? (selectedOffense.mpmText || null) : null,
         lat: lastResolvedGps ? lastResolvedGps.lat : null,
         lng: lastResolvedGps ? lastResolvedGps.lng : null,
         photos: allPhotoDataUrls.map(u => u.split(',')[1])
@@ -3382,20 +3386,29 @@
   // This is a practical quick-reference list, not an authoritative legal
   // citation — for anything requiring legal certainty, verify current
   // wording (e.g. on zakonyprolidi.cz) before relying on it.
+  // Prefix cesty stromem "Typ události" v MP Manageru pro položky spadající
+  // pod § 125c odst. 1 písm. k) — "jiným jednáním nesplnila nebo porušila
+  // povinnost". Tahle větev se v MP Manageru otevírá automaticky (viz
+  // bookmarklet), zbytek cesty (větev + konkrétní položka) je specifický
+  // pro každý přestupek — viz mpmId/mpmText níže. ID i text jsou vzaté
+  // přímo z onclick atributů odkazů ve stromu EventE.asp (potvrzeno s
+  // uživatelem 28.08.2026 — jen těchto 9 nejčastějších přestupků).
+  const MPM_TREE_PREFIX = 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. k - jiným jednáním nesplnila nebo porušila povinnost';
+
   const OFFENSES = [
     // § 27 odst. 1 zákona č. 361/2000 Sb. — kde je zastavení a stání zakázáno
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. a)', label:'V nepřehledné zatáčce a v její těsné blízkosti' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. b)', label:'Před nepřehledným vrcholem stoupání, na něm a za ním' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
-    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. c)', label:'Na přechodu pro chodce / přejezdu pro cyklisty nebo do 5 m před nimi' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
-    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. d)', label:'Na křižovatce nebo do 5 m před a za její hranicí', top:5 , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
+    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. c)', label:'Na přechodu pro chodce / přejezdu pro cyklisty nebo do 5 m před nimi' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' , mpmId:'51990', mpmText: MPM_TREE_PREFIX + ' - stání a zastavení - zastavení a stání vozidlem na přechodu pro chodce nebo na přejezdu pro cyklisty' },
+    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. d)', label:'Na křižovatce nebo do 5 m před a za její hranicí', top:5 , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' , mpmId:'51988', mpmText: MPM_TREE_PREFIX + ' - stání a zastavení - zastavení a stání na křižovatce a 5m před a za hranicí křižovatky' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. e)', label:'V připojovacím nebo odbočovacím pruhu' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. f)', label:'V prostoru zastávky tramvaje, autobusu nebo trolejbusu' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. g)', label:'Na železničním přejezdu, v podjezdu/tunelu nebo do 15 m od nich' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. h)', label:'V místě, kde vozidlo zakrývá dopravní značku' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. i)', label:'Ve vyhrazeném jízdním pruhu nebo pruhu pro cyklisty' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. j)', label:'V jízdních pruzích mimo pravého jízdního pruhu' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
-    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. k)', label:'Do 5 m od souvislé čáry nebo nástupního ostrůvku', top:8 , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
-    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. l)', label:'Na mostě' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
+    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. k)', label:'Do 5 m od souvislé čáry nebo nástupního ostrůvku', top:8 , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' , mpmId:'53198', mpmText: MPM_TREE_PREFIX + ' - stání a zastavení - není volný jízdní pruh 3m mezi vozidlem a podélnou čárou souvislou (až do 5m od konce)' },
+    { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. l)', label:'Na mostě' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' , mpmId:'52112', mpmText: MPM_TREE_PREFIX + ' - stání a zastavení - stání a zastavení na mostě' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. m)', label:'V tunelu (mimo vyznačené nouzové stání)' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. n)', label:'Před vjezdem na komunikaci z polní nebo lesní cesty' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
     { group:'§ 27 — kde je zastavení a stání zakázáno', ref:'§ 27 odst. 1 písm. o)', label:'Na vyhrazeném parkovišti (jiné vozidlo, než pro které je vyhrazeno)' , sankce:'§ 125c odst. 1 písm. k)' , chapeau:'Řidič nesmí zastavit a stát' },
@@ -3412,18 +3425,18 @@
     { group:'§ 25 — jak se smí zastavit a stát', ref:'§ 25 odst. 3', label:'Nedodržení volného jízdního pruhu 3 m při zastavení/stání', top:7 , sankce:'§ 125c odst. 1 písm. k)' },
 
     // § 53 odst. 2 zákona č. 361/2000 Sb. — chodník je určen chodcům
-    { group:'§ 53 — užívání chodníku', ref:'§ 53 odst. 2', label:'Stání na chodníku bez povolení dopravní značkou (IP 11d–IP 11g)', top:6 , sankce:'§ 125c odst. 1 písm. k)' },
+    { group:'§ 53 — užívání chodníku', ref:'§ 53 odst. 2', label:'Stání na chodníku bez povolení dopravní značkou (IP 11d–IP 11g)', top:6 , sankce:'§ 125c odst. 1 písm. k)' , mpmId:'51991', mpmText: MPM_TREE_PREFIX + ' - stání a zastavení - zastavení a stání na chodníku kde to není DZ povoleno' },
 
     // § 125c odst. 1 zákona č. 361/2000 Sb. — sankční ustanovení
     { group:'§ 125c — sankční ustanovení', ref:'§ 125c odst. 1 písm. f) bod 11', label:'Neoprávněné stání na parkovišti vyhrazeném pro ZTP (invalidy)', top:10 },
     { group:'§ 125c — sankční ustanovení', ref:'§ 125c odst. 1 písm. f) bod 17', label:'Zastavení nebo stání a způsobení překážky provozu' },
 
     // § 124 odst. 15 zákona č. 361/2000 Sb. — pravomoc obecní/městské policie
-    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu zastavení — B28' , top:1 , sankce:'§ 125c odst. 1 písm. k)' },
-    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu stání — B29', top:2 , sankce:'§ 125c odst. 1 písm. k)' },
+    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu zastavení — B28' , top:1 , sankce:'§ 125c odst. 1 písm. k)' , mpmId:'51984', mpmText: MPM_TREE_PREFIX + ' - stání a zastavení - zastavení nebo stání v zákazu zastavení B 28' },
+    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu stání — B29', top:2 , sankce:'§ 125c odst. 1 písm. k)' , mpmId:'51985', mpmText: MPM_TREE_PREFIX + ' - stání a zastavení - stání v zákazu stání B 29' },
     { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. b)', label:'Nedovolené zastavení nebo stání vozidla (obecná kategorie)' , sankce:'§ 125c odst. 1 písm. k)' },
-    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu vjezdu — B1 (zákaz vjezdu všech vozidel)', top:3 , sankce:'§ 125c odst. 1 písm. k)' },
-    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu vjezdu — B2 (zákaz vjezdu všech motorových vozidel)', top:4 , sankce:'§ 125c odst. 1 písm. k)' },
+    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu vjezdu — B1 (zákaz vjezdu všech vozidel)', top:3 , sankce:'§ 125c odst. 1 písm. k)' , mpmId:'51976', mpmText: MPM_TREE_PREFIX + ' - vjezd - porušení zákazu vjezdu B1' },
+    { group:'§ 124 odst. 15 — pravomoc obecní policie', ref:'§ 124 odst. 15 písm. a)', label:'Porušení zákazu vjezdu — B2 (zákaz vjezdu všech motorových vozidel)', top:4 , sankce:'§ 125c odst. 1 písm. k)' , mpmId:'51977', mpmText: MPM_TREE_PREFIX + ' - vjezd - porušení zákazu vjezdu v protisměru do jednosměrné komunikace - B2' },
 
     // § 5 odst. 1 zákona č. 251/2016 Sb. — přestupky proti veřejnému pořádku
     { group:'§ 5 — veřejný pořádek (zákon č. 251/2016 Sb.)', ref:'§ 5 odst. 1 písm. g)', label:'Poškození nebo neoprávněný zábor veřejného prostranství', law:'251/2016 Sb.' },

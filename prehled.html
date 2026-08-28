@@ -111,6 +111,7 @@
   .list-bottom-btn.resolve{background:var(--good); border-color:var(--good); color:#000;}
   .list-bottom-btn.resolve[disabled]{background:var(--good); color:#000; opacity:1;}
   .list-bottom-btn.back{background:var(--amber); border-color:var(--amber); color:#241a00;}
+  .list-bottom-btn.mpm{background:transparent; border-color:var(--line); color:var(--text);}
   .list-bottom-btn:active{transform:scale(.96);}
   /* "Zpět" na seznamu je <a href>, ne <button> — bez tohohle by iOS po
      zhruba půl vteřině podržení sám spustil svoje kontextové menu
@@ -315,6 +316,7 @@
       <div class="list-bottom-bar">
         <button class="list-bottom-btn print" id="printBtn" title="Vytisknout">Tisk</button>
         <button class="list-bottom-btn resolve" id="resolveMenuBtn">Dořešit</button>
+        <button class="list-bottom-btn mpm" id="mpmExportBtn" title="Zkopírovat údaje pro MP Manager">MPM</button>
         <button class="list-bottom-btn back" id="detailCloseBtn">Zpět</button>
       </div>
     </div>
@@ -607,6 +609,101 @@
     note.textContent = text;
     note.className = 'submit-note' + (kind ? ' ' + kind : '');
     note.style.display = text ? 'block' : 'none';
+  }
+
+  // ---------- Export údajů pro MP Manager (přes schránku + bookmarklet) ----------
+  // MP Manager (mp.blansko.cz) nemá žádné API — appka proto jen zkopíruje
+  // strukturovaná data do schránky. Na straně MP Manageru je pak vyplní
+  // bookmarklet (uložený jako záložka v prohlížeči), který přečte schránku
+  // a naplní jí odpovídající pole formuláře "Událost - nová". Kvalifikace
+  // přestupku a strážníci se do MP Manageru vybírají ručně (jsou to
+  // vnořené stromy / AJAX vyhledávání s vlastními ID, riskantní na
+  // automatické mapování) — zkopírovaný popis obsahuje text kvalifikace
+  // jako nápovědu, ať se strážník neupisuje.
+  //
+  // Pevně dané hodnoty pro každý záznam z RZ Scanneru (viz domluva s
+  // uživatelem) — typ události je vždy PŘ, oddělení vždy Výkon služby,
+  // oprávnění vždy §11 podání vysvětlení + §12 prokázání totožnosti
+  // (a u botičky navíc §17a BOTIČKA), způsob řešení vždy Provedena
+  // lustrace vozidla (a u parkovačky navíc Výzva pro nepřítomného řidiče
+  // - lístek za stěrač). ID položek jsou z EventAjaxAddItem.asp seznamů
+  // v EventE.asp (§11=40001, §12=40003, §17a BOTIČKA=40009,
+  // Provedena lustrace vozidla=51772, Výzva pro nepřítomného řidiče=51919).
+  const MPM_LOCAL_PARTS = ['Těchov','Lažánky','Obůrka','Klepačov','Hořice',
+    'Horní Lhota','Dolní Lhota','Olešná','Žižlavice','Skalní mlýn','Češkovice'];
+
+  // record.address appky RZ Scanner má tvar "Část, Blansko" (místní část)
+  // nebo "Ulice, Blansko" (pojmenovaná ulice) — viz reverseGeocode()
+  // v index.html. Select "Místo události" v MP Manageru má opačné pořadí
+  // ("Blansko, Část"), proto se tu prohazuje.
+  function parseAddressForMPM(address){
+    if(!address) return { town: 'Blansko', street: '' };
+    const first = address.split(',')[0].trim();
+    if(MPM_LOCAL_PARTS.includes(first)){
+      return { town: 'Blansko, ' + first, street: '' };
+    }
+    return { town: 'Blansko', street: first };
+  }
+
+  function isoToCzDate(iso){
+    if(!iso) return '';
+    const parts = iso.split('-');
+    if(parts.length !== 3) return '';
+    const [y, m, d] = parts;
+    const pad = n => String(n).padStart(2, '0');
+    return pad(+d) + '.' + pad(+m) + '.' + y;
+  }
+
+  async function exportToMPManager(record){
+    if(!record) return;
+    const { town, street } = parseAddressForMPM(record.address);
+    const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
+    const descLines = [];
+    descLines.push('Vozidlo RZ ' + (record.plate || '?') + (vehicleBits ? ' (' + vehicleBits + ')' : ''));
+    if(record.offenseLabel){
+      descLines.push('Přestupek: ' + record.offenseLabel + (record.offenseCitation ? ' — ' + record.offenseCitation : ''));
+    }
+    if(record.address) descLines.push('Místo: ' + record.address);
+    if(record.lat != null && record.lng != null){
+      descLines.push('GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6));
+    }
+
+    const dateCz = isoToCzDate(record.date);
+    const isBoticka = record.docType === 'boticka';
+
+    // Oprávnění: vždy §11 + §12, u botičky navíc §17a BOTIČKA
+    const authorizationIds = ['40001', '40003'];
+    if(isBoticka) authorizationIds.push('40009');
+
+    // Způsob řešení: vždy Provedena lustrace vozidla, u parkovačky navíc
+    // Výzva pro nepřítomného řidiče (lístek za stěrač)
+    const solutionIds = ['51772'];
+    if(!isBoticka) solutionIds.push('51919');
+
+    const data = {
+      rz: record.plate || '',
+      carSubType: record.brand || '',
+      town: town,
+      street: street,
+      desc: descLines.join('\n'),
+      dateStart: dateCz,
+      timeStart: record.time || '',
+      dateEnd: dateCz,
+      timeEnd: record.time || '',
+      department: { name: 'Výkon služby', id: '16' },
+      eventTypeRadioId: 'tKodUdalostiKUP',
+      authorizationIds: authorizationIds,
+      solutionIds: solutionIds,
+      udalostId: record.mpmUdalostId || null,
+      udalostText: record.mpmUdalostText || null
+    };
+
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(data));
+      setDetailNote('Údaje zkopírovány. V MP Manageru spusť záložku „Vyplnit z RZ Scanneru“.', 'ok');
+    }catch(e){
+      setDetailNote('Nepodařilo se zkopírovat do schránky — appka k tomu potřebuje HTTPS a oprávnění prohlížeče.', 'err');
+    }
   }
 
   // ---------- Export "Oznámení přestupku" jako skutečný .docx ----------
@@ -1593,6 +1690,10 @@
 
   document.getElementById('resolveMenuBtn').addEventListener('click', ()=>{
     document.getElementById('resolveMenuOverlay').classList.add('open');
+  });
+
+  document.getElementById('mpmExportBtn').addEventListener('click', ()=>{
+    if(currentDetailRecord) exportToMPManager(currentDetailRecord);
   });
 
   document.getElementById('menuCancelBtn').addEventListener('click', ()=>{

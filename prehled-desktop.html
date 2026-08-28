@@ -310,7 +310,7 @@
     gap:26px; flex-wrap:wrap;
   }
   #noticeCardContainer{flex:1 1 340px; max-width:400px;}
-  .panel-actions{display:flex; justify-content:center; padding:16px 22px; border-top:1px solid var(--line); flex:0 0 auto;}
+  .panel-actions{display:flex; justify-content:center; padding:16px 22px; border-top:1px solid var(--line); flex:0 0 auto; gap:12px;}
   .panel-actions .btn{flex:0 0 auto; padding:10px 28px;}
 
   /* ---------- Souhrn směny ---------- */
@@ -565,6 +565,7 @@
         <div class="submit-note" id="detailNote"></div>
       </div>
       <div class="panel-actions">
+        <button class="btn btn-ghost" id="mpmExportBtn" title="Zkopírovat údaje pro MP Manager">MPM</button>
         <button class="btn btn-primary" id="resolveMenuBtn">Dořešit</button>
       </div>
     </div>
@@ -910,6 +911,81 @@
     note.textContent = text;
     note.className = 'submit-note' + (kind ? ' ' + kind : '');
     note.style.display = text ? 'block' : 'none';
+  }
+
+  // ---------- Export údajů pro MP Manager (přes schránku + bookmarklet) ----------
+  // Stejná logika jako v mobilní appce (prehled.html) — viz komentáře tam.
+  // Typ události vždy PŘ, oddělení vždy Výkon služby, oprávnění vždy §11+§12
+  // (u botičky navíc §17a BOTIČKA), způsob řešení vždy Provedena lustrace
+  // vozidla (u parkovačky navíc Výzva pro nepřítomného řidiče).
+  const MPM_LOCAL_PARTS = ['Těchov','Lažánky','Obůrka','Klepačov','Hořice',
+    'Horní Lhota','Dolní Lhota','Olešná','Žižlavice','Skalní mlýn','Češkovice'];
+
+  function parseAddressForMPM(address){
+    if(!address) return { town: 'Blansko', street: '' };
+    const first = address.split(',')[0].trim();
+    if(MPM_LOCAL_PARTS.includes(first)){
+      return { town: 'Blansko, ' + first, street: '' };
+    }
+    return { town: 'Blansko', street: first };
+  }
+
+  function isoToCzDate(iso){
+    if(!iso) return '';
+    const parts = iso.split('-');
+    if(parts.length !== 3) return '';
+    const [y, m, d] = parts;
+    const pad = n => String(n).padStart(2, '0');
+    return pad(+d) + '.' + pad(+m) + '.' + y;
+  }
+
+  async function exportToMPManager(record){
+    if(!record) return;
+    const { town, street } = parseAddressForMPM(record.address);
+    const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
+    const descLines = [];
+    descLines.push('Vozidlo RZ ' + (record.plate || '?') + (vehicleBits ? ' (' + vehicleBits + ')' : ''));
+    if(record.offenseLabel){
+      descLines.push('Přestupek: ' + record.offenseLabel + (record.offenseCitation ? ' — ' + record.offenseCitation : ''));
+    }
+    if(record.address) descLines.push('Místo: ' + record.address);
+    if(record.lat != null && record.lng != null){
+      descLines.push('GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6));
+    }
+
+    const dateCz = isoToCzDate(record.date);
+    const isBoticka = record.docType === 'boticka';
+
+    const authorizationIds = ['40001', '40003'];
+    if(isBoticka) authorizationIds.push('40009');
+
+    const solutionIds = ['51772'];
+    if(!isBoticka) solutionIds.push('51919');
+
+    const data = {
+      rz: record.plate || '',
+      carSubType: record.brand || '',
+      town: town,
+      street: street,
+      desc: descLines.join('\n'),
+      dateStart: dateCz,
+      timeStart: record.time || '',
+      dateEnd: dateCz,
+      timeEnd: record.time || '',
+      department: { name: 'Výkon služby', id: '16' },
+      eventTypeRadioId: 'tKodUdalostiKUP',
+      authorizationIds: authorizationIds,
+      solutionIds: solutionIds,
+      udalostId: record.mpmUdalostId || null,
+      udalostText: record.mpmUdalostText || null
+    };
+
+    try{
+      await navigator.clipboard.writeText(JSON.stringify(data));
+      setDetailNote('Údaje zkopírovány. V MP Manageru spusť záložku „Vyplnit z RZ Scanneru“.', 'ok');
+    }catch(e){
+      setDetailNote('Nepodařilo se zkopírovat do schránky — appka k tomu potřebuje HTTPS a oprávnění prohlížeče.', 'err');
+    }
   }
 
   // ---------- Export "Oznámení přestupku" jako skutečný .docx ----------
@@ -2812,6 +2888,10 @@
   document.getElementById('resolveMenuBtn').addEventListener('click', ()=>{
     document.getElementById('resolveMenuOverlay').classList.add('open');
     menuFocusIndex = -1;
+  });
+
+  document.getElementById('mpmExportBtn').addEventListener('click', ()=>{
+    if(currentDetailRecord) exportToMPManager(currentDetailRecord);
   });
 
   document.getElementById('menuCancelBtn').addEventListener('click', ()=>{
