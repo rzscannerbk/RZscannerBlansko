@@ -206,7 +206,7 @@
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
   .record-item{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 150px 130px 64px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 84px 150px 130px 64px;
     align-items:start; padding:12px 22px; min-height:74px; cursor:pointer;
     border-bottom:1px solid var(--line-soft); position:relative; gap:0 10px;
     background:rgba(51,211,153,.05);
@@ -236,6 +236,9 @@
     font-size:12.5px; color:var(--muted); line-height:1.4; padding-right:16px; padding-top:3px;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:help;
   }
+
+  .record-pachatel{font-size:12px; color:var(--muted); line-height:1.35; padding-top:4px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .record-castka{font-family:'Roboto Mono',monospace; font-size:12.5px; color:var(--text); padding-top:4px; text-align:center; white-space:nowrap;}
 
   .record-status{display:flex; align-items:center; gap:8px; padding-top:5px; font-size:12px; color:var(--muted);}
   .record-status .dot{width:10px; height:10px; border-radius:50%; flex:0 0 auto; background:var(--faint); cursor:help;}
@@ -469,6 +472,52 @@
   .confirm-yes:hover{opacity:.9;}
   .confirm-cancel{background:transparent; border:none; color:var(--muted); font-size:13.5px; margin-top:4px; cursor:pointer; font-family:inherit;}
 
+  /* ---------- Modál "Příkaz na místě" (částka + pachatel) ---------- */
+  .prikaz-box{
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
+    padding:24px 26px; max-width:420px; width:100%; text-align:left;
+  }
+  .prikaz-box h3{font-size:16px; margin:0 0 18px; color:var(--text); text-align:center;}
+  .prikaz-box .field{margin-bottom:12px;}
+  .prikaz-row2{display:flex; gap:12px;}
+  .prikaz-row2 .field{flex:1; min-width:0;}
+  .prikaz-pachatel-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 10px;}
+  .prikaz-pachatel-head span{font-size:12.5px; color:var(--muted); font-weight:600;}
+  .prikaz-scan-btn{
+    display:flex; align-items:center; gap:6px; background:transparent; border:1.5px solid var(--line);
+    color:var(--text); border-radius:9px; padding:6px 12px; font-size:12.5px; font-family:inherit;
+    cursor:pointer; font-weight:600;
+  }
+  .prikaz-scan-btn:hover{border-color:#2F6FED; color:#2F6FED;}
+  .prikaz-scan-btn .cam-icon{font-size:15px; line-height:1;}
+  .prikaz-note{font-size:11.5px; color:var(--faint); margin:-4px 0 14px; line-height:1.4;}
+  .prikaz-actions{display:flex; gap:12px; margin-top:6px;}
+
+  /* ---------- Kamera pro sken MRZ (strojově čitelné zóny) občanky ---------- */
+  .mrz-camera-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:120;
+    align-items:center; justify-content:center; flex-direction:column; padding:20px;
+  }
+  .mrz-camera-overlay.open{display:flex;}
+  .mrz-camera-frame{position:relative; width:100%; max-width:560px; border-radius:14px; overflow:hidden; background:#000;}
+  .mrz-camera-frame video{width:100%; display:block;}
+  .mrz-camera-guide{
+    position:absolute; left:6%; right:6%; bottom:10%; height:22%;
+    border:2px dashed rgba(255,255,255,.85); border-radius:6px; pointer-events:none;
+  }
+  .mrz-camera-guide::after{
+    content:'Zarovnej sem 2–3 řádky písmen dole na občance'; position:absolute; left:0; right:0; top:-26px;
+    text-align:center; color:#fff; font-size:12px; text-shadow:0 1px 3px rgba(0,0,0,.8);
+  }
+  .mrz-camera-actions{display:flex; gap:14px; margin-top:18px;}
+  .mrz-camera-actions button{
+    padding:11px 22px; border-radius:10px; font-family:inherit; font-weight:600; font-size:14px; cursor:pointer;
+  }
+  .mrz-shoot-btn{background:#2F6FED; border:1.5px solid #2F6FED; color:#fff;}
+  .mrz-shoot-btn:hover{opacity:.9;}
+  .mrz-cancel-btn{background:transparent; border:1.5px solid rgba(255,255,255,.4); color:#fff;}
+  .mrz-camera-status{color:#fff; font-size:13px; margin-top:12px; min-height:18px; text-align:center;}
+
   ::-webkit-scrollbar{width:9px; height:9px;}
   ::-webkit-scrollbar-thumb{background:var(--asphalt-4); border-radius:6px;}
   ::-webkit-scrollbar-track{background:transparent;}
@@ -539,6 +588,8 @@
           <span class="sortable" data-sort="type">Typ</span>
           <span class="sortable" data-sort="address">Ulice</span>
           <span class="sortable" data-sort="offense">Přestupek</span>
+          <span>Pachatel</span>
+          <span>Částka</span>
           <span class="head-left sortable" data-sort="status">Stav</span>
           <span class="sortable" data-sort="sent">Odesláno</span>
           <span></span>
@@ -594,6 +645,61 @@
         <button class="confirm-btn confirm-no" id="menuDomluvaBtn">Domluva</button>
         <button class="confirm-cancel" id="menuCancelBtn">Zrušit</button>
       </div>
+    </div>
+  </div>
+
+  <div class="confirm-overlay" id="prikazOverlay">
+    <div class="prikaz-box">
+      <h3>Příkaz na místě</h3>
+      <div class="field">
+        <label for="prikazCastka">Částka (Kč)</label>
+        <input type="number" id="prikazCastka" inputmode="numeric" min="0" step="1" placeholder="např. 1500">
+      </div>
+
+      <div class="prikaz-pachatel-head">
+        <span>PACHATEL</span>
+        <button type="button" class="prikaz-scan-btn" id="prikazScanBtn">
+          <span class="cam-icon">📷</span> Skenovat OP
+        </button>
+      </div>
+      <div class="prikaz-row2">
+        <div class="field">
+          <label for="prikazJmeno">Jméno</label>
+          <input type="text" id="prikazJmeno" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="prikazPrijmeni">Příjmení</label>
+          <input type="text" id="prikazPrijmeni" autocomplete="off">
+        </div>
+      </div>
+      <div class="prikaz-row2">
+        <div class="field">
+          <label for="prikazNarozeni">Datum narození</label>
+          <input type="text" id="prikazNarozeni" placeholder="DD.MM.RRRR" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="prikazDoklad">Číslo dokladu</label>
+          <input type="text" id="prikazDoklad" autocomplete="off">
+        </div>
+      </div>
+      <div class="prikaz-note" id="prikazScanNote" style="display:none;"></div>
+
+      <div class="prikaz-actions">
+        <button class="confirm-no confirm-btn" id="prikazCancelBtn">Zrušit</button>
+        <button class="confirm-yes confirm-btn" id="prikazConfirmBtn">Potvrdit a uložit</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="mrz-camera-overlay" id="mrzCameraOverlay">
+    <div class="mrz-camera-frame">
+      <video id="mrzVideo" autoplay playsinline muted></video>
+      <div class="mrz-camera-guide"></div>
+    </div>
+    <div class="mrz-camera-status" id="mrzStatus"></div>
+    <div class="mrz-camera-actions">
+      <button class="mrz-cancel-btn" id="mrzCancelBtn">Zrušit</button>
+      <button class="mrz-shoot-btn" id="mrzShootBtn">Vyfotit a načíst</button>
     </div>
   </div>
 
@@ -2194,6 +2300,18 @@
       if(r.offenseLabel) offense.title = r.offenseLabel;
       item.appendChild(offense);
 
+      const pachatelCell = document.createElement('span');
+      pachatelCell.className = 'record-pachatel';
+      const pachatelName = r.pachatel ? [r.pachatel.jmeno, r.pachatel.prijmeni].filter(Boolean).join(' ') : '';
+      pachatelCell.textContent = pachatelName || '—';
+      if(pachatelName) pachatelCell.title = pachatelName + (r.pachatel.datumNarozeni ? ' · nar. ' + r.pachatel.datumNarozeni : '') + (r.pachatel.cisloDokladu ? ' · OP ' + r.pachatel.cisloDokladu : '');
+      item.appendChild(pachatelCell);
+
+      const castkaCell = document.createElement('span');
+      castkaCell.className = 'record-castka';
+      castkaCell.textContent = (r.castka != null && r.castka !== '') ? (Number(r.castka).toLocaleString('cs-CZ') + ' Kč') : '—';
+      item.appendChild(castkaCell);
+
       const status = document.createElement('span');
       status.className = 'record-status st-' + sKey;
       status.innerHTML = '<span class="dot" title="' + escapeHtml(statusLabel[sKey]) + '"></span>' + escapeHtml(statusLabel[sKey]);
@@ -2950,25 +3068,277 @@
   // otevření dokumentu "Oznámení", tak po klepnutí na "Příkaz na místě".
   // "method" rozlišuje, jaký text appka pak zobrazí (viz updateResolveBtn
   // a vykreslení odznaku v seznamu).
-  async function markResolved(record, method){
+  async function markResolved(record, method, extra){
     if(!record || record.resolved) return;
     // Shortens this record's Firestore TTL from the default 90 days
     // (set when it was created) to 60 days from now — the "expireAt"
     // field is what the TTL policy actually watches, so updating it is
     // enough; no need to move the document anywhere.
     const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
-    await db.collection('prestupky').doc(record.id).update({
+    const updateData = {
       resolved: true,
       resolvedMethod: method,
       resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
       expireAt: expireAt
-    });
+    };
+    // "Příkaz na místě" nese navíc částku a údaje o pachateli (viz modál
+    // prikazOverlay) — appka je posílá jen když skutečně existují, ať
+    // u ostatních způsobů řešení nepřibývají v Firestore prázdná pole.
+    if(extra && extra.castka != null) updateData.castka = extra.castka;
+    if(extra && extra.pachatel) updateData.pachatel = extra.pachatel;
+    await db.collection('prestupky').doc(record.id).update(updateData);
     record.resolved = true;
     record.resolvedMethod = method;
+    if(extra && extra.castka != null) record.castka = extra.castka;
+    if(extra && extra.pachatel) record.pachatel = extra.pachatel;
     updateResolveBtn(record);
     refreshView();
     showUndoToast(record, method);
   }
+
+  // ---------- Modál "Příkaz na místě" (částka + pachatel, volitelně sken OP) ----------
+  function openPrikazModal(){
+    document.getElementById('prikazCastka').value = '';
+    document.getElementById('prikazJmeno').value = '';
+    document.getElementById('prikazPrijmeni').value = '';
+    document.getElementById('prikazNarozeni').value = '';
+    document.getElementById('prikazDoklad').value = '';
+    const note = document.getElementById('prikazScanNote');
+    note.style.display = 'none';
+    note.textContent = '';
+    document.getElementById('prikazOverlay').classList.add('open');
+    document.getElementById('prikazCastka').focus();
+  }
+
+  document.getElementById('prikazCancelBtn').addEventListener('click', ()=>{
+    document.getElementById('prikazOverlay').classList.remove('open');
+  });
+
+  document.getElementById('prikazConfirmBtn').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record || record.resolved) return;
+    const castkaRaw = document.getElementById('prikazCastka').value.trim();
+    const jmeno = document.getElementById('prikazJmeno').value.trim();
+    const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
+    const narozeni = document.getElementById('prikazNarozeni').value.trim();
+    const doklad = document.getElementById('prikazDoklad').value.trim();
+
+    const btn = document.getElementById('prikazConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = 'Ukládám…';
+    try{
+      const extra = {};
+      if(castkaRaw !== '' && !isNaN(Number(castkaRaw))) extra.castka = Number(castkaRaw);
+      if(jmeno || prijmeni || narozeni || doklad){
+        extra.pachatel = {
+          jmeno: jmeno || null,
+          prijmeni: prijmeni || null,
+          datumNarozeni: narozeni || null,
+          cisloDokladu: doklad || null
+        };
+      }
+      document.getElementById('prikazOverlay').classList.remove('open');
+      await markResolved(record, 'prikaz', extra);
+    }catch(e){
+      console.error('Označení jako dořešeno selhalo:', e);
+      alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
+      document.getElementById('prikazOverlay').classList.add('open');
+    }finally{
+      btn.disabled = false;
+      btn.textContent = 'Potvrdit a uložit';
+    }
+  });
+
+  // ---------- Kamera + OCR pro sken MRZ (strojově čitelné zóny) OP ----------
+  // Čte jen strojově čitelnou zónu vzadu na občance (2–3 řádky písmen
+  // a číslic dole) — má pevný font a kontrolní číslice (viz mrzCheckDigit),
+  // takže appka pozná, jestli se něco přečetlo špatně, a řekne to
+  // strážníkovi místo tichého vložení špatných dat. OCR běží celé
+  // v prohlížeči (Tesseract.js, dotažený líně až při prvním použití) —
+  // fotka občanky nikam neodchází na cizí server.
+  //
+  // Důležité: obecný "eng" model Tesseractu není trénovaný na OCR-B
+  // (písmo MRZ zón), takže přesnost není 100%. Appka proto načtená data
+  // VŽDY jen předvyplní do polí výše k ruční kontrole/opravě — nikdy je
+  // neukládá bez potvrzení strážníkem.
+  let mrzStream = null;
+  let tesseractLoadPromise = null;
+
+  function loadTesseract(){
+    if(window.Tesseract) return Promise.resolve();
+    if(tesseractLoadPromise) return tesseractLoadPromise;
+    tesseractLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Nepodařilo se načíst OCR knihovnu — zkontroluj připojení k internetu.'));
+      document.head.appendChild(s);
+    });
+    return tesseractLoadPromise;
+  }
+
+  async function openMrzCamera(){
+    const overlay = document.getElementById('mrzCameraOverlay');
+    const video = document.getElementById('mrzVideo');
+    const status = document.getElementById('mrzStatus');
+    status.textContent = '';
+    overlay.classList.add('open');
+    try{
+      mrzStream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } },
+        audio:false
+      });
+      video.srcObject = mrzStream;
+      await video.play().catch(()=>{});
+    }catch(e){
+      status.textContent = 'Kameru se nepodařilo spustit (' + e.message + ').';
+    }
+  }
+
+  function closeMrzCamera(){
+    if(mrzStream){
+      mrzStream.getTracks().forEach(t => t.stop());
+      mrzStream = null;
+    }
+    document.getElementById('mrzVideo').srcObject = null;
+    document.getElementById('mrzCameraOverlay').classList.remove('open');
+  }
+
+  document.getElementById('prikazScanBtn').addEventListener('click', openMrzCamera);
+  document.getElementById('mrzCancelBtn').addEventListener('click', closeMrzCamera);
+
+  // Kontrolní číslice MRZ (ICAO 9303): váhy 7-3-1 se opakují, '<' = 0,
+  // číslice = hodnota, písmena A-Z = 10-35, součet mod 10.
+  function mrzCheckDigit(str){
+    const weights = [7,3,1];
+    let sum = 0;
+    for(let i=0;i<str.length;i++){
+      const c = str[i];
+      let v;
+      if(c === '<') v = 0;
+      else if(c >= '0' && c <= '9') v = c.charCodeAt(0) - 48;
+      else if(c >= 'A' && c <= 'Z') v = c.charCodeAt(0) - 55;
+      else v = 0;
+      sum += v * weights[i % 3];
+    }
+    return sum % 10;
+  }
+
+  // YYMMDD → DD.MM.RRRR. Občanky mají platnost max ~10 let, ale majitel
+  // může být narozený kdykoliv — dvojciferný rok se řeší stejným
+  // "pivotem" jako jinde v appce (roky výrazně před tím současným
+  // dvojčíslím se berou jako 19xx, jinak 20xx).
+  function mrzDateToCz(yymmdd){
+    if(!/^\d{6}$/.test(yymmdd)) return null;
+    const yy = yymmdd.slice(0,2), mm = yymmdd.slice(2,4), dd = yymmdd.slice(4,6);
+    const currentYY = new Date().getFullYear() % 100;
+    const century = (Number(yy) > currentYY + 5) ? '19' : '20';
+    return dd + '.' + mm + '.' + century + yy;
+  }
+
+  // Rozparsuje syrový OCR text na jméno/příjmení/datum narození/číslo
+  // dokladu. Odolné vůči šumu z OCR — hledá řádky vypadající jako MRZ
+  // (jen A-Z0-9<), řádek se jmény pozná podle "<<" oddělovače, datum
+  // narození podle 6 číslic + kontrolní číslice, číslo dokladu z prvního
+  // datového řádku. Vrací null, pokud se nenašlo vůbec nic použitelného.
+  function parseMrz(rawText){
+    const lines = rawText
+      .toUpperCase()
+      .split('\n')
+      .map(l => l.replace(/[^A-Z0-9<]/g, ''))
+      .filter(l => l.length >= 20 && /^[A-Z0-9<]+$/.test(l));
+
+    if(lines.length < 2) return null;
+
+    const nameLineIdx = lines.findIndex(l => l.includes('<<'));
+    const nameLine = nameLineIdx >= 0 ? lines[nameLineIdx] : null;
+    const dataLines = lines.filter((_, i) => i !== nameLineIdx);
+
+    let jmeno = '', prijmeni = '';
+    if(nameLine){
+      const parts = nameLine.split('<<');
+      prijmeni = (parts[0] || '').replace(/</g, ' ').trim();
+      jmeno = (parts[1] || '').replace(/</g, ' ').trim().split(' ')[0] || '';
+    }
+
+    let cisloDokladu = null, datumNarozeni = null, checksOk = true, foundAnyDate = false;
+    for(const line of dataLines){
+      const m = line.match(/(\d{6})(\d)/);
+      if(m && !foundAnyDate){
+        foundAnyDate = true;
+        checksOk = checksOk && (String(mrzCheckDigit(m[1])) === m[2]);
+        datumNarozeni = mrzDateToCz(m[1]);
+      }
+    }
+    if(dataLines.length){
+      const first = dataLines[0];
+      const m2 = first.match(/^[A-Z]{1,2}[A-Z]{3}([A-Z0-9]{6,9})/);
+      cisloDokladu = (m2 ? m2[1] : first.slice(5, 14)).replace(/<+$/, '') || null;
+    }
+
+    if(!nameLine && !cisloDokladu && !datumNarozeni) return null;
+    return { jmeno, prijmeni, datumNarozeni, cisloDokladu, checksOk };
+  }
+
+  document.getElementById('mrzShootBtn').addEventListener('click', async ()=>{
+    const video = document.getElementById('mrzVideo');
+    const status = document.getElementById('mrzStatus');
+    const shootBtn = document.getElementById('mrzShootBtn');
+    if(!video.videoWidth){
+      status.textContent = 'Kamera ještě není připravená, zkus to za chvíli.';
+      return;
+    }
+
+    shootBtn.disabled = true;
+    status.textContent = 'Načítám OCR knihovnu…';
+    try{
+      await loadTesseract();
+
+      // Ořízne se stejná oblast, kterou appka vizuálně ukazuje jako
+      // vodítko (spodních ~22 % výšky se stranovým okrajem) — souřadnice
+      // musí odpovídat .mrz-camera-guide v CSS výše.
+      const vw = video.videoWidth, vh = video.videoHeight;
+      const cropX = Math.round(vw * 0.06);
+      const cropW = Math.round(vw * 0.88);
+      const cropY = Math.round(vh * 0.68);
+      const cropH = Math.round(vh * 0.22);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = cropW; canvas.height = cropH;
+      canvas.getContext('2d').drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+      status.textContent = 'Rozpoznávám text…';
+      const result = await window.Tesseract.recognize(canvas, 'eng', {
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
+      });
+      const rawText = (result && result.data && result.data.text) || '';
+      const parsed = parseMrz(rawText);
+
+      if(!parsed){
+        status.textContent = 'Nepodařilo se rozpoznat MRZ zónu — zkus to znovu, blíž a rovněji na doklad.';
+        shootBtn.disabled = false;
+        return;
+      }
+
+      document.getElementById('prikazJmeno').value = parsed.jmeno || '';
+      document.getElementById('prikazPrijmeni').value = parsed.prijmeni || '';
+      document.getElementById('prikazNarozeni').value = parsed.datumNarozeni || '';
+      document.getElementById('prikazDoklad').value = parsed.cisloDokladu || '';
+
+      const note = document.getElementById('prikazScanNote');
+      note.style.display = 'block';
+      note.textContent = parsed.checksOk
+        ? 'Načteno ze skenu OP — zkontroluj prosím správnost před uložením.'
+        : 'Načteno ze skenu OP, ale kontrolní číslice nesedí — hodnoty pečlivě zkontroluj nebo zkus sken znovu.';
+
+      closeMrzCamera();
+    }catch(e){
+      console.error('OCR skenu OP selhalo:', e);
+      status.textContent = 'Rozpoznání se nezdařilo (' + e.message + ').';
+    }finally{
+      shootBtn.disabled = false;
+    }
+  });
 
   // Vrátí přestupek zpět na nevyřešený — používá se jen z tlačítka "Zpět"
   // v toastu do 5 vteřin po Dořešit, pro omylem kliknuté případy.
@@ -3097,20 +3467,11 @@
     if(opened) markResolved(record, 'vyzva');
   });
 
-  document.getElementById('menuVyresenoBtn').addEventListener('click', async ()=>{
+  document.getElementById('menuVyresenoBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
     if(!record || record.resolved) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
-    const btn = document.getElementById('menuVyresenoBtn');
-    btn.disabled = true;
-    btn.textContent = 'Ukládám…';
-    try{
-      await markResolved(record, 'prikaz');
-    }catch(e){
-      console.error('Označení jako dořešeno selhalo:', e);
-      btn.disabled = false;
-      btn.textContent = 'Vyřešeno (chyba, zkuste znovu)';
-    }
+    openPrikazModal();
   });
 
   document.getElementById('menuDomluvaBtn').addEventListener('click', async ()=>{
