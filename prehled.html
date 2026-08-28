@@ -674,20 +674,20 @@
     return '<w:p><w:pPr>' + pPr + '</w:pPr>' + labelRun + tabRun + valueRun + '</w:p>';
   }
 
-  function docxHeaderTable(leftLines, rightLines){
+  function docxHeaderTable(leftLines, rightLines, leftBold){
     // Mezisloupec (gutter) mezi adresou úřadu a blokem s č.j. — bez něj by
     // sloupce splývaly těsně vedle sebe. Pravý blok tak začíná výrazně
     // víc vpravo, blíž k pravému okraji stránky.
     const leftW = 3600, gutterW = 2200, rightW = 3226;
-    const cell = (lines, w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' +
-      lines.map(t => docxPara(t, { size: 19, spacingAfter: 20 })).join('') + '</w:tc>';
+    const cell = (lines, w, bold) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' +
+      lines.map(t => docxPara(t, { size: 19, spacingAfter: 20, bold: !!bold })).join('') + '</w:tc>';
     const emptyCell = (w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' + docxPara('', { size: 19 }) + '</w:tc>';
     return '<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblBorders>' +
       '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>' +
       '<w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>' +
       '<w:tblLayout w:type="fixed"/></w:tblPr>' +
       '<w:tblGrid><w:gridCol w:w="' + leftW + '"/><w:gridCol w:w="' + gutterW + '"/><w:gridCol w:w="' + rightW + '"/></w:tblGrid>' +
-      '<w:tr>' + cell(leftLines, leftW) + emptyCell(gutterW) + cell(rightLines, rightW) + '</w:tr></w:tbl>';
+      '<w:tr>' + cell(leftLines, leftW, leftBold) + emptyCell(gutterW) + cell(rightLines, rightW, false) + '</w:tr></w:tbl>';
   }
 
   function docxNarrowBoxTable(widthMm, innerXml){
@@ -749,6 +749,113 @@
     const m = citation.match(/^(.+?)(?: — přestupek dle (.+?))? \(zákon č\. (.+?)\)$/);
     if(!m) return null;
     return { ref: m[1], sankce: m[2] || null, law: m[3] };
+  }
+
+  // ---------- Export "Výzva" (dopis konkrétní osobě) jako .docx ----------
+  // Jiný dokument než ta "Výzva" v rámečku na Oznámení (ta je "na sklo",
+  // pro nepřítomného pachatele bez known identity). Tahle jde poštou
+  // konkrétní ztotožněné osobě (jméno, datum narození, adresa) — tu
+  // identitu ale RZ Scanner nezná (má ji jen MP Manager po lustraci
+  // v RSV), takže tahle tři pole a číslo jednací MP Manageru zůstávají
+  // v dokumentu jako [DOPLNIT...] placeholder pro ruční doplnění před
+  // odesláním. Termín dostavení se taky nechává na doplnění — jde
+  // o právně závaznou lhůtu, kterou má určit strážník/vedoucí, ne appka
+  // od oka. Vzor dodal Lukáš 28.8.2026 (Výzva_vzor.rtf).
+  const VYZVA_LOCAL_PARTS = ['Těchov','Lažánky','Obůrka','Klepačov','Hořice',
+    'Horní Lhota','Dolní Lhota','Olešná','Žižlavice','Skalní mlýn','Češkovice'];
+
+  function addressForLetter(address){
+    if(!address) return { city: 'Blansko', locationPhrase: '' };
+    const first = address.split(',')[0].trim();
+    if(VYZVA_LOCAL_PARTS.includes(first)){
+      return { city: 'Blansko', locationPhrase: 'v místní části ' + first };
+    }
+    return { city: 'Blansko', locationPhrase: 'na ulici ' + first };
+  }
+
+  async function buildVyzvaDopisDocx(record){
+    const offenseLabel = record.offenseLabel || '';
+    const offenseCitation = record.offenseCitation || '';
+    const parsedCitation = parseOffenseCitation(offenseCitation);
+    // mpmUdalostText (přesná cesta stromem MP Manageru, viz index.html)
+    // sedí slovně nejblíž vzoru — když ho appka pro daný přestupek nezná,
+    // poskládá se náhradní text stejným způsobem jako u Oznámení.
+    const offenseFullText = record.mpmUdalostText ||
+      ('Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích – ' + offenseCitation + ' – ' + offenseLabel);
+    const shortRef = parsedCitation ? parsedCitation.ref : offenseCitation;
+    const loc = addressForLetter(record.address);
+
+    let body = '';
+    body += docxHeaderTable(
+      ['[DOPLNIT JMÉNO A PŘÍJMENÍ]', '', '[DOPLNIT DATUM NAROZENÍ]', '', '[DOPLNIT ULICE A ČP]', '', '[DOPLNIT PSČ A OBEC]'],
+      [
+        'Naše  č. j.: [DOPLNIT]',
+        'Vyřizuje: str. ' + (record.officerName || ''),
+        'Tel.: ' + OZNAMENI_TEL,
+        'E-mail: ' + OZNAMENI_EMAIL,
+        '',
+        'Datum: ' + todayCz()
+      ],
+      true
+    );
+    body += docxPara('', { size: 20 });
+    body += docxPara('VÝZVA', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
+
+    const text = 'Žádáme Vás, abyste se dostavil(a) dne [DOPLNIT DATUM A ČAS] na Městskou policii Blansko, Sadová č. 2, ' +
+      'k podání vysvětlení podle § 11 odst. 1 zák. č. 553/91 Sb., o obecní policii, ve znění pozdějších předpisů, ve věci objasnění ' +
+      'skutečností důležitých pro odhalení pachatele přestupku ' + offenseFullText + ', zjištěného dne ' + formatDateCz(record.date) +
+      ' v ' + (record.time || '—') + ' hod v ' + loc.city + (loc.locationPhrase ? ', ' + loc.locationPhrase : '') +
+      ', kdy došlo k porušení zákona o provozu na pozemních komunikacích' + (shortRef ? ' - ' + shortRef : '') +
+      ' zák. č. 361/2000 Sb. a to řidičem vozidla ' + (record.brand ? (record.brand + ', ') : '') + 'RZ ' + (record.plate || '') + '.';
+    body += docxPara(text, { size: 20, spacingAfter: 300 });
+
+    body += docxPara('Přineste s sebou tyto doklady:', { size: 20, spacingAfter: 60 });
+    body += docxPara('- tuto výzvu', { size: 20 });
+    body += docxPara('- doklad totožnosti', { size: 20, spacingAfter: 300 });
+
+    body += docxPara(
+      'Nedostavíte-li se bez dostatečné omluvy nebo bez závažného důvodu, můžete být dle § 11 odst. 9 zák. č. 553/91 Sb., ' +
+      'o obecní policii, ve znění pozdějších předpisů, předveden(a).',
+      { size: 20, spacingAfter: 400 }
+    );
+
+    body += docxPara('Ing. Martin Lepka', { size: 20, spacingBefore: 600 });
+    body += docxPara('ředitel MP Blansko', { size: 20 });
+
+    const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+      'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<w:body>' + body +
+      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>' +
+      '</w:sectPr></w:body></w:document>';
+
+    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '</Types>';
+
+    const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '</Relationships>';
+
+    const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.file('_rels/.rels', rootRels);
+    zip.file('word/document.xml', documentXml);
+    zip.file('word/_rels/document.xml.rels', docRels);
+
+    return zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    });
   }
 
   async function buildOznameniDocx(record, photosB64){
@@ -1539,6 +1646,8 @@
       // "Dořešeno".
       if(record.resolvedMethod === 'oznameni'){
         menuBtn.textContent = '✓ Oznámeno';
+      } else if(record.resolvedMethod === 'vyzva'){
+        menuBtn.textContent = '✓ Odeslána výzva';
       } else if(record.resolvedMethod === 'prikaz'){
         menuBtn.textContent = '✓ Dořešeno příkazem';
       } else if(record.resolvedMethod === 'domluva'){
@@ -1582,12 +1691,40 @@
     renderList(document.getElementById('searchInput').value);
   }
 
-  // Zatím jen placeholder — šablona dokumentu "Výzva" (jiný typ než
-  // stávající Oznámení) ještě není připravená. Až Lukáš dodá podklad,
-  // nahradí se tělo této funkce skutečným generováním .docx stejně jako
-  // u exportOznameni().
   async function exportVyzva(record){
-    setDetailNote('Dokument „Výzva" zatím není připravený — tahle možnost bude funkční později.', 'err');
+    const btn = document.getElementById('menuVyzvaBtn');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Připravuji…';
+    try{
+      if(typeof JSZip === 'undefined'){
+        setDetailNote('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).', 'err');
+        return false;
+      }
+      const blob = await buildVyzvaDopisDocx(record);
+      const filename = 'Vyzva_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx';
+      try{
+        const file = new File([blob], filename, { type: blob.type });
+        if(navigator.canShare && navigator.canShare({ files: [file] })){
+          await navigator.share({ files: [file] });
+          return true;
+        }
+      }catch(e){
+        // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
+        // otevření v nové kartě, stejně jako u Oznámení.
+      }
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(()=> URL.revokeObjectURL(url), 60000);
+      return true;
+    }catch(e){
+      console.error('Export Výzvy selhal:', e);
+      setDetailNote('Vytvoření dokumentu se nezdařilo (' + e.message + ').', 'err');
+      return false;
+    }finally{
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   }
 
   document.getElementById('printBtn').addEventListener('click', ()=>{
@@ -1612,9 +1749,12 @@
     if(opened) markResolved(record, 'oznameni');
   });
 
-  document.getElementById('menuVyzvaBtn').addEventListener('click', ()=>{
+  document.getElementById('menuVyzvaBtn').addEventListener('click', async ()=>{
     document.getElementById('resolveMenuOverlay').classList.remove('open');
-    if(currentDetailRecord) exportVyzva(currentDetailRecord);
+    const record = currentDetailRecord;
+    if(!record) return;
+    const opened = await exportVyzva(record);
+    if(opened) markResolved(record, 'vyzva');
   });
 
   document.getElementById('menuVyresenoBtn').addEventListener('click', async ()=>{
