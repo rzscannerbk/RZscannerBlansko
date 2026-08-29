@@ -203,13 +203,12 @@
   .preview-add-photo-wrap span{font-size:9.5px; color:var(--muted); font-family:'Roboto Mono',monospace; white-space:nowrap;}
 
   .pdf-preview-actions{
-    display:flex; align-items:flex-start; justify-content:center; gap:12px;
+    display:grid; grid-template-columns: 1fr auto 1fr; align-items:start; gap:12px;
     padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px); flex-shrink:0;
   }
-  .pdf-preview-actions > .btn, .pdf-preview-actions > .pdf-preview-submit-col{
-    flex:1 1 0; min-width:0;
-  }
-  .pdf-preview-submit-col{display:flex; flex-direction:column;}
+  .pdf-preview-actions > .btn{width:100%; flex:none;}
+  .pdf-preview-actions > .preview-add-photo-wrap{justify-self:center;}
+  .pdf-preview-submit-col{display:flex; flex-direction:column; width:100%;}
   .pdf-preview-submit-col .btn{width:100%;}
   #pdfPreviewPrinterNote{
     text-align:center; font-size:10.5px; color:var(--muted); margin-top:5px;
@@ -385,10 +384,10 @@
   .notice-footer .authority-phone{font-size:9.5px; color:#999; margin-top:2px;}
   .notice-footer .generated-by{font-size:9.5px; color:#aaa; margin-top:10px;}
 
-  .pdf-preview-thumbs{display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px;}
+  .pdf-preview-thumbs{display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px; justify-content:center;}
   .pdf-preview-thumbs:empty{display:none; margin-bottom:0;}
   .pdf-preview-thumb{position:relative; flex:0 0 auto; width:78px; height:78px; border-radius:10px; overflow:hidden;}
-  .pdf-preview-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .pdf-preview-thumb img{width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;}
   .pdf-preview-thumb-remove{
     position:absolute; top:3px; right:3px; width:22px; height:22px; border-radius:50%;
     background:rgba(20,20,20,.75); border:1.5px solid rgba(255,255,255,.6); color:#fff;
@@ -396,6 +395,12 @@
     cursor:pointer; padding:0;
   }
   .pdf-preview-thumb-remove:active{transform:scale(.9);}
+  .photo-lightbox-overlay{
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:200;
+    align-items:center; justify-content:center; padding:20px;
+  }
+  .photo-lightbox-overlay.open{display:flex;}
+  .photo-lightbox-overlay img{max-width:100%; max-height:100%; border-radius:8px; object-fit:contain;}
 
   /* ---------- HISTORY ---------- */
   #historyScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
@@ -861,6 +866,10 @@
         <button class="confirm-btn confirm-yes" id="printerOfflineTiskBtn" disabled>Tisk</button>
       </div>
     </div>
+  </div>
+
+  <div class="photo-lightbox-overlay" id="photoLightboxOverlay">
+    <img id="photoLightboxImg" alt="Fotodokumentace">
   </div>
 
   <!-- LOGIN -->
@@ -1336,6 +1345,17 @@
   // tiskárna zrovna není dostupná, nabídne dialog místo tichého selhání
   // tisku (viz showPrinterOfflineDialog výše).
   async function submitAndPrintFromPreview(){
+    // Kontrola limitu velikosti fotek (Firestore ~1 MB) hned na začátku,
+    // dřív než appka vůbec začne cokoliv měnit na tlačítku — ať se
+    // neobjeví na zlomek vteřiny "Odesílám…" a hned nato chybová hláška.
+    // Místo červeného textu appka rovnou ukáže dialog, ať je to nepřehlédnutelné.
+    const photos = lastGeneratedPdf.photos || [];
+    const approxBytes = photos.reduce((sum, p) => sum + p.length, 0);
+    if(approxBytes > 950000){
+      alert('Příliš velká velikost fotek. Odstraň jednu fotku');
+      return;
+    }
+
     const btn = document.getElementById('pdfPreviewPrintBtn');
     const note = document.getElementById('pdfPreviewPrinterNote');
     const originalText = btn.textContent;
@@ -3378,6 +3398,11 @@
   // po přidání/smazání fotky přímo na téhle obrazovce. Každý náhled má
   // tlačítko × pro smazání — hlavně pro případ, že by součet fotek
   // překročil limit Firestore (~1 MB), ať jde snadno nějakou odebrat.
+  // Zavře fullscreen náhled fotky klepnutím kamkoliv na tmavé pozadí.
+  document.getElementById('photoLightboxOverlay').addEventListener('click', ()=>{
+    document.getElementById('photoLightboxOverlay').classList.remove('open');
+  });
+
   function refreshPdfPreviewGallery(){
     const photos = (lastGeneratedPdf && lastGeneratedPdf.photos) || [];
     const thumbs = document.getElementById('pdfPreviewThumbs');
@@ -3389,6 +3414,10 @@
       const img = document.createElement('img');
       img.src = 'data:image/jpeg;base64,' + b64;
       img.alt = 'Fotodokumentace';
+      img.addEventListener('click', ()=>{
+        document.getElementById('photoLightboxImg').src = img.src;
+        document.getElementById('photoLightboxOverlay').classList.add('open');
+      });
       item.appendChild(img);
 
       const removeBtn = document.createElement('button');
