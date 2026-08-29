@@ -377,8 +377,8 @@
 
     <div class="confirm-overlay" id="prikazOverlay">
       <div class="prikaz-box">
-        <h3>Příkaz na místě</h3>
-        <div class="field">
+        <h3 id="prikazDialogTitle">Příkaz na místě</h3>
+        <div class="field" id="prikazCastkaField">
           <label for="prikazCastka">Částka (Kč)</label>
           <input type="number" id="prikazCastka" inputmode="numeric" min="0" step="1" placeholder="např. 1500">
         </div>
@@ -873,7 +873,7 @@
     return { city: 'Blansko', locationPhrase: 'na ulici ' + first };
   }
 
-  async function buildVyzvaDopisDocx(record){
+  async function buildVyzvaDopisDocx(record, pachatel){
     const offenseLabel = record.offenseLabel || '';
     const offenseCitation = record.offenseCitation || '';
     const parsedCitation = parseOffenseCitation(offenseCitation);
@@ -885,9 +885,23 @@
     const shortRef = parsedCitation ? parsedCitation.ref : offenseCitation;
     const loc = addressForLetter(record.address);
 
+    // Jméno/příjmení a datum narození se vyplní, pokud je appka má
+    // z dialogu "Pachatel" (ručně zadané nebo ze skenu OP) — adresu
+    // appka nezná (na OP se skenuje jen MRZ zóna), zůstává placeholder.
+    const pachatelJmeno = pachatel ? [pachatel.jmeno, pachatel.prijmeni].filter(Boolean).join(' ') : '';
+    const headerLeft = [
+      pachatelJmeno || '[DOPLNIT JMÉNO A PŘÍJMENÍ]',
+      '',
+      (pachatel && pachatel.datumNarozeni) || '[DOPLNIT DATUM NAROZENÍ]',
+      '',
+      '[DOPLNIT ULICE A ČP]',
+      '',
+      '[DOPLNIT PSČ A OBEC]'
+    ];
+
     let body = '';
     body += docxHeaderTable(
-      ['[DOPLNIT JMÉNO A PŘÍJMENÍ]', '', '[DOPLNIT DATUM NAROZENÍ]', '', '[DOPLNIT ULICE A ČP]', '', '[DOPLNIT PSČ A OBEC]'],
+      headerLeft,
       [
         'Naše  č. j.: [DOPLNIT]',
         'Vyřizuje: str. ' + (record.officerName || ''),
@@ -958,7 +972,7 @@
     });
   }
 
-  async function buildOznameniDocx(record, photosB64){
+  async function buildOznameniDocx(record, photosB64, pachatel){
     const offenseCitation = record.offenseCitation || '';
     const offenseLabel = record.offenseLabel || '';
 
@@ -987,8 +1001,14 @@
     if(record.brand || record.color){
       body += docxLabelValuePara('Tovární značka, barva:', [record.brand, record.color].filter(Boolean).join(', '), { size: 20, spacingAfter: 200 });
     }
-    body += docxPara('Příjmení a jméno: ', { size: 20, spacingAfter: 200 });
-    body += docxPara('Datum narození: ', { size: 20, spacingAfter: 200 });
+    // Jméno/datum narození/číslo OP se vyplní, pokud je má appka
+    // z dialogu "Pachatel" (ručně zadané nebo ze skenu OP).
+    const pachatelJmeno = pachatel ? [pachatel.prijmeni, pachatel.jmeno].filter(Boolean).join(' ') : '';
+    body += docxLabelValuePara('Příjmení a jméno:', pachatelJmeno, { size: 20, spacingAfter: 200, valueBold: true });
+    body += docxLabelValuePara('Datum narození:', (pachatel && pachatel.datumNarozeni) || '', { size: 20, spacingAfter: 200, valueBold: true });
+    if(pachatel && pachatel.cisloDokladu){
+      body += docxLabelValuePara('Číslo OP:', pachatel.cisloDokladu, { size: 20, spacingAfter: 200, valueBold: true });
+    }
     body += docxPara('Bydliště: ', { size: 20, spacingAfter: 200 });
 
     body += docxPara('Popis skutku:', { bold: true, size: 20, spacingAfter: 100 });
@@ -1150,11 +1170,7 @@
     });
   }
 
-  async function exportOznameni(record){
-    const btn = document.getElementById('menuOznameniBtn');
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Připravuji…';
+  async function exportOznameni(record, pachatel, filenameOverride){
     try{
       if(typeof JSZip === 'undefined'){
         setDetailNote('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).', 'err');
@@ -1170,8 +1186,8 @@
         record._resolvedPhotos = photosB64;
         record._resolvedMime = (data && data.photoMime) || 'image/jpeg';
       }
-      const blob = await buildOznameniDocx(record, photosB64 || []);
-      const filename = 'Oznameni_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx';
+      const blob = await buildOznameniDocx(record, photosB64 || [], pachatel);
+      const filename = filenameOverride || ('Oznameni_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx');
       try{
         const file = new File([blob], filename, { type: blob.type });
         if(navigator.canShare && navigator.canShare({ files: [file] })){
@@ -1190,9 +1206,6 @@
       console.error('Export Oznámení selhal:', e);
       setDetailNote('Vytvoření dokumentu se nezdařilo (' + e.message + ').', 'err');
       return false;
-    }finally{
-      btn.disabled = false;
-      btn.textContent = originalText;
     }
   }
 
@@ -1798,18 +1811,14 @@
     renderList(document.getElementById('searchInput').value);
   }
 
-  async function exportVyzva(record){
-    const btn = document.getElementById('menuVyzvaBtn');
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Připravuji…';
+  async function exportVyzva(record, pachatel, filenameOverride){
     try{
       if(typeof JSZip === 'undefined'){
         setDetailNote('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).', 'err');
         return false;
       }
-      const blob = await buildVyzvaDopisDocx(record);
-      const filename = 'Vyzva_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx';
+      const blob = await buildVyzvaDopisDocx(record, pachatel);
+      const filename = filenameOverride || ('Vyzva_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx');
       try{
         const file = new File([blob], filename, { type: blob.type });
         if(navigator.canShare && navigator.canShare({ files: [file] })){
@@ -1828,9 +1837,6 @@
       console.error('Export Výzvy selhal:', e);
       setDetailNote('Vytvoření dokumentu se nezdařilo (' + e.message + ').', 'err');
       return false;
-    }finally{
-      btn.disabled = false;
-      btn.textContent = originalText;
     }
   }
 
@@ -1846,33 +1852,40 @@
     document.getElementById('resolveMenuOverlay').classList.remove('open');
   });
 
-  document.getElementById('menuOznameniBtn').addEventListener('click', async ()=>{
-    document.getElementById('resolveMenuOverlay').classList.remove('open');
+  document.getElementById('menuOznameniBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
-    if(!record) return;
-    const opened = await exportOznameni(record);
-    // Jen když se dokument doopravdy otevřel/stáhnul (ne při chybě) a jen
-    // pokud přestupek ještě nebyl vyřešený jiným způsobem dřív.
-    if(opened) markResolved(record, 'oznameni');
+    if(!record || record.resolved) return;
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    openPrikazModal('oznameni');
   });
 
-  document.getElementById('menuVyzvaBtn').addEventListener('click', async ()=>{
-    document.getElementById('resolveMenuOverlay').classList.remove('open');
+  document.getElementById('menuVyzvaBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
-    if(!record) return;
-    const opened = await exportVyzva(record);
-    if(opened) markResolved(record, 'vyzva');
+    if(!record || record.resolved) return;
+    document.getElementById('resolveMenuOverlay').classList.remove('open');
+    openPrikazModal('vyzva');
   });
 
   document.getElementById('menuVyresenoBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
     if(!record || record.resolved) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
-    openPrikazModal();
+    openPrikazModal('prikaz');
   });
 
-  // ---------- Modál "Příkaz na místě" (částka + pachatel, volitelně sken OP) ----------
-  function openPrikazModal(){
+  // ---------- Modál "Příkaz na místě" / "Výzva" / "Oznámení" (pachatel, volitelně sken OP) ----------
+  // Stejná logika jako v prehled-desktop.html — viz tam podrobný komentář.
+  const PRIKAZ_MODE_TITLES = {
+    prikaz: 'Příkaz na místě',
+    vyzva: 'Výzva k podání vysvětlení',
+    oznameni: 'Oznámení správnímu orgánu'
+  };
+  let prikazMode = 'prikaz';
+
+  function openPrikazModal(mode){
+    prikazMode = mode || 'prikaz';
+    document.getElementById('prikazDialogTitle').textContent = PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz;
+    document.getElementById('prikazCastkaField').style.display = (prikazMode === 'prikaz') ? '' : 'none';
     document.getElementById('prikazCastka').value = '';
     document.getElementById('prikazJmeno').value = '';
     document.getElementById('prikazPrijmeni').value = '';
@@ -1888,6 +1901,21 @@
     document.getElementById('prikazOverlay').classList.remove('open');
   });
 
+  // Jméno souboru: "Výzva/Oznámení RR_MM_DD - číslo přestupku - spz - ulice"
+  // (datum = den vygenerování dokumentu, ne den přestupku).
+  function buildDocFilename(prefix, record){
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const rrMmDd = pad(now.getFullYear() % 100) + '_' + pad(now.getMonth() + 1) + '_' + pad(now.getDate());
+    const bits = [];
+    if(record.noticeNumber) bits.push(record.noticeNumber);
+    if(record.plate) bits.push(record.plate);
+    const street = record.address ? record.address.split(',')[0].trim() : '';
+    if(street) bits.push(street);
+    const name = prefix + ' ' + rrMmDd + (bits.length ? ' - ' + bits.join(' - ') : '');
+    return name.replace(/[\\/:*?"<>|]/g, '') + '.docx';
+  }
+
   document.getElementById('prikazConfirmBtn').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
     if(!record || record.resolved) return;
@@ -1896,23 +1924,34 @@
     const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
     const narozeni = document.getElementById('prikazNarozeni').value.trim();
     const doklad = document.getElementById('prikazDoklad').value.trim();
+    const pachatel = (jmeno || prijmeni || narozeni || doklad) ? {
+      jmeno: jmeno || null,
+      prijmeni: prijmeni || null,
+      datumNarozeni: narozeni || null,
+      cisloDokladu: doklad || null
+    } : null;
 
     const btn = document.getElementById('prikazConfirmBtn');
     btn.disabled = true;
     btn.textContent = 'Ukládám…';
     try{
-      const extra = {};
-      if(castkaRaw !== '' && !isNaN(Number(castkaRaw))) extra.castka = Number(castkaRaw);
-      if(jmeno || prijmeni || narozeni || doklad){
-        extra.pachatel = {
-          jmeno: jmeno || null,
-          prijmeni: prijmeni || null,
-          datumNarozeni: narozeni || null,
-          cisloDokladu: doklad || null
-        };
+      if(prikazMode === 'prikaz'){
+        const extra = {};
+        if(castkaRaw !== '' && !isNaN(Number(castkaRaw))) extra.castka = Number(castkaRaw);
+        if(pachatel) extra.pachatel = pachatel;
+        document.getElementById('prikazOverlay').classList.remove('open');
+        await markResolved(record, 'prikaz', extra);
+      } else if(prikazMode === 'vyzva'){
+        document.getElementById('prikazOverlay').classList.remove('open');
+        const filename = buildDocFilename('Výzva', record);
+        const opened = await exportVyzva(record, pachatel, filename);
+        if(opened) await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
+      } else if(prikazMode === 'oznameni'){
+        document.getElementById('prikazOverlay').classList.remove('open');
+        const filename = buildDocFilename('Oznámení', record);
+        const opened = await exportOznameni(record, pachatel, filename);
+        if(opened) await markResolved(record, 'oznameni', pachatel ? { pachatel } : undefined);
       }
-      document.getElementById('prikazOverlay').classList.remove('open');
-      await markResolved(record, 'prikaz', extra);
     }catch(e){
       console.error('Označení jako dořešeno selhalo:', e);
       alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
