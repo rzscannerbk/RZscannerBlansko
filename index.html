@@ -189,6 +189,18 @@
   }
   .add-photo-fab svg{width:20px; height:20px;}
   .add-photo-fab:active{transform:translate(-50%,-50%) scale(.93);}
+  .preview-add-photo-btn{
+    width:52px; height:52px; border-radius:50%; flex:0 0 52px;
+    background:radial-gradient(circle at 35% 30%, #FFC65B, var(--amber) 60%);
+    border:2px solid var(--asphalt-3);
+    box-shadow:0 0 0 2px var(--amber), 0 6px 18px rgba(255,176,32,.25);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:transform .12s ease;
+  }
+  .preview-add-photo-btn svg{width:20px; height:20px;}
+  .preview-add-photo-btn:active{transform:scale(.93);}
+  .preview-add-photo-wrap{display:flex; flex-direction:column; align-items:center; gap:5px; flex:0 0 auto;}
+  .preview-add-photo-wrap span{font-size:9.5px; color:var(--muted); font-family:'Roboto Mono',monospace; white-space:nowrap;}
   .extra-photos-strip{display:flex; gap:10px; overflow-x:auto; margin-top:12px; padding-bottom:2px; justify-content:center;}
   .extra-photo-thumb{position:relative; flex:0 0 auto; width:64px; height:64px; border-radius:10px; overflow:hidden; border:1px solid var(--line);}
   .extra-photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
@@ -811,9 +823,27 @@
     </div>
     <div class="btn-row" style="padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px); margin:0; gap:12px; flex-shrink:0; align-items:flex-start;">
       <button class="btn btn-primary" id="pdfPreviewBackBtn">Zpět</button>
+      <div class="preview-add-photo-wrap">
+        <button class="preview-add-photo-btn" id="pdfPreviewAddPhotoBtn" type="button" title="Přidej foto">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="#241a00" stroke-width="1.8"/><circle cx="12" cy="13" r="3.4" stroke="#241a00" stroke-width="1.8"/></svg>
+        </button>
+        <span>Přidej foto</span>
+      </div>
+      <input type="file" id="pdfPreviewPhotoInput" accept="image/*" capture="environment" style="display:none;">
       <div style="flex:1; display:flex; flex-direction:column;">
-        <button class="btn btn-submit" id="pdfPreviewPrintBtn" style="width:100%;">Tisk</button>
+        <button class="btn btn-submit" id="pdfPreviewPrintBtn" style="width:100%;">Odeslat</button>
         <div id="pdfPreviewPrinterNote" style="display:none; text-align:center; font-size:10.5px; color:var(--muted); margin-top:5px; font-family:'Roboto Mono',monospace;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-overlay" id="printerOfflineOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text">🖨 Tiskárna není připojena</div>
+      <div class="printer-check-note" id="printerOfflineNote">Zkouším se připojit…</div>
+      <div class="confirm-btns">
+        <button class="confirm-btn confirm-no" id="printerOfflineSkipBtn">Netisknout</button>
+        <button class="confirm-btn confirm-yes" id="printerOfflineTiskBtn" disabled>Tisk</button>
       </div>
     </div>
   </div>
@@ -1036,6 +1066,107 @@
     return String(next).padStart(6, '0');
   }
 
+  // Samotné odeslání přestupku do Firestore, beze všeho kolem tisku —
+  // používá ho jak starší cesta (tlačítko "Odeslat přestupek" na obrazovce
+  // Rozpoznaný záznam, s doptáváním na tisk až po odeslání), tak nová
+  // cesta (tlačítko "Odeslat" na Kontrole údajů, které tiskne rovnou).
+  // Při chybě rovnou vyhazuje výjimku — volající si řeší svoje vlastní
+  // UI (tlačítko/poznámku), tahle funkce žádné prvky obrazovky nezná.
+  async function submitPrestupekToFirestore(docType){
+    docType = docType || 'vyzva';
+    // Firestore documents are capped at ~1 MiB; leave headroom for the
+    // other fields. The stored value IS the base64 string, so the check
+    // has to use its actual character length — not the decoded byte
+    // count (that earlier bug let oversized uploads through, which is
+    // why one just failed after a slow round-trip instead of being
+    // caught instantly here).
+    const photos = lastGeneratedPdf.photos || [];
+    const approxBytes = photos.reduce((sum, p) => sum + p.length, 0);
+    if(approxBytes > 950000){
+      throw new Error('Fotky jsou bohužel příliš velké pro odeslání (limit Firestore ~1 MB). Zkuste odebrat některou fotku.');
+    }
+    // The list screen in the online přehled only ever needs the text
+    // fields — never the photos — but reading a Firestore collection
+    // always pulls whole documents. Keeping photos in the main document
+    // made every list load download every photo of every record, which
+    // is what made the přehled take ~10s to open. Storing them in a
+    // subcollection instead means the list query never touches them;
+    // they're fetched only when someone actually opens that record's
+    // "Foto" panel.
+    const docRef = db.collection('prestupky').doc();
+    let noticeNumber;
+    let counterBlocked = false;
+    try{
+      noticeNumber = await getNextNoticeNumber();
+    }catch(e){
+      if(e && e.code === 'permission-denied'){
+        // Firestore pravidla ještě nepovolují meta/noticeCounter — radši
+        // necháme odeslání proběhnout dál s náhradním číslem, než aby
+        // celý přestupek kvůli tomu spadl.
+        counterBlocked = true;
+        noticeNumber = String(Date.now() % 1000000).padStart(6, '0');
+      } else {
+        throw e;
+      }
+    }
+    const baseData = {
+      plate: lastGeneratedPdf.plate,
+      date: lastGeneratedPdf.date,
+      time: lastGeneratedPdf.time,
+      address: lastGeneratedPdf.address,
+      offenseLabel: lastGeneratedPdf.offenseLabel,
+      offenseCitation: lastGeneratedPdf.offenseCitation,
+      hasPhotos: photos.length > 0,
+      resolved: false,
+      // Default retention for an unresolved offense: 90 days. Marking it
+      // "Dořešeno" in the přehled shortens this to 60 days from that
+      // moment — Firestore's TTL policy (configured on this same field)
+      // deletes the document automatically once it's past.
+      expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 90*24*60*60*1000)),
+      submittedBy: auth.currentUser ? auth.currentUser.email : null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    const extraData = {
+      officerName: lastGeneratedPdf.officerName || null,
+      noticeNumber,
+      lat: lastGeneratedPdf.lat != null ? lastGeneratedPdf.lat : null,
+      lng: lastGeneratedPdf.lng != null ? lastGeneratedPdf.lng : null,
+      brand: lastGeneratedPdf.brand || null,
+      color: lastGeneratedPdf.color || null,
+      docType: docType || 'vyzva',
+      mpmUdalostId: lastGeneratedPdf.mpmUdalostId || null,
+      mpmUdalostText: lastGeneratedPdf.mpmUdalostText || null
+    };
+    let extrasBlocked = false;
+    try{
+      // Nejdřív zkusíme zapsat i nová pole (jméno strážníka, číslo výzvy).
+      await docRef.set({ ...baseData, ...extraData });
+    }catch(e){
+      // Pokud to spadne na oprávnění, je nejpravděpodobnější příčinou, že
+      // Firestore pravidla mají u kolekce "prestupky" pevný seznam
+      // povolených polí (např. přes hasOnly([...])), který nová pole
+      // officerName/noticeNumber ještě neobsahuje. Aby kvůli tomu nespadlo
+      // odeslání úplně, zkusíme to znovu bez nich — hlavní záznam o
+      // přestupku se tak uloží vždy, i než se pravidla upraví.
+      if(e && e.code === 'permission-denied'){
+        extrasBlocked = true;
+        await docRef.set(baseData);
+      } else {
+        throw e;
+      }
+    }
+    if(photos.length){
+      await docRef.collection('data').doc('photos').set({
+        photos: photos,
+        photoMime: 'image/jpeg'
+      });
+    }
+    return {
+      noticeNumber, extrasBlocked, counterBlocked,
+      submittedRecord: { ...lastGeneratedPdf, noticeNumber, docType }
+    };
+  }
+
   async function uploadLastPdfToFirestore(docType, forcePrint){
     docType = docType || 'vyzva';
     if(!lastGeneratedPdf){
@@ -1046,95 +1177,7 @@
     submitBtn.disabled = true;
     setSubmitNote('Odesílám…', '');
     try{
-      // Firestore documents are capped at ~1 MiB; leave headroom for the
-      // other fields. The stored value IS the base64 string, so the check
-      // has to use its actual character length — not the decoded byte
-      // count (that earlier bug let oversized uploads through, which is
-      // why one just failed after a slow round-trip instead of being
-      // caught instantly here).
-      const photos = lastGeneratedPdf.photos || [];
-      const approxBytes = photos.reduce((sum, p) => sum + p.length, 0);
-      if(approxBytes > 950000){
-        setSubmitNote('Fotky jsou bohužel příliš velké pro odeslání (limit Firestore ~1 MB). Zkuste odebrat některou fotku.', 'err');
-        submitBtn.disabled = false;
-        return;
-      }
-      // The list screen in the online přehled only ever needs the text
-      // fields — never the photos — but reading a Firestore collection
-      // always pulls whole documents. Keeping photos in the main document
-      // made every list load download every photo of every record, which
-      // is what made the přehled take ~10s to open. Storing them in a
-      // subcollection instead means the list query never touches them;
-      // they're fetched only when someone actually opens that record's
-      // "Foto" panel.
-      const docRef = db.collection('prestupky').doc();
-      let noticeNumber;
-      let counterBlocked = false;
-      try{
-        noticeNumber = await getNextNoticeNumber();
-      }catch(e){
-        if(e && e.code === 'permission-denied'){
-          // Firestore pravidla ještě nepovolují meta/noticeCounter — radši
-          // necháme odeslání proběhnout dál s náhradním číslem, než aby
-          // celý přestupek kvůli tomu spadl.
-          counterBlocked = true;
-          noticeNumber = String(Date.now() % 1000000).padStart(6, '0');
-        } else {
-          throw e;
-        }
-      }
-      const baseData = {
-        plate: lastGeneratedPdf.plate,
-        date: lastGeneratedPdf.date,
-        time: lastGeneratedPdf.time,
-        address: lastGeneratedPdf.address,
-        offenseLabel: lastGeneratedPdf.offenseLabel,
-        offenseCitation: lastGeneratedPdf.offenseCitation,
-        hasPhotos: photos.length > 0,
-        resolved: false,
-        // Default retention for an unresolved offense: 90 days. Marking it
-        // "Dořešeno" in the přehled shortens this to 60 days from that
-        // moment — Firestore's TTL policy (configured on this same field)
-        // deletes the document automatically once it's past.
-        expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 90*24*60*60*1000)),
-        submittedBy: auth.currentUser ? auth.currentUser.email : null,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      const extraData = {
-        officerName: lastGeneratedPdf.officerName || null,
-        noticeNumber,
-        lat: lastGeneratedPdf.lat != null ? lastGeneratedPdf.lat : null,
-        lng: lastGeneratedPdf.lng != null ? lastGeneratedPdf.lng : null,
-        brand: lastGeneratedPdf.brand || null,
-        color: lastGeneratedPdf.color || null,
-        docType: docType || 'vyzva',
-        mpmUdalostId: lastGeneratedPdf.mpmUdalostId || null,
-        mpmUdalostText: lastGeneratedPdf.mpmUdalostText || null
-      };
-      let extrasBlocked = false;
-      try{
-        // Nejdřív zkusíme zapsat i nová pole (jméno strážníka, číslo výzvy).
-        await docRef.set({ ...baseData, ...extraData });
-      }catch(e){
-        // Pokud to spadne na oprávnění, je nejpravděpodobnější příčinou, že
-        // Firestore pravidla mají u kolekce "prestupky" pevný seznam
-        // povolených polí (např. přes hasOnly([...])), který nová pole
-        // officerName/noticeNumber ještě neobsahuje. Aby kvůli tomu nespadlo
-        // odeslání úplně, zkusíme to znovu bez nich — hlavní záznam o
-        // přestupku se tak uloží vždy, i než se pravidla upraví.
-        if(e && e.code === 'permission-denied'){
-          extrasBlocked = true;
-          await docRef.set(baseData);
-        } else {
-          throw e;
-        }
-      }
-      if(photos.length){
-        await docRef.collection('data').doc('photos').set({
-          photos: photos,
-          photoMime: 'image/jpeg'
-        });
-      }
+      const { noticeNumber, extrasBlocked, counterBlocked, submittedRecord } = await submitPrestupekToFirestore(docType);
       if(extrasBlocked){
         setSubmitNote('✓ Přestupek odeslán, ale BEZ čísla výzvy a jména strážníka — Firestore pravidla je zatím neumožňují uložit. Je potřeba upravit pravidla v konzoli (přidat "officerName" a "noticeNumber" mezi povolená pole).', 'ok');
         submitBtn.disabled = true;
@@ -1149,7 +1192,6 @@
         setTimeout(()=>{ finishBatchItemOrGoHome(); }, 1200);
       } else {
         submitBtn.disabled = true;
-        const submittedRecord = { ...lastGeneratedPdf, noticeNumber, docType };
         let wantsPrint;
         if(forcePrint){
           // Tlačítko "Tisk" na Kontrole údajů — záměr tisknout je už jasný
@@ -1202,16 +1244,26 @@
     show('result');
   });
 
-  // Tlačítko "Tisk" na Kontrole údajů — odešle přestupek na pozadí a rovnou
-  // (bez ptaní) vytiskne výzvu/oznámení, jakmile odeslání proběhne.
+  // Tlačítko "Odeslat" na Kontrole údajů — nejdřív ověří, že existuje
+  // aspoň jedna fotka (bez ní se přestupek vůbec neodešle ani nevytiskne),
+  // pak odešle do přehledu a hned zkusí vytisknout. Když tiskárna zrovna
+  // není dostupná, appka zůstane na téhle obrazovce a nabídne dialog
+  // s možností počkat (appka zkouší připojení na pozadí) nebo přestupek
+  // nechat nevytištěný.
   document.getElementById('pdfPreviewPrintBtn').addEventListener('click', ()=>{
     if(!lastGeneratedPdf){
       show('result');
       setSubmitNote('Nejdřív zobrazte náhled.', 'err');
       return;
     }
+    if(!lastGeneratedPdf.photos || lastGeneratedPdf.photos.length === 0){
+      const note = document.getElementById('pdfPreviewPrinterNote');
+      note.style.display = 'block';
+      note.style.color = 'var(--bad)';
+      note.textContent = 'Doplň fotodokumentaci.';
+      return;
+    }
     document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
-    show('result');
     if(!auth.currentUser){
       pendingSubmitAfterLogin = true;
       pendingAutoPrintAfterLogin = true;
@@ -1219,8 +1271,87 @@
       show('login');
       return;
     }
-    uploadLastPdfToFirestore(lastGeneratedPdf.docType, true);
+    submitAndPrintFromPreview();
   });
+
+  // Živě zkouší dostupnost tiskárny, dokud je dialog "Tiskárna není
+  // připojena" otevřený — jakmile appka zjistí, že jde tiskárnu použít,
+  // tlačítko Tisk se samo aktivuje bez nutnosti dialog zavřít a znovu
+  // otevřít. Vrací true, pokud strážník klikl na (aktivní) Tisk, false
+  // při "Netisknout".
+  let printerOfflinePollTimer = null;
+  function showPrinterOfflineDialog(){
+    return new Promise((resolve)=>{
+      const overlay = document.getElementById('printerOfflineOverlay');
+      const tiskBtn = document.getElementById('printerOfflineTiskBtn');
+      const skipBtn = document.getElementById('printerOfflineSkipBtn');
+      const note = document.getElementById('printerOfflineNote');
+      tiskBtn.disabled = true;
+      note.textContent = '🖨 Zkouším se připojit…';
+      overlay.classList.add('open');
+
+      function stopPoll(){
+        if(printerOfflinePollTimer){ clearInterval(printerOfflinePollTimer); printerOfflinePollTimer = null; }
+      }
+      function cleanup(result){
+        stopPoll();
+        overlay.classList.remove('open');
+        tiskBtn.removeEventListener('click', onTisk);
+        skipBtn.removeEventListener('click', onSkip);
+        resolve(result);
+      }
+      function onTisk(){ if(!tiskBtn.disabled) cleanup(true); }
+      function onSkip(){ cleanup(false); }
+      tiskBtn.addEventListener('click', onTisk);
+      skipBtn.addEventListener('click', onSkip);
+
+      printerOfflinePollTimer = setInterval(async ()=>{
+        const reachable = await pingPrinter();
+        tiskBtn.disabled = !reachable;
+        note.textContent = reachable ? '✓ Tiskárna dostupná' : '🖨 Zkouším se připojit…';
+      }, 2500);
+    });
+  }
+
+  // Odešle přestupek do přehledu a hned se pokusí vytisknout — pokud
+  // tiskárna zrovna není dostupná, nabídne dialog místo tichého selhání
+  // tisku (viz showPrinterOfflineDialog výše).
+  async function submitAndPrintFromPreview(){
+    const btn = document.getElementById('pdfPreviewPrintBtn');
+    const note = document.getElementById('pdfPreviewPrinterNote');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Odesílám…';
+    note.style.color = '';
+    note.style.display = 'none';
+    try{
+      const { extrasBlocked, counterBlocked, submittedRecord } = await submitPrestupekToFirestore(lastGeneratedPdf.docType);
+      if(extrasBlocked || counterBlocked){
+        note.style.display = 'block';
+        note.textContent = counterBlocked
+          ? 'Odesláno s náhradním číslem jednacím (je potřeba upravit Firestore pravidla).'
+          : 'Odesláno, ale bez čísla výzvy/jména strážníka (je potřeba upravit Firestore pravidla).';
+      }
+
+      let reachable = await pingPrinter();
+      if(!reachable){
+        reachable = await showPrinterOfflineDialog();
+      }
+      if(reachable){
+        btn.textContent = 'Tiskne se…';
+        await printViaEpson(submittedRecord);
+      }
+      setTimeout(()=>{ finishBatchItemOrGoHome(); }, reachable ? 1000 : 0);
+    }catch(e){
+      console.error('Odeslání/tisk selhal:', e);
+      note.style.display = 'block';
+      note.style.color = 'var(--bad)';
+      note.textContent = 'Odeslání se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
+    }finally{
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
 
   document.getElementById('loginCancelBtn').addEventListener('click', ()=>{
     pendingSubmitAfterLogin = false;
@@ -3033,23 +3164,21 @@
     });
   }
 
-  // Zkontroluje tiskárnu hned při otevření Kontroly údajů — tlačítko
-  // "Tisk" zůstane šedé/neaktivní s malou nápovědou pod sebou, dokud
-  // appka nepotvrdí, že se na tiskárnu dá přes síť dosáhnout. Zabrání to
-  // situaci, kdy strážník klikne na Tisk, appka mezitím odešle přestupek
-  // do přehledu, a tisk samotný pak spadne na nedostupnou tiskárnu.
+  // Zkontroluje tiskárnu hned při otevření Kontroly údajů — jen jako
+  // informativní nápovědu pod tlačítkem "Odeslat" (appka teď žádnou
+  // fotku/tisk předem neblokuje kvůli tiskárně; když je při kliknutí na
+  // "Odeslat" nedostupná, appka to řeší dialogem — viz
+  // showPrinterOfflineDialog — ne zašedlým tlačítkem předem).
   async function updatePrintButtonAvailability(){
-    const btn = document.getElementById('pdfPreviewPrintBtn');
     const note = document.getElementById('pdfPreviewPrinterNote');
-    btn.disabled = true;
     note.textContent = '🖨 Kontroluji tiskárnu…';
+    note.style.color = '';
     note.style.display = 'block';
     const reachable = await pingPrinter();
-    btn.disabled = !reachable;
     if(reachable){
       note.style.display = 'none';
     } else {
-      note.textContent = 'připoj tiskárnu';
+      note.textContent = 'připoj tiskárnu (appka to zkusí znovu při odeslání)';
       note.style.display = 'block';
     }
   }
@@ -3198,27 +3327,7 @@
       // Show the notice for review before anything is sent — plain HTML,
       // so the text is always sharp regardless of screen or zoom level.
       document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(lastGeneratedPdf);
-      const gallery = document.getElementById('photoGallery');
-      const photoWrap = document.getElementById('photoWrap');
-      const photoToggleBtn = document.getElementById('photoToggleBtn');
-      photoWrap.classList.remove('open');
-      gallery.innerHTML = '';
-      if(allPhotoDataUrls.length){
-        allPhotoDataUrls.forEach(dataUrl=>{
-          const img = document.createElement('img');
-          img.src = dataUrl;
-          img.alt = 'Fotodokumentace';
-          gallery.appendChild(img);
-        });
-        photoToggleBtn.textContent = 'Foto (' + allPhotoDataUrls.length + ')';
-        photoToggleBtn.style.display = 'inline-block';
-        // Rovnou zobrazit, ať je vidět bez nutnosti klepnout na tlačítko —
-        // appka je má stejně už lokálně na telefonu, žádné dotahování z
-        // internetu tu není potřeba.
-        photoWrap.classList.add('open');
-      } else {
-        photoToggleBtn.style.display = 'none';
-      }
+      refreshPdfPreviewGallery();
 
       // Allow pinch-to-zoom just for this screen, so the photo can be
       // inspected closely — the rest of the app locks zoom out (it
@@ -3237,8 +3346,66 @@
     }
   });
 
+  // Znovu vykreslí galerii fotek na Kontrole údajů z lastGeneratedPdf.photos
+  // (base64 bez "data:" prefixu, vždy JPEG — viz preparePhotoForUpload).
+  // Volá se jak při prvním sestavení náhledu, tak po přidání další fotky
+  // tlačítkem "Přidej foto" přímo na téhle obrazovce.
+  function refreshPdfPreviewGallery(){
+    const photos = (lastGeneratedPdf && lastGeneratedPdf.photos) || [];
+    const gallery = document.getElementById('photoGallery');
+    const photoWrap = document.getElementById('photoWrap');
+    const photoToggleBtn = document.getElementById('photoToggleBtn');
+    photoWrap.classList.remove('open');
+    gallery.innerHTML = '';
+    if(photos.length){
+      photos.forEach(b64=>{
+        const img = document.createElement('img');
+        img.src = 'data:image/jpeg;base64,' + b64;
+        img.alt = 'Fotodokumentace';
+        gallery.appendChild(img);
+      });
+      photoToggleBtn.textContent = 'Foto (' + photos.length + ')';
+      photoToggleBtn.style.display = 'inline-block';
+      // Rovnou zobrazit, ať je vidět bez nutnosti klepnout na tlačítko —
+      // appka je má stejně už lokálně na telefonu, žádné dotahování z
+      // internetu tu není potřeba.
+      photoWrap.classList.add('open');
+    } else {
+      photoToggleBtn.style.display = 'none';
+    }
+  }
+
   document.getElementById('photoToggleBtn').addEventListener('click', ()=>{
     document.getElementById('photoWrap').classList.toggle('open');
+  });
+
+  // "Přidej foto" přímo na Kontrole údajů — pro případ, že hlavní fotka
+  // chybí nebo je potřeba doplnit další záběr, aniž by se appka musela
+  // vracet na předchozí obrazovku. Fotka se rovnou přidá do
+  // lastGeneratedPdf.photos (stejné pole, které jde na "Odeslat") a hned
+  // se ukáže v náhledové galerii.
+  document.getElementById('pdfPreviewAddPhotoBtn').addEventListener('click', ()=>{
+    document.getElementById('pdfPreviewPhotoInput').click();
+  });
+  document.getElementById('pdfPreviewPhotoInput').addEventListener('change', (e)=>{
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // allow picking/retaking the same photo again
+    if(!file || !lastGeneratedPdf) return;
+    const reader = new FileReader();
+    reader.onload = async (ev)=>{
+      const processed = await preparePhotoForUpload(ev.target.result, 950, 0.68);
+      if(!lastGeneratedPdf.photos) lastGeneratedPdf.photos = [];
+      lastGeneratedPdf.photos.push(processed.split(',')[1]);
+      refreshPdfPreviewGallery();
+      // Fotka teď existuje, takže případná hláška "Doplň fotodokumentaci"
+      // z předchozího pokusu o odeslání už neplatí.
+      const note = document.getElementById('pdfPreviewPrinterNote');
+      if(note.textContent === 'Doplň fotodokumentaci.'){
+        note.style.display = 'none';
+        note.style.color = '';
+      }
+    };
+    reader.readAsDataURL(file);
   });
 
 
