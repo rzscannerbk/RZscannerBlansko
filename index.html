@@ -288,6 +288,7 @@
   .btn-primary{background:var(--amber); color:#241a00;}
   .btn:active{transform:scale(.97);}
   .btn[disabled]{opacity:.5; pointer-events:none;}
+  .btn-dim{opacity:.5;}
 
   .saved-note{margin-top:16px; text-align:center; font-size:12.5px; color:var(--good); font-family:'Roboto Mono',monospace; display:none;}
   .btn-submit{background:transparent; border:1.5px solid var(--good); color:var(--good);}
@@ -1193,6 +1194,11 @@
       note.textContent = 'Doplň fotodokumentaci.';
       return;
     }
+    if(!printerReady){
+      // Krátký ťuk na zašedlé tlačítko schválně nic nedělá — jen dlouhé
+      // podržení (3 s, viz startPrinterHold) odešle přestupek bez tisku.
+      return;
+    }
     document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
     if(!auth.currentUser){
       pendingSubmitAfterLogin = true;
@@ -1203,6 +1209,41 @@
     }
     submitAndPrintFromPreview();
   });
+
+  // Dlouhé podržení (3 s) tlačítka "Odeslat", zatímco je vizuálně
+  // zašedlé (tiskárna nedostupná) — odešle přestupek do přehledu bez
+  // pokusu o tisk. Používá Pointer Events, ať to funguje stejně na
+  // dotyku i myši. Krátké puštění před uplynutím 3 s podržení zruší
+  // beze změny (viz click listener výše — krátký ťuk je no-op).
+  (function(){
+    const btn = document.getElementById('pdfPreviewPrintBtn');
+    let holdTimer = null;
+    let holding = false;
+    let originalText = null;
+
+    function startHold(){
+      if(printerReady || holding || btn.disabled) return;
+      holding = true;
+      originalText = btn.textContent;
+      btn.textContent = 'Držte pro odeslání bez tisku…';
+      holdTimer = setTimeout(()=>{
+        holding = false;
+        btn.textContent = originalText;
+        submitAndPrintFromPreview({ skipPrint: true });
+      }, 3000);
+    }
+    function cancelHold(){
+      if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
+      if(holding){
+        holding = false;
+        btn.textContent = originalText;
+      }
+    }
+    btn.addEventListener('pointerdown', startHold);
+    btn.addEventListener('pointerup', cancelHold);
+    btn.addEventListener('pointercancel', cancelHold);
+    btn.addEventListener('pointerleave', cancelHold);
+  })();
 
   // Živě zkouší dostupnost tiskárny, dokud je dialog "Tiskárna není
   // připojena" otevřený — jakmile appka zjistí, že jde tiskárnu použít,
@@ -1246,7 +1287,8 @@
   // Odešle přestupek do přehledu a hned se pokusí vytisknout — pokud
   // tiskárna zrovna není dostupná, nabídne dialog místo tichého selhání
   // tisku (viz showPrinterOfflineDialog výše).
-  async function submitAndPrintFromPreview(){
+  async function submitAndPrintFromPreview(opts){
+    opts = opts || {};
     // Kontrola limitu velikosti fotek (Firestore ~1 MB) hned na začátku,
     // dřív než appka vůbec začne cokoliv měnit na tlačítku — ať se
     // neobjeví na zlomek vteřiny "Odesílám…" a hned nato chybová hláška.
@@ -1275,13 +1317,16 @@
           : 'Odesláno, ale bez čísla výzvy/jména strážníka (je potřeba upravit Firestore pravidla).';
       }
 
-      let reachable = await pingPrinter();
-      if(!reachable){
-        reachable = await showPrinterOfflineDialog();
-      }
-      if(reachable){
-        btn.textContent = 'Tiskne se…';
-        await printViaEpson(submittedRecord);
+      let reachable = false;
+      if(!opts.skipPrint){
+        reachable = await pingPrinter();
+        if(!reachable){
+          reachable = await showPrinterOfflineDialog();
+        }
+        if(reachable){
+          btn.textContent = 'Tiskne se…';
+          await printViaEpson(submittedRecord);
+        }
       }
       setTimeout(()=>{ finishBatchItemOrGoHome(); }, reachable ? 1000 : 0);
     }catch(e){
@@ -3096,13 +3141,20 @@
   function stopPdfPreviewPrinterPoll(){
     if(pdfPreviewPrinterPollTimer){ clearInterval(pdfPreviewPrinterPollTimer); pdfPreviewPrinterPollTimer = null; }
   }
+  // Tlačítko "Odeslat" je bez tiskárny jen VIZUÁLNĚ zašedlé (třída
+  // .btn-dim), ne opravdové [disabled] — to by totiž blokovalo i
+  // dotyková gesta, a appka potřebuje zachytit dlouhé podržení (viz
+  // startPrinterHold níže) i v tomhle stavu. Krátký ťuk beze změny nic
+  // neudělá (viz click listener), jen podržení 3s odešle bez tisku.
+  let printerReady = true;
   async function updatePrintButtonAvailability(){
     const btn = document.getElementById('pdfPreviewPrintBtn');
     const note = document.getElementById('pdfPreviewPrinterNote');
     async function check(){
       const reachable = await pingPrinter();
-      btn.disabled = !reachable;
-      note.textContent = 'připoj tiskárnu';
+      printerReady = reachable;
+      btn.classList.toggle('btn-dim', !reachable);
+      note.textContent = reachable ? '' : 'připoj tiskárnu (nebo podrž tlačítko 3 s pro odeslání bez tisku)';
       note.style.display = reachable ? 'none' : 'block';
     }
     await check();
