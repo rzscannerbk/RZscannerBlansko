@@ -275,7 +275,7 @@
   .dot{width:7px; height:7px; border-radius:50%;}
 
   .btn-row{display:flex; justify-content:center; gap:130px;}
-  .btn-row #makePdfBtn, .btn-row #submitBtn{flex:0 0 auto; min-width:98px; padding-left:10px; padding-right:10px;}
+  .btn-row #makePdfBtn{flex:0 0 auto; min-width:98px; padding-left:10px; padding-right:10px;}
   .btn{
     flex:1; border-radius:14px; padding:15px 12px; font-family:'Inter',sans-serif; font-weight:700;
     font-size:14.5px; text-align:center; cursor:pointer; border:none; letter-spacing:.01em;
@@ -588,9 +588,6 @@
         <button class="result-close" id="resultCloseBtn" title="Zpět na hlavní obrazovku">✕</button>
       </div>
       <div class="thumb-wrap" id="thumbWrap" title="Klepnutím znovu skenovat RZ"><img id="thumb" alt="Fotka značky"></div>
-      <div class="extra-photos-strip" id="extraPhotosStrip"></div>
-
-      <input type="file" id="extraPhotoInput" accept="image/*" capture="environment" style="display:none;">
 
       <div class="plate">
         <div class="plate-strip"><span class="stars">★★<br>★★</span><span class="cz">CZ</span></div>
@@ -731,11 +728,7 @@
       <div class="btn-row-wrap">
         <div class="btn-row">
           <button class="btn btn-primary" id="makePdfBtn">Náhled</button>
-          <button class="btn btn-submit" id="submitBtn" disabled>Odeslat</button>
         </div>
-        <button class="add-photo-fab" id="addPhotoBtn" type="button" title="Přidat foto">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="#241a00" stroke-width="1.8"/><circle cx="12" cy="13" r="3.4" stroke="#241a00" stroke-width="1.8"/></svg>
-        </button>
       </div>
 
       <div class="saved-note" id="savedNote">✓ Náhled zkontrolován</div>
@@ -995,9 +988,6 @@
   const camError = document.getElementById('camError');
   let stream = null;
   let capturedDataUrl = null;
-  // Extra photos added via "Přidat foto", already downscaled — kept
-  // separate from the main plate photo (which stays full-res for OCR).
-  let extraPhotos = [];
 
   // ---------- Dávkový režim (víc aut za sebou) ----------
   // batchCapturing: appka právě prochází foťákem víc aut po sobě, bez
@@ -1013,28 +1003,6 @@
   let batchDocType = null;
   let batchQueue = [];
   let currentBatchIndex = null;
-
-  function renderExtraPhotosStrip(){
-    const strip = document.getElementById('extraPhotosStrip');
-    strip.innerHTML = '';
-    extraPhotos.forEach((dataUrl, idx)=>{
-      const thumb = document.createElement('div');
-      thumb.className = 'extra-photo-thumb';
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      thumb.appendChild(img);
-      const removeBtn = document.createElement('button');
-      removeBtn.className = 'extra-photo-remove';
-      removeBtn.type = 'button';
-      removeBtn.textContent = '×';
-      removeBtn.addEventListener('click', ()=>{
-        extraPhotos.splice(idx, 1);
-        renderExtraPhotosStrip();
-      });
-      thumb.appendChild(removeBtn);
-      strip.appendChild(thumb);
-    });
-  }
 
   // ---------- Firebase (Firestore + Auth) ----------
   const firebaseConfig = {
@@ -1190,73 +1158,6 @@
       submittedRecord: { ...lastGeneratedPdf, noticeNumber, docType }
     };
   }
-
-  async function uploadLastPdfToFirestore(docType, forcePrint){
-    docType = docType || 'vyzva';
-    if(!lastGeneratedPdf){
-      setSubmitNote('Nejdřív zobrazte náhled.', 'err');
-      return;
-    }
-    const submitBtn = document.getElementById('submitBtn');
-    submitBtn.disabled = true;
-    setSubmitNote('Odesílám…', '');
-    try{
-      const { noticeNumber, extrasBlocked, counterBlocked, submittedRecord } = await submitPrestupekToFirestore(docType);
-      if(extrasBlocked){
-        setSubmitNote('✓ Přestupek odeslán, ale BEZ čísla výzvy a jména strážníka — Firestore pravidla je zatím neumožňují uložit. Je potřeba upravit pravidla v konzoli (přidat "officerName" a "noticeNumber" mezi povolená pole).', 'ok');
-        submitBtn.disabled = true;
-        // Krátká pauza, aby uživatel stihl vidět potvrzení, než appka
-        // přeskočí zpět na úvodní obrazovku (nebo na další položku fronty,
-        // je-li appka právě uprostřed kontroly dávky) připravenou na
-        // další přestupek.
-        setTimeout(()=>{ finishBatchItemOrGoHome(); }, 1200);
-      } else if(counterBlocked){
-        setSubmitNote('✓ Přestupek odeslán, ale s náhradním číslem jednacím — Firestore pravidla zatím neumožňují chronologický čítač. Je potřeba upravit pravidla v konzoli (povolit read+write na "meta/noticeCounter").', 'ok');
-        submitBtn.disabled = true;
-        setTimeout(()=>{ finishBatchItemOrGoHome(); }, 1200);
-      } else {
-        submitBtn.disabled = true;
-        let wantsPrint;
-        if(forcePrint){
-          // Tlačítko "Tisk" na Kontrole údajů — záměr tisknout je už jasný
-          // ze samotného tlačítka, appka se tedy neptá znovu a jen krátce
-          // potvrdí, že se odeslání i tisk povedly.
-          setSubmitNote(`✓ Přestupek odeslán do přehledu · Č. j.: ${noticeNumber} · tiskne se výzva…`, 'ok');
-          wantsPrint = true;
-        } else {
-          // Jinak appka nabídne tisk až po odeslání — číslo jednací i
-          // všechna pole už jsou v tuhle chvíli hotová, takže je to
-          // nejpřirozenější okamžik se zeptat.
-          wantsPrint = await askPrintAfterSubmit(`✓ Přestupek odeslán do přehledu<br>Č. j.: ${noticeNumber}`);
-        }
-        if(wantsPrint){
-          await printViaEpson(submittedRecord);
-          setTimeout(()=>{ finishBatchItemOrGoHome(); }, 1200);
-        } else {
-          finishBatchItemOrGoHome();
-        }
-      }
-    }catch(e){
-      console.error('Odeslání do Firestore selhalo:', e);
-      setSubmitNote('Odeslání se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + '). Zkuste to prosím znovu.', 'err');
-      submitBtn.disabled = false;
-    }
-  }
-
-  document.getElementById('submitBtn').addEventListener('click', async ()=>{
-    if(!lastGeneratedPdf){
-      setSubmitNote('Nejdřív zobrazte náhled.', 'err');
-      return;
-    }
-    if(!auth.currentUser){
-      pendingSubmitAfterLogin = true;
-      pendingAutoPrintAfterLogin = false;
-      document.getElementById('loginError').style.display = 'none';
-      show('login');
-      return;
-    }
-    uploadLastPdfToFirestore(lastGeneratedPdf.docType);
-  });
 
   // Tlačítko "Zpět" na Kontrole údajů — jen se vrátí ke kontrole záznamu,
   // stejné chování jako dřívější plovoucí "OK".
@@ -1417,12 +1318,13 @@
       await auth.signInWithEmailAndPassword(email, password);
       document.getElementById('loginPassword').value = '';
       applyOfficerLock();
-      show('result');
       if(pendingSubmitAfterLogin){
         pendingSubmitAfterLogin = false;
-        const forcePrint = pendingAutoPrintAfterLogin;
         pendingAutoPrintAfterLogin = false;
-        uploadLastPdfToFirestore(lastGeneratedPdf ? lastGeneratedPdf.docType : null, forcePrint);
+        show('pdfPreview');
+        submitAndPrintFromPreview();
+      } else {
+        show('result');
       }
     }catch(e){
       errEl.textContent = 'Přihlášení se nezdařilo — zkontrolujte e-mail a heslo.';
@@ -1768,25 +1670,6 @@
         finishCapture(canvas.toDataURL('image/jpeg',0.92));
       };
       img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-
-  // "Přidat foto" — additional photos attached alongside the main plate
-  // photo, e.g. wider shots of the parking situation. Each one is
-  // downscaled immediately so the in-memory list stays light.
-  document.getElementById('addPhotoBtn').addEventListener('click', ()=>{
-    document.getElementById('extraPhotoInput').click();
-  });
-  document.getElementById('extraPhotoInput').addEventListener('change', (e)=>{
-    const file = e.target.files && e.target.files[0];
-    e.target.value = ''; // allow picking/retaking the same photo again
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev)=>{
-      const processed = await preparePhotoForUpload(ev.target.result, 950, 0.68);
-      extraPhotos.push(processed);
-      renderExtraPhotosStrip();
     };
     reader.readAsDataURL(file);
   });
@@ -2629,9 +2512,6 @@
     }
     document.getElementById('savedNote').style.display = 'none';
     lastGeneratedPdf = null;
-    extraPhotos = [];
-    renderExtraPhotosStrip();
-    document.getElementById('submitBtn').disabled = true;
     setSubmitNote('', '');
   }
 
@@ -3352,8 +3232,9 @@
       const offenseCitation = selectedOffense ? offenseFullCitation(selectedOffense) : null;
 
       const mainPhotoDataUrl = capturedDataUrl ? await preparePhotoForUpload(capturedDataUrl, 950, 0.68) : null;
-      // Main plate photo first, then any extra photos in the order they were added.
-      const allPhotoDataUrls = [mainPhotoDataUrl, ...extraPhotos].filter(Boolean);
+      // Další fotky (kromě téhle hlavní z rozpoznání SPZ) se teď přidávají
+      // až na Kontrole údajů tlačítkem "Přidej foto".
+      const allPhotoDataUrls = [mainPhotoDataUrl].filter(Boolean);
 
       // Cache the record so "Odeslat přestupek" can upload exactly what's
       // about to be shown for review, without recomputing anything.
@@ -3367,7 +3248,6 @@
         lng: lastResolvedGps ? lastResolvedGps.lng : null,
         photos: allPhotoDataUrls.map(u => u.split(',')[1])
       };
-      document.getElementById('submitBtn').disabled = false;
       setSubmitNote('', '');
 
       // Show the notice for review before anything is sent — plain HTML,
@@ -3589,9 +3469,6 @@
     row.style.display = 'block';
     document.getElementById('savedNote').style.display = 'none';
     lastGeneratedPdf = null;
-    extraPhotos = [];
-    renderExtraPhotosStrip();
-    document.getElementById('submitBtn').disabled = true;
     setSubmitNote('', '');
 
     show('result');
