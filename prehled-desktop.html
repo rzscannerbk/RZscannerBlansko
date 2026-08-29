@@ -481,6 +481,21 @@
   .prikaz-box .field{margin-bottom:12px;}
   .prikaz-row2{display:flex; gap:12px;}
   .prikaz-row2 .field{flex:1; min-width:0;}
+  .prikaz-row-address{display:flex; gap:12px;}
+  .prikaz-street-field{flex:4; min-width:0;}
+  .prikaz-housenum-field{flex:1; min-width:0;}
+  .prikaz-suggest-wrap{position:relative;}
+  .prikaz-suggest-list{
+    display:none; position:absolute; left:0; right:0; top:100%; margin-top:4px; z-index:30;
+    background:var(--asphalt-4); border:1px solid var(--line); border-radius:9px;
+    max-height:190px; overflow-y:auto; box-shadow:0 10px 26px rgba(0,0,0,.45);
+  }
+  .prikaz-suggest-list.open{display:block;}
+  .prikaz-suggest-item{padding:10px 12px; font-size:13px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--line);}
+  .prikaz-suggest-item:last-child{border-bottom:none;}
+  .prikaz-suggest-item:hover{background:var(--asphalt-3);}
+  .prikaz-suggest-item .sub{display:block; font-size:11px; color:var(--muted); margin-top:1px;}
+  .prikaz-box input:disabled{opacity:.4;}
   .prikaz-pachatel-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 10px;}
   .prikaz-pachatel-head span{font-size:12.5px; color:var(--muted); font-weight:600;}
   .prikaz-scan-btn{
@@ -680,6 +695,22 @@
         <div class="field">
           <label for="prikazDoklad">Číslo dokladu</label>
           <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
+        </div>
+      </div>
+      <div class="field prikaz-suggest-wrap">
+        <label for="prikazMesto">Adresa trvalého pobytu</label>
+        <input type="text" id="prikazMesto" autocomplete="off" placeholder="PSČ, obec">
+        <div class="prikaz-suggest-list" id="prikazMestoSuggest"></div>
+      </div>
+      <div class="prikaz-row-address">
+        <div class="field prikaz-suggest-wrap prikaz-street-field">
+          <label for="prikazUlice">Ulice</label>
+          <input type="text" id="prikazUlice" autocomplete="off" disabled placeholder="nejdřív vyber obec">
+          <div class="prikaz-suggest-list" id="prikazUliceSuggest"></div>
+        </div>
+        <div class="field prikaz-housenum-field">
+          <label for="prikazCisloDomu">Č. p.</label>
+          <input type="text" id="prikazCisloDomu" inputmode="numeric" autocomplete="off">
         </div>
       </div>
       <div class="prikaz-note" id="prikazScanNote" style="display:none;"></div>
@@ -1290,7 +1321,10 @@
     if(pachatel && pachatel.cisloDokladu){
       body += docxLabelValuePara('Číslo OP:', pachatel.cisloDokladu, { size: 20, spacingAfter: 200, valueBold: true });
     }
-    body += docxPara('Bydliště: ', { size: 20, spacingAfter: 200 });
+    const bydlisteAdresa = pachatel && (pachatel.ulice || pachatel.cisloDomu || pachatel.mesto)
+      ? [[pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' '), pachatel.mesto].filter(Boolean).join(', ')
+      : '';
+    body += docxPara('Bydliště: ' + bydlisteAdresa, { size: 20, spacingAfter: 200 });
 
     body += docxPara('Popis skutku:', { bold: true, size: 20, spacingAfter: 100 });
     let gpsPart = '';
@@ -1482,19 +1516,22 @@
     const shortRef = parsedCitation ? parsedCitation.ref : offenseCitation;
     const loc = addressForLetter(record.address);
 
-    // Jméno/příjmení a datum narození se vyplní, pokud je appka má
-    // z dialogu "Pachatel" (ručně zadané nebo ze skenu OP) — adresu
-    // (ulice/PSČ/obec) appka nezná (na OP se skenuje jen MRZ zóna, ta
-    // adresu neobsahuje), takže tam zůstává placeholder k ručnímu dopsání.
+    // Jméno/příjmení, datum narození a adresa se vyplní, pokud je appka
+    // má z dialogu "Pachatel" (ručně zadané, ze skenu OP, nebo z
+    // našeptávače Mapy.com u adresy trvalého pobytu) — co chybí, zůstává
+    // jako placeholder k ručnímu dopsání.
     const pachatelJmeno = pachatel ? [pachatel.jmeno, pachatel.prijmeni].filter(Boolean).join(' ') : '';
+    const pachatelUlice = pachatel && (pachatel.ulice || pachatel.cisloDomu)
+      ? [pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' ')
+      : '';
     const headerLeft = [
       pachatelJmeno || '[DOPLNIT JMÉNO A PŘÍJMENÍ]',
       '',
       (pachatel && pachatel.datumNarozeni) || '[DOPLNIT DATUM NAROZENÍ]',
       '',
-      '[DOPLNIT ULICE A ČP]',
+      pachatelUlice || '[DOPLNIT ULICE A ČP]',
       '',
-      '[DOPLNIT PSČ A OBEC]'
+      (pachatel && pachatel.mesto) || '[DOPLNIT PSČ A OBEC]'
     ];
 
     let body = '';
@@ -3133,6 +3170,12 @@
     document.getElementById('prikazPrijmeni').value = '';
     document.getElementById('prikazNarozeni').value = '';
     document.getElementById('prikazDoklad').value = '';
+    document.getElementById('prikazMesto').value = '';
+    document.getElementById('prikazUlice').value = '';
+    document.getElementById('prikazUlice').disabled = true;
+    document.getElementById('prikazUlice').placeholder = 'nejdřív vyber obec';
+    document.getElementById('prikazCisloDomu').value = '';
+    selectedMesto = null;
     const note = document.getElementById('prikazScanNote');
     note.style.display = 'none';
     note.style.color = '';
@@ -3143,6 +3186,126 @@
 
   document.getElementById('prikazCancelBtn').addEventListener('click', ()=>{
     document.getElementById('prikazOverlay').classList.remove('open');
+  });
+
+  // ---------- Adresa trvalého pobytu — Mapy.com Suggest API ----------
+  // Zdarma 250 000 kreditů/měsíc (adresní dotaz = 4 kredity → 62 500
+  // dotazů/měsíc zdarma), pro objem téhle appky by to reálně mělo vyjít
+  // na 0 Kč. Klíč se získá zdarma na developer.mapy.com — DOPLŇ HO SEM:
+  const MAPY_API_KEY = 'DOPLNIT_API_KLIC';
+
+  let selectedMesto = null; // { name, position: {lon, lat} }
+
+  function debounce(fn, wait){
+    let t;
+    return function(...args){
+      clearTimeout(t);
+      t = setTimeout(()=> fn.apply(this, args), wait);
+    };
+  }
+
+  // allowEmpty: použije se pro "sonda má obec vůbec ulice?" dotaz, kde
+  // se schválně posílá prázdný query jen s filtrem locality+type.
+  async function mapySuggest(query, types, opts){
+    opts = opts || {};
+    if(!opts.allowEmpty && (!query || query.trim().length < 2)) return [];
+    const params = new URLSearchParams();
+    params.set('apikey', MAPY_API_KEY);
+    params.set('query', query || '');
+    params.set('lang', 'cs');
+    params.set('limit', String(opts.limit || 8));
+    types.forEach(t => params.append('type', t));
+    if(opts.locality) params.append('locality', opts.locality);
+    try{
+      const res = await fetch('https://api.mapy.com/v1/suggest?' + params.toString());
+      if(!res.ok) return [];
+      const data = await res.json();
+      return data.items || [];
+    }catch(e){
+      console.error('Mapy.com suggest selhal:', e);
+      return [];
+    }
+  }
+
+  function renderSuggestList(listEl, items, onPick){
+    listEl.innerHTML = '';
+    if(!items.length){ listEl.classList.remove('open'); return; }
+    items.forEach(item=>{
+      const row = document.createElement('div');
+      row.className = 'prikaz-suggest-item';
+      row.innerHTML = escapeHtml(item.name) + (item.location ? '<span class="sub">' + escapeHtml(item.location) + '</span>' : '');
+      // mousedown (ne click) + preventDefault, ať input nestihne ztratit
+      // fokus (blur) dřív, než se výběr zpracuje.
+      row.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        onPick(item);
+        listEl.classList.remove('open');
+        listEl.innerHTML = '';
+      });
+      listEl.appendChild(row);
+    });
+    listEl.classList.add('open');
+  }
+
+  const prikazMestoInput = document.getElementById('prikazMesto');
+  const prikazMestoList = document.getElementById('prikazMestoSuggest');
+  const prikazUliceInput = document.getElementById('prikazUlice');
+  const prikazUliceList = document.getElementById('prikazUliceSuggest');
+  const prikazCisloDomuInput = document.getElementById('prikazCisloDomu');
+
+  async function checkStreetsAndAdvance(){
+    prikazUliceInput.value = '';
+    prikazCisloDomuInput.value = '';
+    if(!selectedMesto) return;
+    prikazUliceInput.disabled = true;
+    prikazUliceInput.placeholder = 'Zjišťuji…';
+    const streets = await mapySuggest('', ['regional.street'], { locality: selectedMesto.name, limit: 1, allowEmpty: true });
+    if(streets.length){
+      prikazUliceInput.disabled = false;
+      prikazUliceInput.placeholder = '';
+      prikazUliceInput.focus();
+    } else {
+      // Obec bez pojmenovaných ulic (běžné u menších obcí) — appka
+      // políčko Ulice zašedne a nechá nedostupné, skočí rovnou na číslo.
+      prikazUliceInput.disabled = true;
+      prikazUliceInput.placeholder = 'obec nemá ulice';
+      prikazCisloDomuInput.focus();
+    }
+  }
+
+  const debouncedMestoSearch = debounce(async ()=>{
+    const q = prikazMestoInput.value.trim();
+    if(q.length < 2){ prikazMestoList.classList.remove('open'); return; }
+    const items = await mapySuggest(q, ['regional.municipality', 'regional.municipality_part'], { limit: 8 });
+    renderSuggestList(prikazMestoList, items, (item)=>{
+      selectedMesto = { name: item.name, position: item.position };
+      prikazMestoInput.value = (item.zip ? item.zip + ' ' : '') + item.name;
+      checkStreetsAndAdvance();
+    });
+  }, 400);
+  prikazMestoInput.addEventListener('input', ()=>{
+    // Ruční editace po výběru zneplatní dřívější volbu, ať appka
+    // nenaváže hledání ulic na obec, kterou uživatel mezitím přepsal.
+    selectedMesto = null;
+    debouncedMestoSearch();
+  });
+  prikazMestoInput.addEventListener('blur', ()=>{
+    setTimeout(()=> prikazMestoList.classList.remove('open'), 150);
+  });
+
+  const debouncedUliceSearch = debounce(async ()=>{
+    if(!selectedMesto || prikazUliceInput.disabled) return;
+    const q = prikazUliceInput.value.trim();
+    if(q.length < 2){ prikazUliceList.classList.remove('open'); return; }
+    const items = await mapySuggest(q, ['regional.street'], { locality: selectedMesto.name, limit: 8 });
+    renderSuggestList(prikazUliceList, items, (item)=>{
+      prikazUliceInput.value = item.name;
+      prikazCisloDomuInput.focus();
+    });
+  }, 400);
+  prikazUliceInput.addEventListener('input', debouncedUliceSearch);
+  prikazUliceInput.addEventListener('blur', ()=>{
+    setTimeout(()=> prikazUliceList.classList.remove('open'), 150);
   });
 
   // Pole "Datum narození" — při psaní jen číslice (DDMMRRRR, bez teček,
@@ -3196,11 +3359,17 @@
     document.getElementById('prikazNarozeni').value = formatNarozeniDots(document.getElementById('prikazNarozeni').value);
     const narozeni = document.getElementById('prikazNarozeni').value.trim();
     const doklad = document.getElementById('prikazDoklad').value.trim();
-    const pachatel = (jmeno || prijmeni || narozeni || doklad) ? {
+    const mesto = document.getElementById('prikazMesto').value.trim();
+    const ulice = document.getElementById('prikazUlice').value.trim();
+    const cisloDomu = document.getElementById('prikazCisloDomu').value.trim();
+    const pachatel = (jmeno || prijmeni || narozeni || doklad || mesto) ? {
       jmeno: jmeno || null,
       prijmeni: prijmeni || null,
       datumNarozeni: narozeni || null,
-      cisloDokladu: doklad || null
+      cisloDokladu: doklad || null,
+      mesto: mesto || null,
+      ulice: ulice || null,
+      cisloDomu: cisloDomu || null
     } : null;
 
     const btn = document.getElementById('prikazConfirmBtn');
