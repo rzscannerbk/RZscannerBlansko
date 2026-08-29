@@ -3135,6 +3135,7 @@
     document.getElementById('prikazDoklad').value = '';
     const note = document.getElementById('prikazScanNote');
     note.style.display = 'none';
+    note.style.color = '';
     note.textContent = '';
     document.getElementById('prikazOverlay').classList.add('open');
     (prikazMode === 'prikaz' ? document.getElementById('prikazCastka') : document.getElementById('prikazJmeno')).focus();
@@ -3163,6 +3164,15 @@
     const record = currentDetailRecord;
     if(!record || record.resolved) return;
     const castkaRaw = document.getElementById('prikazCastka').value.trim();
+
+    // U příkazu na místě je částka povinná — bez ní appka neuloží a
+    // rovnou skočí na pole (s číselnou klávesnicí, díky inputmode).
+    if(prikazMode === 'prikaz' && castkaRaw === ''){
+      const castkaInput = document.getElementById('prikazCastka');
+      castkaInput.focus();
+      return;
+    }
+
     const jmeno = document.getElementById('prikazJmeno').value.trim();
     const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
     const narozeni = document.getElementById('prikazNarozeni').value.trim();
@@ -3384,7 +3394,8 @@
 
       const note = document.getElementById('prikazScanNote');
       note.style.display = 'block';
-      note.textContent = 'Údaje načtené ze skenu — OCR není 100% spolehlivé, prosím zkontroluj správnost všech polí před uložením.';
+      note.style.color = 'var(--bad)';
+      note.textContent = 'Zkontroluj správnost všech polí.';
 
       closeMrzCamera();
     }catch(e){
