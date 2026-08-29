@@ -171,7 +171,7 @@
   }
   .prikaz-scan-btn:active{border-color:#2F6FED; color:#2F6FED;}
   .prikaz-scan-btn .cam-icon{font-size:16px; line-height:1;}
-  .prikaz-note{font-size:11.5px; color:var(--faint); margin:-4px 0 14px; line-height:1.4;}
+  .prikaz-note{font-size:11.5px; color:var(--faint); margin:-4px 0 14px; line-height:1.4; text-align:center;}
   .prikaz-actions{display:flex; gap:12px; margin-top:6px;}
 
   /* ---------- Kamera pro sken MRZ (strojově čitelné zóny) občanky ---------- */
@@ -402,11 +402,11 @@
         <div class="prikaz-row2">
           <div class="field">
             <label for="prikazNarozeni">Datum narození</label>
-            <input type="text" id="prikazNarozeni" placeholder="DD.MM.RRRR" autocomplete="off">
+            <input type="text" id="prikazNarozeni" inputmode="numeric" placeholder="DDMMRRRR" maxlength="10" autocomplete="off">
           </div>
           <div class="field">
             <label for="prikazDoklad">Číslo dokladu</label>
-            <input type="text" id="prikazDoklad" autocomplete="off">
+            <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
           </div>
         </div>
         <div class="prikaz-note" id="prikazScanNote" style="display:none;"></div>
@@ -1902,6 +1902,22 @@
     document.getElementById('prikazOverlay').classList.remove('open');
   });
 
+  // Pole "Datum narození" — při psaní jen číslice (DDMMRRRR, bez teček,
+  // ať se to na numerické klávesnici píše plynule), po opuštění pole se
+  // přeformátuje na obvyklý zápis s tečkami (DD.MM.RRRR).
+  function formatNarozeniDots(raw){
+    const digits = (raw || '').replace(/\D/g, '');
+    if(digits.length !== 8) return raw;
+    return digits.slice(0,2) + '.' + digits.slice(2,4) + '.' + digits.slice(4,8);
+  }
+  const prikazNarozeniInput = document.getElementById('prikazNarozeni');
+  prikazNarozeniInput.addEventListener('input', (e)=>{
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
+  });
+  prikazNarozeniInput.addEventListener('blur', (e)=>{
+    e.target.value = formatNarozeniDots(e.target.value);
+  });
+
   // Jméno souboru: "Výzva/Oznámení RR_MM_DD - číslo přestupku - spz - ulice"
   // (datum = den vygenerování dokumentu, ne den přestupku).
   function buildDocFilename(prefix, record){
@@ -1932,6 +1948,9 @@
 
     const jmeno = document.getElementById('prikazJmeno').value.trim();
     const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
+    // Pro jistotu naformátovat i tady (kdyby náhodou nestihlo proběhnout
+    // "blur" pole datum narození dřív, než appka hodnotu přečte).
+    document.getElementById('prikazNarozeni').value = formatNarozeniDots(document.getElementById('prikazNarozeni').value);
     const narozeni = document.getElementById('prikazNarozeni').value.trim();
     const doklad = document.getElementById('prikazDoklad').value.trim();
     const pachatel = (jmeno || prijmeni || narozeni || doklad) ? {
@@ -2046,6 +2065,13 @@
 
   // Rozparsuje syrový OCR text z PŘEDNÍ strany občanky — viz podrobný
   // komentář u stejné funkce v prehled-desktop.html.
+  // OCR čte jméno/příjmení z OP velkými písmeny (JURAČKA) — appka je pro
+  // pole formuláře převede na "První velké, zbytek malá" (Juračka).
+  function toNameCase(s){
+    if(!s) return s;
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  }
+
   function parseOpFront(rawText){
     console.log('OP OCR raw text:', rawText); // pro ladění při špatném rozpoznání — viz DevTools konzole
 
@@ -2125,8 +2151,8 @@
         return;
       }
 
-      if(parsed.jmeno) document.getElementById('prikazJmeno').value = parsed.jmeno;
-      if(parsed.prijmeni) document.getElementById('prikazPrijmeni').value = parsed.prijmeni;
+      if(parsed.jmeno) document.getElementById('prikazJmeno').value = toNameCase(parsed.jmeno);
+      if(parsed.prijmeni) document.getElementById('prikazPrijmeni').value = toNameCase(parsed.prijmeni);
       if(parsed.datumNarozeni) document.getElementById('prikazNarozeni').value = parsed.datumNarozeni;
       if(parsed.cisloDokladu) document.getElementById('prikazDoklad').value = parsed.cisloDokladu;
 
