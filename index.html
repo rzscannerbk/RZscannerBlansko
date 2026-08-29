@@ -201,6 +201,20 @@
   .preview-add-photo-btn:active{transform:scale(.93);}
   .preview-add-photo-wrap{display:flex; flex-direction:column; align-items:center; gap:5px; flex:0 0 auto;}
   .preview-add-photo-wrap span{font-size:9.5px; color:var(--muted); font-family:'Roboto Mono',monospace; white-space:nowrap;}
+
+  .pdf-preview-actions{
+    display:flex; align-items:flex-start; justify-content:center; gap:12px;
+    padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px); flex-shrink:0;
+  }
+  .pdf-preview-actions > .btn, .pdf-preview-actions > .pdf-preview-submit-col{
+    flex:1 1 0; min-width:0;
+  }
+  .pdf-preview-submit-col{display:flex; flex-direction:column;}
+  .pdf-preview-submit-col .btn{width:100%;}
+  #pdfPreviewPrinterNote{
+    text-align:center; font-size:10.5px; color:var(--muted); margin-top:5px;
+    font-family:'Roboto Mono',monospace;
+  }
   .extra-photos-strip{display:flex; gap:10px; overflow-x:auto; margin-top:12px; padding-bottom:2px; justify-content:center;}
   .extra-photo-thumb{position:relative; flex:0 0 auto; width:64px; height:64px; border-radius:10px; overflow:hidden; border:1px solid var(--line);}
   .extra-photo-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
@@ -371,11 +385,17 @@
   .notice-footer .authority-phone{font-size:9.5px; color:#999; margin-top:2px;}
   .notice-footer .generated-by{font-size:9.5px; color:#aaa; margin-top:10px;}
 
-  .photo-toggle-row{text-align:center; margin-top:20px;}
-  .notice-photo-wrap{margin-top:14px; display:none; max-width:440px; margin-left:auto; margin-right:auto;}
-  .notice-photo-wrap.open{display:block;}
-  .notice-photo-wrap img{width:100%; border-radius:12px; display:block; margin-bottom:12px;}
-  .notice-photo-wrap img:last-child{margin-bottom:0;}
+  .pdf-preview-thumbs{display:flex; gap:10px; overflow-x:auto; padding-bottom:4px; margin-bottom:16px;}
+  .pdf-preview-thumbs:empty{display:none; margin-bottom:0;}
+  .pdf-preview-thumb{position:relative; flex:0 0 auto; width:78px; height:78px; border-radius:10px; overflow:hidden;}
+  .pdf-preview-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .pdf-preview-thumb-remove{
+    position:absolute; top:3px; right:3px; width:22px; height:22px; border-radius:50%;
+    background:rgba(20,20,20,.75); border:1.5px solid rgba(255,255,255,.6); color:#fff;
+    font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; padding:0;
+  }
+  .pdf-preview-thumb-remove:active{transform:scale(.9);}
 
   /* ---------- HISTORY ---------- */
   #historyScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
@@ -813,15 +833,10 @@
       <span style="font-family:'Roboto Mono',monospace; color:var(--muted);">KONTROLA ÚDAJŮ</span>
     </div>
     <div class="pdf-preview-scroll">
+      <div class="pdf-preview-thumbs" id="pdfPreviewThumbs"></div>
       <div id="noticeCardContainer"></div>
-      <div class="photo-toggle-row">
-        <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
-      </div>
-      <div class="notice-photo-wrap" id="photoWrap">
-        <div id="photoGallery"></div>
-      </div>
     </div>
-    <div class="btn-row" style="padding:14px 14px calc(env(safe-area-inset-bottom,0px) + 14px); margin:0; gap:12px; flex-shrink:0; align-items:flex-start;">
+    <div class="pdf-preview-actions">
       <button class="btn btn-primary" id="pdfPreviewBackBtn">Zpět</button>
       <div class="preview-add-photo-wrap">
         <button class="preview-add-photo-btn" id="pdfPreviewAddPhotoBtn" type="button" title="Přidej foto">
@@ -830,9 +845,9 @@
         <span>Přidej foto</span>
       </div>
       <input type="file" id="pdfPreviewPhotoInput" accept="image/*" capture="environment" style="display:none;">
-      <div style="flex:1; display:flex; flex-direction:column;">
-        <button class="btn btn-submit" id="pdfPreviewPrintBtn" style="width:100%;">Odeslat</button>
-        <div id="pdfPreviewPrinterNote" style="display:none; text-align:center; font-size:10.5px; color:var(--muted); margin-top:5px; font-family:'Roboto Mono',monospace;"></div>
+      <div class="pdf-preview-submit-col">
+        <button class="btn btn-submit" id="pdfPreviewPrintBtn">Odeslat</button>
+        <div id="pdfPreviewPrinterNote" style="display:none;"></div>
       </div>
     </div>
   </div>
@@ -1237,6 +1252,7 @@
   // Tlačítko "Zpět" na Kontrole údajů — jen se vrátí ke kontrole záznamu,
   // stejné chování jako dřívější plovoucí "OK".
   document.getElementById('pdfPreviewBackBtn').addEventListener('click', ()=>{
+    stopPdfPreviewPrinterPoll();
     document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
     const note = document.getElementById('savedNote');
     note.style.display = 'block';
@@ -1257,6 +1273,9 @@
       return;
     }
     if(!lastGeneratedPdf.photos || lastGeneratedPdf.photos.length === 0){
+      // Zastavit průběžné sledování tiskárny, ať ho za pár vteřin
+      // nepřepíše zpátky na "připoj tiskárnu"/schová docela.
+      stopPdfPreviewPrinterPoll();
       const note = document.getElementById('pdfPreviewPrinterNote');
       note.style.display = 'block';
       note.style.color = 'var(--bad)';
@@ -1320,6 +1339,7 @@
     const btn = document.getElementById('pdfPreviewPrintBtn');
     const note = document.getElementById('pdfPreviewPrinterNote');
     const originalText = btn.textContent;
+    stopPdfPreviewPrinterPoll();
     btn.disabled = true;
     btn.textContent = 'Odesílám…';
     note.style.color = '';
@@ -1347,9 +1367,11 @@
       note.style.display = 'block';
       note.style.color = 'var(--bad)';
       note.textContent = 'Odeslání se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
-    }finally{
-      btn.disabled = false;
       btn.textContent = originalText;
+      // Znovu zkontroluje tiskárnu a obnoví průběžné sledování — tlačítko
+      // tak zůstane zašedlé/aktivní podle skutečného stavu, ne prostě
+      // vždycky odemčené po chybě.
+      updatePrintButtonAvailability();
     }
   }
 
@@ -3164,23 +3186,27 @@
     });
   }
 
-  // Zkontroluje tiskárnu hned při otevření Kontroly údajů — jen jako
-  // informativní nápovědu pod tlačítkem "Odeslat" (appka teď žádnou
-  // fotku/tisk předem neblokuje kvůli tiskárně; když je při kliknutí na
-  // "Odeslat" nedostupná, appka to řeší dialogem — viz
-  // showPrinterOfflineDialog — ne zašedlým tlačítkem předem).
+  // Zkontroluje tiskárnu při otevření Kontroly údajů a pak dál na pozadí
+  // v pravidelných intervalech, dokud je appka na téhle obrazovce —
+  // tlačítko "Odeslat" zůstává zašedlé, dokud appka nepotvrdí, že se na
+  // tiskárnu dá přes síť dosáhnout, a samo se aktivuje, jakmile ji
+  // strážník připojí (bez nutnosti cokoliv ručně obnovovat).
+  let pdfPreviewPrinterPollTimer = null;
+  function stopPdfPreviewPrinterPoll(){
+    if(pdfPreviewPrinterPollTimer){ clearInterval(pdfPreviewPrinterPollTimer); pdfPreviewPrinterPollTimer = null; }
+  }
   async function updatePrintButtonAvailability(){
+    const btn = document.getElementById('pdfPreviewPrintBtn');
     const note = document.getElementById('pdfPreviewPrinterNote');
-    note.textContent = '🖨 Kontroluji tiskárnu…';
-    note.style.color = '';
-    note.style.display = 'block';
-    const reachable = await pingPrinter();
-    if(reachable){
-      note.style.display = 'none';
-    } else {
-      note.textContent = 'připoj tiskárnu (appka to zkusí znovu při odeslání)';
-      note.style.display = 'block';
+    async function check(){
+      const reachable = await pingPrinter();
+      btn.disabled = !reachable;
+      note.textContent = 'připoj tiskárnu';
+      note.style.display = reachable ? 'none' : 'block';
     }
+    await check();
+    stopPdfPreviewPrinterPoll();
+    pdfPreviewPrinterPollTimer = setInterval(check, 3000);
   }
 
   function askPrintAfterSubmit(successText){
@@ -3346,38 +3372,40 @@
     }
   });
 
-  // Znovu vykreslí galerii fotek na Kontrole údajů z lastGeneratedPdf.photos
-  // (base64 bez "data:" prefixu, vždy JPEG — viz preparePhotoForUpload).
-  // Volá se jak při prvním sestavení náhledu, tak po přidání další fotky
-  // tlačítkem "Přidej foto" přímo na téhle obrazovce.
+  // Znovu vykreslí pruh náhledů fotek nahoře na Kontrole údajů z
+  // lastGeneratedPdf.photos (base64 bez "data:" prefixu, vždy JPEG — viz
+  // preparePhotoForUpload). Volá se jak při prvním sestavení náhledu, tak
+  // po přidání/smazání fotky přímo na téhle obrazovce. Každý náhled má
+  // tlačítko × pro smazání — hlavně pro případ, že by součet fotek
+  // překročil limit Firestore (~1 MB), ať jde snadno nějakou odebrat.
   function refreshPdfPreviewGallery(){
     const photos = (lastGeneratedPdf && lastGeneratedPdf.photos) || [];
-    const gallery = document.getElementById('photoGallery');
-    const photoWrap = document.getElementById('photoWrap');
-    const photoToggleBtn = document.getElementById('photoToggleBtn');
-    photoWrap.classList.remove('open');
-    gallery.innerHTML = '';
-    if(photos.length){
-      photos.forEach(b64=>{
-        const img = document.createElement('img');
-        img.src = 'data:image/jpeg;base64,' + b64;
-        img.alt = 'Fotodokumentace';
-        gallery.appendChild(img);
-      });
-      photoToggleBtn.textContent = 'Foto (' + photos.length + ')';
-      photoToggleBtn.style.display = 'inline-block';
-      // Rovnou zobrazit, ať je vidět bez nutnosti klepnout na tlačítko —
-      // appka je má stejně už lokálně na telefonu, žádné dotahování z
-      // internetu tu není potřeba.
-      photoWrap.classList.add('open');
-    } else {
-      photoToggleBtn.style.display = 'none';
-    }
-  }
+    const thumbs = document.getElementById('pdfPreviewThumbs');
+    thumbs.innerHTML = '';
+    photos.forEach((b64, idx)=>{
+      const item = document.createElement('div');
+      item.className = 'pdf-preview-thumb';
 
-  document.getElementById('photoToggleBtn').addEventListener('click', ()=>{
-    document.getElementById('photoWrap').classList.toggle('open');
-  });
+      const img = document.createElement('img');
+      img.src = 'data:image/jpeg;base64,' + b64;
+      img.alt = 'Fotodokumentace';
+      item.appendChild(img);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'pdf-preview-thumb-remove';
+      removeBtn.title = 'Smazat fotku';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        lastGeneratedPdf.photos.splice(idx, 1);
+        refreshPdfPreviewGallery();
+      });
+      item.appendChild(removeBtn);
+
+      thumbs.appendChild(item);
+    });
+  }
 
   // "Přidej foto" přímo na Kontrole údajů — pro případ, že hlavní fotka
   // chybí nebo je potřeba doplnit další záběr, aniž by se appka musela
@@ -3398,11 +3426,11 @@
       lastGeneratedPdf.photos.push(processed.split(',')[1]);
       refreshPdfPreviewGallery();
       // Fotka teď existuje, takže případná hláška "Doplň fotodokumentaci"
-      // z předchozího pokusu o odeslání už neplatí.
+      // (a s ní zastavené sledování tiskárny) už neplatí — obnovit.
       const note = document.getElementById('pdfPreviewPrinterNote');
       if(note.textContent === 'Doplň fotodokumentaci.'){
-        note.style.display = 'none';
         note.style.color = '';
+        updatePrintButtonAvailability();
       }
     };
     reader.readAsDataURL(file);
