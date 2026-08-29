@@ -154,12 +154,16 @@
   #resultScreen{padding:0;}
   .result-scroll{
     flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
-    padding:calc(env(safe-area-inset-top,0px) + 20px) 20px 20px;
+    padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 100px);
   }
   .result-footer{
-    flex-shrink:0; background:var(--asphalt); border-top:1px solid var(--line);
-    padding:10px 20px calc(env(safe-area-inset-bottom,0px) + 10px);
+    position:fixed; left:0; right:0; bottom:0; z-index:20;
+    padding:0 20px calc(env(safe-area-inset-bottom,0px) + 20px);
+    background:transparent; border-top:none; pointer-events:none;
+    display:flex; flex-direction:column; align-items:center;
   }
+  .result-footer > *{pointer-events:auto;}
+  #makePdfBtn{box-shadow:0 10px 28px rgba(0,0,0,.5);}
   .result-header{display:flex; align-items:center; justify-content:center; margin-bottom:18px; position:relative;}
   .result-header h2{font-family:'Oswald',sans-serif; font-size:15px; letter-spacing:.1em; text-transform:uppercase; margin:0; color:var(--muted); font-weight:600;}
   .result-close{
@@ -340,7 +344,7 @@
     border-bottom:1px solid var(--line);
   }
   .pdf-preview-top span{font-size:18px !important; letter-spacing:.08em;}
-  .pdf-preview-scroll{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:22px 16px 22px;}
+  .pdf-preview-scroll{flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; background:#3a3a3a; padding:calc(env(safe-area-inset-top,0px) + 22px) 16px 22px;}
   .float-fab{
     position:fixed; right:20px; bottom:calc(env(safe-area-inset-bottom,0px) + 20px); z-index:20;
     width:64px; height:64px; border-radius:50%; border:none; background:var(--amber);
@@ -827,9 +831,6 @@
 
   <!-- PREVIEW -->
   <div id="pdfPreviewScreen" class="screen">
-    <div class="pdf-preview-top">
-      <span style="font-family:'Roboto Mono',monospace; color:var(--muted);">KONTROLA ÚDAJŮ</span>
-    </div>
     <div class="pdf-preview-scroll">
       <div class="pdf-preview-thumbs" id="pdfPreviewThumbs"></div>
       <div id="noticeCardContainer"></div>
