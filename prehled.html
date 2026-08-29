@@ -183,11 +183,11 @@
   .mrz-camera-frame{position:relative; width:100%; max-width:520px; border-radius:14px; overflow:hidden; background:#000;}
   .mrz-camera-frame video{width:100%; display:block;}
   .mrz-camera-guide{
-    position:absolute; left:5%; right:5%; bottom:8%; height:24%;
-    border:2px dashed rgba(255,255,255,.85); border-radius:6px; pointer-events:none;
+    position:absolute; left:4%; right:4%; top:8%; bottom:8%;
+    border:2px dashed rgba(255,255,255,.85); border-radius:10px; pointer-events:none;
   }
   .mrz-camera-guide::after{
-    content:'Zarovnej sem 2–3 řádky písmen dole na občance'; position:absolute; left:0; right:0; top:-24px;
+    content:'Zarovnej sem celou přední stranu občanky'; position:absolute; left:0; right:0; top:-24px;
     text-align:center; color:#fff; font-size:11.5px; text-shadow:0 1px 3px rgba(0,0,0,.8);
   }
   .mrz-camera-actions{display:flex; gap:14px; margin-top:16px; width:100%; max-width:520px;}
@@ -2013,76 +2013,66 @@
   document.getElementById('prikazScanBtn').addEventListener('click', openMrzCamera);
   document.getElementById('mrzCancelBtn').addEventListener('click', closeMrzCamera);
 
-  // Kontrolní číslice MRZ (ICAO 9303): váhy 7-3-1 se opakují, '<' = 0,
-  // číslice = hodnota, písmena A-Z = 10-35, součet mod 10.
-  function mrzCheckDigit(str){
-    const weights = [7,3,1];
-    let sum = 0;
-    for(let i=0;i<str.length;i++){
-      const c = str[i];
-      let v;
-      if(c === '<') v = 0;
-      else if(c >= '0' && c <= '9') v = c.charCodeAt(0) - 48;
-      else if(c >= 'A' && c <= 'Z') v = c.charCodeAt(0) - 55;
-      else v = 0;
-      sum += v * weights[i % 3];
-    }
-    return sum % 10;
+  // Mapa pro odstranění diakritiky BEZ změny délky řetězce — viz
+  // podrobný komentář u stejné logiky v prehled-desktop.html.
+  const OP_DIACRITICS_MAP = {
+    'Á':'A','Č':'C','Ď':'D','É':'E','Ě':'E','Í':'I','Ň':'N','Ó':'O','Ř':'R','Š':'S','Ť':'T','Ú':'U','Ů':'U','Ý':'Y','Ž':'Z',
+    'á':'a','č':'c','ď':'d','é':'e','ě':'e','í':'i','ň':'n','ó':'o','ř':'r','š':'s','ť':'t','ú':'u','ů':'u','ý':'y','ž':'z'
+  };
+  function stripDiacriticsSameLength(s){
+    return s.split('').map(ch => OP_DIACRITICS_MAP[ch] || ch).join('');
   }
 
-  // YYMMDD → DD.MM.RRRR, se stejnou "pivot" logikou pro dvojciferný rok
-  // jako jinde v appce.
-  function mrzDateToCz(yymmdd){
-    if(!/^\d{6}$/.test(yymmdd)) return null;
-    const yy = yymmdd.slice(0,2), mm = yymmdd.slice(2,4), dd = yymmdd.slice(4,6);
-    const currentYY = new Date().getFullYear() % 100;
-    const century = (Number(yy) > currentYY + 5) ? '19' : '20';
-    return dd + '.' + mm + '.' + century + yy;
+  function captureAfterLabel(rawText, normText, labelRegex, valueRegex, windowLen){
+    const m = labelRegex.exec(normText);
+    if(!m) return null;
+    const start = m.index + m[0].length;
+    const windowNorm = normText.slice(start, start + (windowLen || 40));
+    const windowOrig = rawText.slice(start, start + (windowLen || 40));
+    const vm = valueRegex.exec(windowNorm);
+    if(!vm) return null;
+    return windowOrig.slice(vm.index, vm.index + vm[0].length).trim();
   }
 
-  // Rozparsuje syrový OCR text na jméno/příjmení/datum narození/číslo
-  // dokladu — viz podrobný komentář u stejné funkce v prehled-desktop.html.
-  // Řádek se jmény se pozná podle absence číslic (ne jen podle "<<" —
-  // to se objevuje i v paddingu za číslem dokladu).
-  function parseMrz(rawText){
-    console.log('MRZ OCR raw text:', rawText); // pro ladění při špatném rozpoznání — viz DevTools konzole
+  // Rozparsuje syrový OCR text z PŘEDNÍ strany občanky — viz podrobný
+  // komentář u stejné funkce v prehled-desktop.html.
+  function parseOpFront(rawText){
+    console.log('OP OCR raw text:', rawText); // pro ladění při špatném rozpoznání — viz DevTools konzole
 
-    const lines = rawText
-      .toUpperCase()
-      .split('\n')
-      .map(l => l.replace(/[^A-Z0-9<]/g, ''))
-      .filter(l => l.length >= 20 && /^[A-Z0-9<]+$/.test(l));
+    const norm = stripDiacriticsSameLength(rawText).toUpperCase();
 
-    if(lines.length < 2) return null;
+    const cisloDokladu = captureAfterLabel(
+      rawText, norm,
+      /CISLO\s*DOKLADU|DOCUMENT\s*NO\.?/,
+      /\d{6,9}/,
+      30
+    );
+    const datumNarozeniRaw = captureAfterLabel(
+      rawText, norm,
+      /DATUM\s*NAROZENI|DATE\s*OF\s*BIRTH/,
+      /\d{1,2}\s*\.\s*\d{1,2}\s*\.\s*\d{4}/,
+      40
+    );
+    const prijmeni = captureAfterLabel(
+      rawText, norm,
+      /PRIJMENI\s*\/?\s*SURNAME/,
+      /[A-Z][A-Z\-]{1,25}/,
+      40
+    );
+    const jmeno = captureAfterLabel(
+      rawText, norm,
+      /JMENO\s*\/?\s*GIVEN\s*NAMES?/,
+      /[A-Z][A-Z\-]{1,25}/,
+      40
+    );
 
-    const noDigitLines = lines.filter(l => !/\d/.test(l));
-    const nameLine = noDigitLines.find(l => l.includes('<<')) || noDigitLines[0] || null;
-    const dataLines = lines.filter(l => l !== nameLine);
-
-    let jmeno = '', prijmeni = '';
-    if(nameLine){
-      const parts = nameLine.split('<<');
-      prijmeni = (parts[0] || '').replace(/</g, ' ').trim();
-      jmeno = (parts[1] || '').replace(/</g, ' ').trim().split(' ')[0] || '';
-    }
-
-    let cisloDokladu = null, datumNarozeni = null, checksOk = true, foundAnyDate = false;
-    for(const line of dataLines){
-      const m = line.match(/(\d{6})(\d)/);
-      if(m && !foundAnyDate){
-        foundAnyDate = true;
-        checksOk = checksOk && (String(mrzCheckDigit(m[1])) === m[2]);
-        datumNarozeni = mrzDateToCz(m[1]);
-      }
-    }
-    if(dataLines.length){
-      const first = dataLines[0];
-      const m2 = first.match(/^[A-Z]{1,2}[A-Z]{3}([A-Z0-9]{6,9})/);
-      cisloDokladu = (m2 ? m2[1] : first.slice(5, 14)).replace(/<+$/, '') || null;
-    }
-
-    if(!nameLine && !cisloDokladu && !datumNarozeni) return null;
-    return { jmeno, prijmeni, datumNarozeni, cisloDokladu, checksOk };
+    if(!cisloDokladu && !datumNarozeniRaw && !prijmeni && !jmeno) return null;
+    return {
+      jmeno: jmeno || null,
+      prijmeni: prijmeni || null,
+      datumNarozeni: datumNarozeniRaw ? datumNarozeniRaw.replace(/\s+/g, '') : null,
+      cisloDokladu: cisloDokladu || null
+    };
   }
 
   document.getElementById('mrzShootBtn').addEventListener('click', async ()=>{
@@ -2099,38 +2089,40 @@
     try{
       await loadTesseract();
 
+      // Ořízne se stejná oblast, kterou appka vizuálně ukazuje jako
+      // vodítko (skoro celý snímek s malým okrajem) — souřadnice musí
+      // odpovídat .mrz-camera-guide v CSS výše.
       const vw = video.videoWidth, vh = video.videoHeight;
-      const cropX = Math.round(vw * 0.05);
-      const cropW = Math.round(vw * 0.90);
-      const cropY = Math.round(vh * 0.68);
-      const cropH = Math.round(vh * 0.24);
+      const cropX = Math.round(vw * 0.04);
+      const cropW = Math.round(vw * 0.92);
+      const cropY = Math.round(vh * 0.08);
+      const cropH = Math.round(vh * 0.84);
 
       const canvas = document.createElement('canvas');
       canvas.width = cropW; canvas.height = cropH;
       canvas.getContext('2d').drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
       status.textContent = 'Rozpoznávám text…';
-      const result = await window.Tesseract.recognize(canvas, 'eng', {
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<'
-      });
+      // Čeština (ne MRZ zóna) — běžný tiskový font s diakritikou, proto
+      // český jazykový model a bez omezení na znakovou sadu.
+      const result = await window.Tesseract.recognize(canvas, 'ces');
       const rawText = (result && result.data && result.data.text) || '';
-      const parsed = parseMrz(rawText);
+      const parsed = parseOpFront(rawText);
 
-      // Jméno/příjmení/datum narození se ukázaly v praxi nespolehlivé
-      // (OCR obecného modelu na fontu MRZ zóny často chybuje) — appka
-      // proto teď z fotky bere jen číslo dokladu, které se dosud čte
-      // spolehlivě, a zbytek nechává na ručním vyplnění.
-      if(!parsed || !parsed.cisloDokladu){
-        status.textContent = 'Nepodařilo se rozpoznat číslo dokladu — zkus to znovu, blíž a rovněji na doklad.';
+      if(!parsed){
+        status.textContent = 'Nepodařilo se rozpoznat údaje — zkus to znovu, blíž, rovněji a s lepším osvětlením.';
         shootBtn.disabled = false;
         return;
       }
 
-      document.getElementById('prikazDoklad').value = parsed.cisloDokladu;
+      if(parsed.jmeno) document.getElementById('prikazJmeno').value = parsed.jmeno;
+      if(parsed.prijmeni) document.getElementById('prikazPrijmeni').value = parsed.prijmeni;
+      if(parsed.datumNarozeni) document.getElementById('prikazNarozeni').value = parsed.datumNarozeni;
+      if(parsed.cisloDokladu) document.getElementById('prikazDoklad').value = parsed.cisloDokladu;
 
       const note = document.getElementById('prikazScanNote');
       note.style.display = 'block';
-      note.textContent = 'Číslo dokladu načteno ze skenu — zkontroluj prosím správnost. Jméno, příjmení a datum narození appka zatím nespolehlivě rozpoznává, doplň je prosím ručně.';
+      note.textContent = 'Údaje načtené ze skenu — OCR není 100% spolehlivé, prosím zkontroluj správnost všech polí před uložením.';
 
       closeMrzCamera();
     }catch(e){
