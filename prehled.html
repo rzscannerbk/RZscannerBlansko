@@ -1965,9 +1965,17 @@
 
   // allowEmpty: použije se pro "sonda má obec vůbec ulice?" dotaz, kde
   // se schválně posílá prázdný query jen s filtrem locality+type.
+  // allowEmpty: použije se pro "sonda má obec vůbec ulice?" dotaz, kde
+  // se schválně posílá prázdný query jen s filtrem locality+type.
+  // Vrací { items, error } — error je čitelný text k zobrazení přímo
+  // v seznamu nabídek (na mobilu nejde snadno do DevTools), ať jde
+  // chybu poznat i jen podle screenshotu z appky.
   async function mapySuggest(query, types, opts){
     opts = opts || {};
-    if(!opts.allowEmpty && (!query || query.trim().length < 2)) return [];
+    if(!opts.allowEmpty && (!query || query.trim().length < 2)) return { items: [], error: null };
+    if(!MAPY_API_KEY || MAPY_API_KEY === 'DOPLNIT_API_KLIC'){
+      return { items: [], error: 'Chybí API klíč Mapy.com v kódu appky.' };
+    }
     const params = new URLSearchParams();
     params.set('apikey', MAPY_API_KEY);
     params.set('query', query || '');
@@ -1975,19 +1983,34 @@
     params.set('limit', String(opts.limit || 8));
     types.forEach(t => params.append('type', t));
     if(opts.locality) params.append('locality', opts.locality);
+    const url = 'https://api.mapy.com/v1/suggest?' + params.toString();
     try{
-      const res = await fetch('https://api.mapy.com/v1/suggest?' + params.toString());
-      if(!res.ok) return [];
+      const res = await fetch(url);
+      if(!res.ok){
+        let bodyText = '';
+        try{ bodyText = await res.text(); }catch(e2){}
+        console.error('Mapy.com suggest HTTP chyba', res.status, bodyText, url);
+        return { items: [], error: 'Mapy.com chyba ' + res.status + (bodyText ? ': ' + bodyText.slice(0, 140) : '') };
+      }
       const data = await res.json();
-      return data.items || [];
+      return { items: data.items || [], error: null };
     }catch(e){
-      console.error('Mapy.com suggest selhal:', e);
-      return [];
+      console.error('Mapy.com suggest selhal:', e, url);
+      return { items: [], error: 'Síťová/CORS chyba: ' + (e && e.message ? e.message : String(e)) };
     }
   }
 
-  function renderSuggestList(listEl, items, onPick){
+  function renderSuggestList(listEl, items, onPick, errorMsg){
     listEl.innerHTML = '';
+    if(errorMsg){
+      const row = document.createElement('div');
+      row.className = 'prikaz-suggest-item';
+      row.style.color = 'var(--bad)';
+      row.textContent = '⚠ ' + errorMsg;
+      listEl.appendChild(row);
+      listEl.classList.add('open');
+      return;
+    }
     if(!items.length){ listEl.classList.remove('open'); return; }
     items.forEach(item=>{
       const row = document.createElement('div');
@@ -2016,7 +2039,15 @@
     if(!selectedMesto) return;
     prikazUliceInput.disabled = true;
     prikazUliceInput.placeholder = 'Zjišťuji…';
-    const streets = await mapySuggest('', ['regional.street'], { locality: selectedMesto.name, limit: 1, allowEmpty: true });
+    const { items: streets, error } = await mapySuggest('', ['regional.street'], { locality: selectedMesto.name, limit: 1, allowEmpty: true });
+    if(error){
+      // I při chybě appka radši ulici odemkne (než aby strážníka
+      // natvrdo zablokovala) — jen o chybě dá vědět v seznamu nabídek.
+      prikazUliceInput.disabled = false;
+      prikazUliceInput.placeholder = '';
+      renderSuggestList(prikazUliceList, [], null, error);
+      return;
+    }
     if(streets.length){
       prikazUliceInput.disabled = false;
       prikazUliceInput.placeholder = '';
@@ -2031,12 +2062,12 @@
   const debouncedMestoSearch = debounce(async ()=>{
     const q = prikazMestoInput.value.trim();
     if(q.length < 2){ prikazMestoList.classList.remove('open'); return; }
-    const items = await mapySuggest(q, ['regional.municipality', 'regional.municipality_part'], { limit: 8 });
+    const { items, error } = await mapySuggest(q, ['regional.municipality', 'regional.municipality_part'], { limit: 8 });
     renderSuggestList(prikazMestoList, items, (item)=>{
       selectedMesto = { name: item.name, position: item.position };
       prikazMestoInput.value = (item.zip ? item.zip + ' ' : '') + item.name;
       checkStreetsAndAdvance();
-    });
+    }, error);
   }, 400);
   prikazMestoInput.addEventListener('input', ()=>{
     selectedMesto = null;
@@ -2050,11 +2081,11 @@
     if(!selectedMesto || prikazUliceInput.disabled) return;
     const q = prikazUliceInput.value.trim();
     if(q.length < 2){ prikazUliceList.classList.remove('open'); return; }
-    const items = await mapySuggest(q, ['regional.street'], { locality: selectedMesto.name, limit: 8 });
+    const { items, error } = await mapySuggest(q, ['regional.street'], { locality: selectedMesto.name, limit: 8 });
     renderSuggestList(prikazUliceList, items, (item)=>{
       prikazUliceInput.value = item.name;
       prikazCisloDomuInput.focus();
-    });
+    }, error);
   }, 400);
   prikazUliceInput.addEventListener('input', debouncedUliceSearch);
   prikazUliceInput.addEventListener('blur', ()=>{
