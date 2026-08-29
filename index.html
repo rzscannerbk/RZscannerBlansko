@@ -2115,7 +2115,7 @@
     return !!s && !/^\d+$/.test(String(s).trim());
   }
 
-  async function reverseGeocode(lat, lng){
+  async function reverseGeocodeNominatim(lat, lng){
     try{
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=17&addressdetails=1`,
@@ -2170,6 +2170,53 @@
     if(!pos) return { address: '', lat: null, lng: null };
     const address = await reverseGeocode(pos.lat, pos.lng);
     return { address, lat: pos.lat, lng: pos.lng };
+  }
+
+  // ---------- Přesnější zjištění místa přestupku — Mapy.com reverse geocoding ----------
+  // Zkusí se JAKO PRVNÍ (má lepší data pro české ulice než Nominatim), ale
+  // je to čistě přídavek — když selže (chybějící/neplatný klíč, výpadek
+  // sítě, 403 z účtu Mapy.com apod.), potichu se spadne na osvědčený
+  // Nominatim postup výše (reverseGeocodeNominatim), beze změny dosavadního
+  // chování. Stejný klíč jako v prehled.html/prehled-desktop.html.
+  const MAPY_API_KEY = '91216wSSQ5waRO4ABMmtDldTuDGTPzp8kd8WcsQM';
+
+  // Z položky rgeocode (+ její regionalStructure, což je seznam nadřazených
+  // celků od nejmenšího) vytáhne jméno ulice a obce/místní části.
+  function extractStreetCityFromRgeoEntity(entity){
+    if(!entity) return { street: '', city: '' };
+    const chain = [{ name: entity.name, type: entity.type }, ...(entity.regionalStructure || [])];
+    const streetEntry = chain.find(s => s.type === 'regional.street');
+    const muniPartEntry = chain.find(s => s.type === 'regional.municipality_part');
+    const muniEntry = chain.find(s => s.type === 'regional.municipality');
+    const city = (muniPartEntry && muniPartEntry.name) || (muniEntry && muniEntry.name) || '';
+    return { street: (streetEntry && streetEntry.name) || '', city };
+  }
+
+  async function reverseGeocodeMapy(lat, lng){
+    if(!MAPY_API_KEY || MAPY_API_KEY === 'DOPLNIT_API_KLIC') return '';
+    try{
+      const url = 'https://api.mapy.com/v1/rgeocode?' + new URLSearchParams({
+        lon: String(lng), lat: String(lat), lang: 'cs', apikey: MAPY_API_KEY
+      }).toString();
+      const res = await fetch(url);
+      if(!res.ok) return '';
+      const data = await res.json();
+      const items = data.items || [];
+      if(!items.length) return '';
+      const { street, city } = extractStreetCityFromRgeoEntity(items[0]);
+      if(street) return [street, city].filter(Boolean).join(', ');
+      if(city) return city;
+      return '';
+    }catch(e){
+      console.error('Mapy.com rgeocode selhal (padá se zpět na Nominatim):', e);
+      return '';
+    }
+  }
+
+  async function reverseGeocode(lat, lng){
+    const mapyResult = await reverseGeocodeMapy(lat, lng);
+    if(mapyResult) return mapyResult;
+    return reverseGeocodeNominatim(lat, lng);
   }
 
   // Sends the photo to Plate Recognizer's ALPR API (specialized model trained
