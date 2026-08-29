@@ -3206,7 +3206,7 @@
       const reachable = await pingPrinter();
       printerReady = reachable;
       btn.classList.toggle('btn-dim', !reachable);
-      note.textContent = reachable ? '' : 'připoj tiskárnu (nebo podrž tlačítko 3 s pro odeslání bez tisku)';
+      note.textContent = reachable ? '' : 'připoj tiskárnu';
       note.style.display = reachable ? 'none' : 'block';
     }
     await check();
