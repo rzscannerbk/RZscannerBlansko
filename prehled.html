@@ -168,13 +168,13 @@
   .prikaz-suggest-wrap{position:relative;}
   .prikaz-suggest-list{
     display:none; position:absolute; left:0; right:0; top:100%; margin-top:4px; z-index:30;
-    background:var(--asphalt-4); border:1px solid var(--line); border-radius:9px;
+    background:var(--asphalt-3); border:1px solid var(--line); border-radius:9px;
     max-height:190px; overflow-y:auto; box-shadow:0 10px 26px rgba(0,0,0,.45);
   }
   .prikaz-suggest-list.open{display:block;}
-  .prikaz-suggest-item{padding:11px 12px; font-size:13.5px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--line);}
+  .prikaz-suggest-item{padding:11px 12px; font-size:13.5px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--line); background:var(--asphalt-3);}
   .prikaz-suggest-item:last-child{border-bottom:none;}
-  .prikaz-suggest-item:active{background:var(--asphalt-3);}
+  .prikaz-suggest-item:active{background:var(--line);}
   .prikaz-suggest-item .sub{display:block; font-size:11px; color:var(--muted); margin-top:1px;}
   .prikaz-box input:disabled{opacity:.4;}
   .prikaz-pachatel-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 10px;}
@@ -2037,26 +2037,15 @@
     prikazUliceInput.value = '';
     prikazCisloDomuInput.value = '';
     if(!selectedMesto) return;
-    prikazUliceInput.disabled = true;
-    prikazUliceInput.placeholder = 'Zjišťuji…';
-    const { items: streets, error } = await mapySuggest('', ['regional.street'], { locality: selectedMesto.name, limit: 1, allowEmpty: true });
-    if(error){
-      // I při chybě appka radši ulici odemkne (než aby strážníka
-      // natvrdo zablokovala) — jen o chybě dá vědět v seznamu nabídek.
-      prikazUliceInput.disabled = false;
-      prikazUliceInput.placeholder = '';
-      renderSuggestList(prikazUliceList, [], null, error);
-      return;
-    }
-    if(streets.length){
-      prikazUliceInput.disabled = false;
-      prikazUliceInput.placeholder = '';
-      prikazUliceInput.focus();
-    } else {
-      prikazUliceInput.disabled = true;
-      prikazUliceInput.placeholder = 'obec nemá ulice';
-      prikazCisloDomuInput.focus();
-    }
+    // Mapy.com Suggest je čistě full-textové vyhledávání — na prázdný
+    // dotaz ("má tahle obec vůbec nějaké ulice?") spolehlivě nevrací nic,
+    // takže dřívější "sonda" hlásila "obec nemá ulice" úplně vždy (i pro
+    // Brno). Automatické zjištění tímhle API nejde, tak pole vždy rovnou
+    // odemkneme — strážník ulici buď napíše (funguje běžný, neprázdný
+    // typeahead níž), nebo nechá prázdné, pokud obec fakt ulice nemá.
+    prikazUliceInput.disabled = false;
+    prikazUliceInput.placeholder = 'ulice (nepovinné)';
+    prikazUliceInput.focus();
   }
 
   const debouncedMestoSearch = debounce(async ()=>{
