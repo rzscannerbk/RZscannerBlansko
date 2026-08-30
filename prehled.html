@@ -2097,17 +2097,16 @@
     e.target.value = formatNarozeniDots(e.target.value);
   });
 
-  // Jméno souboru: "Výzva/Oznámení RR_MM_DD - číslo přestupku - spz - ulice"
+  // Jméno souboru: "Výzva/Oznámení rr-mm-dd - číslo přestupku - spz - příjmení"
   // (datum = den vygenerování dokumentu, ne den přestupku).
-  function buildDocFilename(prefix, record){
+  function buildDocFilename(prefix, record, pachatel){
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
-    const rrMmDd = pad(now.getFullYear() % 100) + '_' + pad(now.getMonth() + 1) + '_' + pad(now.getDate());
+    const rrMmDd = pad(now.getFullYear() % 100) + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
     const bits = [];
     if(record.noticeNumber) bits.push(record.noticeNumber);
     if(record.plate) bits.push(record.plate);
-    const street = record.address ? record.address.split(',')[0].trim() : '';
-    if(street) bits.push(street);
+    if(pachatel && pachatel.prijmeni) bits.push(pachatel.prijmeni);
     const name = prefix + ' ' + rrMmDd + (bits.length ? ' - ' + bits.join(' - ') : '');
     return name.replace(/[\\/:*?"<>|]/g, '') + '.docx';
   }
@@ -2157,12 +2156,12 @@
         await markResolved(record, 'prikaz', extra);
       } else if(prikazMode === 'vyzva'){
         document.getElementById('prikazOverlay').classList.remove('open');
-        const filename = buildDocFilename('Výzva', record);
+        const filename = buildDocFilename('Výzva', record, pachatel);
         const opened = await exportVyzva(record, pachatel, filename);
         if(opened) await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
       } else if(prikazMode === 'oznameni'){
         document.getElementById('prikazOverlay').classList.remove('open');
-        const filename = buildDocFilename('Oznámení', record);
+        const filename = buildDocFilename('Oznámení', record, pachatel);
         const opened = await exportOznameni(record, pachatel, filename);
         if(opened) await markResolved(record, 'oznameni', pachatel ? { pachatel } : undefined);
       }
@@ -2256,6 +2255,24 @@
     if(!s) return s;
     return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   }
+
+  // Živé psaní do Jméno/Příjmení — první písmeno se samo přehodí na
+  // velké, zbytek se nechává tak, jak strážník napsal (na rozdíl od
+  // toNameCase výše, která se používá po skenu OP a shazuje zbytek
+  // na malá písmena — u ručního psaní by to bylo otravné).
+  function capitalizeFirstLetterLive(input){
+    input.addEventListener('input', ()=>{
+      const v = input.value;
+      if(!v) return;
+      const capitalized = v.charAt(0).toUpperCase() + v.slice(1);
+      if(capitalized === v) return;
+      const pos = input.selectionStart;
+      input.value = capitalized;
+      input.setSelectionRange(pos, pos);
+    });
+  }
+  capitalizeFirstLetterLive(document.getElementById('prikazJmeno'));
+  capitalizeFirstLetterLive(document.getElementById('prikazPrijmeni'));
 
   function parseOpFront(rawText){
     console.log('OP OCR raw text:', rawText); // pro ladění při špatném rozpoznání — viz DevTools konzole
