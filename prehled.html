@@ -2137,14 +2137,23 @@
   // Malá prodleva mezi opuštěním jednoho pole a zaostřením dalšího — na
   // iOS Safari se bez ní umí klávesnice krátce zavřít a znovu otevřít
   // (probliknutí), místo aby plynule zůstala nahoře.
+  //
+  // U kalendáře/selectu appka NEvolá showPicker() automaticky — ten
+  // spolehlivě funguje jen v rámci téhož gesta, které appku k přeskoku
+  // přimělo, a jakékoliv zpoždění (i jen tenhle setTimeout) to gesto
+  // zruší. Výsledkem bylo, že pole jen krátce bliklo a samo doplnilo
+  // dnešní datum / výchozí hodnotu, aniž by si uživatel opravdu vybral.
+  // Appka teď takové pole jen zaostří (zvýrazní se jako aktuální) a
+  // otevření kolečka nechá na klepnutí.
   function focusField(el){
     if(!el) return;
-    setTimeout(()=>{
+    const isNativePicker = el.tagName === 'SELECT' ||
+      (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'time'));
+    if(isNativePicker){
       el.focus();
-      if(typeof el.showPicker === 'function'){
-        try{ el.showPicker(); }catch(e){}
-      }
-    }, 60);
+      return;
+    }
+    setTimeout(()=>{ el.focus(); }, 60);
   }
 
   // Klávesa Return/Next na klávesnici u textových/číselných polí dělá
