@@ -179,6 +179,37 @@
   .prikaz-suggest-item:last-child{border-bottom:none;}
   .prikaz-suggest-item:active{background:var(--line);}
   .prikaz-suggest-item .sub{display:block; font-size:11px; color:var(--muted); margin-top:1px;}
+
+  /* ---------- Vlastní kalendář pro Datum narození / Dostavit se dne ----------
+     Nahrazuje nativní <input type="date">: appka si sama vykresluje
+     měsíc/rok (přes select, kvůli rychlému skoku i desítky let zpátky) a
+     mřížku dnů, takže se neotevírá žádná OS klávesnice ani nativní
+     kalendář, které mohl vytlačit posun layoutu (viz setAppHeight výš). */
+  .prikaz-datepicker-wrap{position:relative;}
+  .js-date-field{cursor:pointer;}
+  .prikaz-datepicker-panel{
+    display:none; position:absolute; left:0; top:100%; margin-top:6px; z-index:40;
+    width:252px; max-width:calc(100vw - 72px);
+    background:var(--asphalt-3); border:1px solid var(--line); border-radius:12px;
+    padding:10px; box-shadow:0 10px 26px rgba(0,0,0,.45);
+  }
+  .prikaz-datepicker-panel.open{display:block;}
+  .prikaz-datepicker-head{display:flex; gap:6px; margin-bottom:8px;}
+  .prikaz-datepicker-head select{
+    flex:1; min-width:0; background:var(--asphalt-2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); font-size:12.5px; font-family:'Inter',sans-serif; padding:6px 3px; outline:none;
+  }
+  .prikaz-datepicker-head select option{background:var(--asphalt-2); color:var(--text);}
+  .prikaz-datepicker-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:3px; text-align:center;}
+  .prikaz-datepicker-dow{font-size:10px; color:var(--muted); font-family:'Roboto Mono',monospace; padding:4px 0;}
+  .prikaz-datepicker-day{font-size:13px; color:var(--text); padding:7px 0; border-radius:7px; cursor:pointer; background:transparent;}
+  .prikaz-datepicker-day:active{background:var(--line);}
+  .prikaz-datepicker-day.is-today{border:1px solid var(--amber);}
+  .prikaz-datepicker-day.is-selected{background:var(--amber); color:var(--ink); font-weight:700;}
+  .prikaz-datepicker-day.is-empty{visibility:hidden; cursor:default;}
+  .prikaz-datepicker-foot{display:flex; justify-content:space-between; margin-top:8px;}
+  .prikaz-datepicker-foot button{background:transparent; border:none; color:var(--muted); font-size:12px; font-family:'Roboto Mono',monospace; cursor:pointer; padding:4px 6px;}
+  .prikaz-datepicker-foot button:active{color:var(--text);}
   .prikaz-box input:disabled{opacity:.4;}
   .prikaz-pachatel-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 10px;}
   .prikaz-pachatel-head span{font-size:12.5px; color:var(--muted); font-weight:600;}
@@ -420,9 +451,10 @@
           </div>
         </div>
         <div class="prikaz-row2">
-          <div class="field">
+          <div class="field prikaz-datepicker-wrap">
             <label for="prikazNarozeni">Datum narození</label>
-            <input type="date" id="prikazNarozeni">
+            <input type="text" id="prikazNarozeni" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
+            <div class="prikaz-datepicker-panel" id="prikazNarozeniPanel"></div>
           </div>
           <div class="field prikaz-suggest-wrap">
             <label for="prikazDoklad">Číslo dokladu</label>
@@ -455,9 +487,10 @@
           </div>
         </div>
 
-        <div class="field" id="prikazVyzvaDatumField" style="display:none;">
+        <div class="field prikaz-datepicker-wrap" id="prikazVyzvaDatumField" style="display:none;">
           <label for="prikazVyzvaDatum">Dostavit se dne</label>
-          <input type="date" id="prikazVyzvaDatum">
+          <input type="text" id="prikazVyzvaDatum" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
+          <div class="prikaz-datepicker-panel" id="prikazVyzvaDatumPanel"></div>
         </div>
         <div class="prikaz-row2" id="prikazVyzvaCasField" style="display:none;">
           <div class="field">
@@ -2132,6 +2165,90 @@
   const prikazJmenoList = document.getElementById('prikazJmenoSuggest');
   const prikazPrijmeniInput = document.getElementById('prikazPrijmeni');
   const prikazPrijmeniList = document.getElementById('prikazPrijmeniSuggest');
+  // ---------- Vlastní kalendář (Datum narození / Dostavit se dne) ----------
+  // Kompletně ve vlastní režii appky (žádný nativní <input type="date">),
+  // takže se nespoléhá na to, jak si který Android/iOS s posunem layoutu
+  // poradí — appka si sama vykresluje mřížku dnů a čeká na klik.
+  const DP_MONTHS_CS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+  const DP_DOW_CS = ['Po','Út','St','Čt','Pá','So','Ne'];
+
+  function initDatePicker(input, panel, opts){
+    opts = opts || {};
+    const today = new Date();
+    const minYear = opts.minYear || (today.getFullYear() - 100);
+    const maxYear = opts.maxYear || (today.getFullYear() + 1);
+    let viewYear = today.getFullYear();
+    let viewMonth = today.getMonth();
+
+    function pad2(n){ return String(n).padStart(2, '0'); }
+    function isoOf(y, m, d){ return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+    function todayIso(){ return isoOf(today.getFullYear(), today.getMonth(), today.getDate()); }
+
+    function render(){
+      const selectedIso = input.value || '';
+      let html = '<div class="prikaz-datepicker-head">';
+      html += '<select class="dp-month">';
+      for(let m = 0; m < 12; m++){
+        html += '<option value="' + m + '"' + (m === viewMonth ? ' selected' : '') + '>' + DP_MONTHS_CS[m] + '</option>';
+      }
+      html += '</select><select class="dp-year">';
+      for(let y = maxYear; y >= minYear; y--){
+        html += '<option value="' + y + '"' + (y === viewYear ? ' selected' : '') + '>' + y + '</option>';
+      }
+      html += '</select></div><div class="prikaz-datepicker-grid">';
+      DP_DOW_CS.forEach(d => { html += '<div class="prikaz-datepicker-dow">' + d + '</div>'; });
+
+      // getDay(): 0=neděle..6=sobota; appka chce pondělí jako první sloupec.
+      const leadingEmpty = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+      const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      for(let i = 0; i < leadingEmpty; i++){ html += '<div class="prikaz-datepicker-day is-empty"></div>'; }
+      for(let d = 1; d <= daysInMonth; d++){
+        const iso = isoOf(viewYear, viewMonth, d);
+        let cls = 'prikaz-datepicker-day';
+        if(iso === todayIso()) cls += ' is-today';
+        if(iso === selectedIso) cls += ' is-selected';
+        html += '<div class="' + cls + '" data-iso="' + iso + '">' + d + '</div>';
+      }
+      html += '</div><div class="prikaz-datepicker-foot"><button type="button" class="dp-today">Dnes</button><button type="button" class="dp-clear">Vymazat</button></div>';
+      panel.innerHTML = html;
+
+      panel.querySelector('.dp-month').addEventListener('change', e => { viewMonth = Number(e.target.value); render(); });
+      panel.querySelector('.dp-year').addEventListener('change', e => { viewYear = Number(e.target.value); render(); });
+      panel.querySelectorAll('.prikaz-datepicker-day[data-iso]').forEach(el => {
+        el.addEventListener('click', () => pick(el.getAttribute('data-iso')));
+      });
+      panel.querySelector('.dp-today').addEventListener('click', () => pick(todayIso()));
+      panel.querySelector('.dp-clear').addEventListener('click', () => {
+        input.value = '';
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+      });
+    }
+
+    function pick(iso){
+      input.value = iso;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+    }
+    function onOutside(e){ if(!panel.contains(e.target) && e.target !== input) close(); }
+    function open(){
+      const base = input.value ? input.value.split('-').map(Number) : null;
+      viewYear = base ? base[0] : today.getFullYear();
+      viewMonth = base ? base[1] - 1 : today.getMonth();
+      render();
+      panel.classList.add('open');
+      setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
+    }
+    function close(){
+      panel.classList.remove('open');
+      document.removeEventListener('mousedown', onOutside);
+    }
+    input.addEventListener('click', () => {
+      if(panel.classList.contains('open')) close(); else open();
+    });
+    return { open, close };
+  }
+
   const prikazNarozeniInput = document.getElementById('prikazNarozeni');
   const prikazDokladInput = document.getElementById('prikazDoklad');
   const prikazDokladList = document.getElementById('prikazDokladSuggest');
@@ -2144,6 +2261,10 @@
   const prikazPscInput = document.getElementById('prikazPsc');
   const prikazPscList = document.getElementById('prikazPscSuggest');
   const prikazVyzvaDatumInput = document.getElementById('prikazVyzvaDatum');
+  initDatePicker(prikazNarozeniInput, document.getElementById('prikazNarozeniPanel'));
+  initDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'), {
+    minYear: new Date().getFullYear(), maxYear: new Date().getFullYear() + 1
+  });
   const prikazVyzvaCasOdInput = document.getElementById('prikazVyzvaCasOd');
   const prikazVyzvaCasDoInput = document.getElementById('prikazVyzvaCasDo');
 
@@ -2161,7 +2282,8 @@
   function focusField(el){
     if(!el) return;
     const isNativePicker = el.tagName === 'SELECT' ||
-      (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'time'));
+      (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'time')) ||
+      (el.classList && el.classList.contains('js-date-field'));
     if(isNativePicker){
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
