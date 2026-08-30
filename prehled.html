@@ -158,7 +158,8 @@
   /* ---------- Modál "Příkaz na místě" (částka + pachatel) ---------- */
   .prikaz-box{
     background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
-    padding:22px 20px; max-width:400px; width:100%; text-align:left; max-height:86vh; overflow-y:auto;
+    padding:22px 20px; max-width:400px; width:100%; text-align:left; max-height:86vh;
+    overflow-y:auto; overflow-x:hidden;
   }
   .prikaz-box h3{font-size:16px; margin:0 0 16px; color:var(--text); text-align:center;}
   .prikaz-box .field{margin-bottom:12px;}
@@ -2015,8 +2016,8 @@
     document.getElementById('prikazVyzvaDatumField').style.display = showVyzvaTermin ? '' : 'none';
     document.getElementById('prikazVyzvaCasField').style.display = showVyzvaTermin ? '' : 'none';
     document.getElementById('prikazVyzvaDatum').value = '';
-    document.getElementById('prikazVyzvaCasOd').value = '';
-    document.getElementById('prikazVyzvaCasDo').value = '';
+    document.getElementById('prikazVyzvaCasOd').value = '08:00';
+    document.getElementById('prikazVyzvaCasDo').value = '16:00';
     const note = document.getElementById('prikazScanNote');
     note.style.display = 'none';
     note.style.color = '';
@@ -2114,20 +2115,48 @@
   const prikazUliceInput = document.getElementById('prikazUlice');
   const prikazUliceList = document.getElementById('prikazUliceSuggest');
   const prikazCisloDomuInput = document.getElementById('prikazCisloDomu');
+  const prikazPscInput = document.getElementById('prikazPsc');
+  const prikazVyzvaDatumInput = document.getElementById('prikazVyzvaDatum');
+  const prikazVyzvaCasOdInput = document.getElementById('prikazVyzvaCasOd');
+  const prikazVyzvaCasDoInput = document.getElementById('prikazVyzvaCasDo');
+
+  // Malá prodleva mezi opuštěním jednoho pole a zaostřením dalšího — na
+  // iOS Safari se bez ní umí klávesnice krátce zavřít a znovu otevřít
+  // (probliknutí), místo aby plynule zůstala nahoře.
+  function focusField(el){
+    if(!el) return;
+    setTimeout(()=>{
+      el.focus();
+      if(typeof el.showPicker === 'function'){
+        try{ el.showPicker(); }catch(e){}
+      }
+    }, 60);
+  }
+
+  // Klávesa Return/Next na klávesnici u textových/číselných polí dělá
+  // totéž, jako by se z pole odešlo (blur) — sjednocuje to "potvrdím" a
+  // "klepnu jinam" na jedno chování, viz blur listenery níž u
+  // jednotlivých polí.
+  function advanceOnEnter(input){
+    input.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+    });
+  }
 
   async function checkStreetsAndAdvance(){
     prikazUliceInput.value = '';
     prikazCisloDomuInput.value = '';
-    if(!selectedMesto) return;
     // Mapy.com Suggest je čistě full-textové vyhledávání — na prázdný
     // dotaz ("má tahle obec vůbec nějaké ulice?") spolehlivě nevrací nic,
     // takže dřívější "sonda" hlásila "obec nemá ulice" úplně vždy (i pro
     // Brno). Automatické zjištění tímhle API nejde, tak pole vždy rovnou
     // odemkneme — strážník ulici buď napíše (funguje běžný, neprázdný
-    // typeahead níž), nebo nechá prázdné, pokud obec fakt ulice nemá.
+    // typeahead níž, akorát bez lokálního omezení na obec, pokud ji
+    // vyplnil ručně bez kliknutí na nabídku), nebo nechá prázdné, pokud
+    // obec fakt ulice nemá.
     prikazUliceInput.disabled = false;
     prikazUliceInput.placeholder = 'ulice (nepovinné)';
-    prikazUliceInput.focus();
+    focusField(prikazUliceInput);
   }
 
   const debouncedMestoSearch = debounce(async ()=>{
@@ -2141,15 +2170,23 @@
       // do pole obce) — pole zůstává editovatelné, kdyby Mapy.com PSČ
       // pro danou obec/část nevrátilo nebo bylo potřeba ho opravit.
       if(item.zip) document.getElementById('prikazPsc').value = item.zip;
-      checkStreetsAndAdvance();
+      focusField(prikazPscInput);
     }, error);
   }, 400);
+  advanceOnEnter(prikazMestoInput);
   prikazMestoInput.addEventListener('input', ()=>{
     selectedMesto = null;
     debouncedMestoSearch();
   });
   prikazMestoInput.addEventListener('blur', ()=>{
     setTimeout(()=> prikazMestoList.classList.remove('open'), 150);
+    if(prikazMestoInput.value.trim()) focusField(prikazPscInput);
+  });
+
+  // PSČ → Ulice (odemkne pole, viz checkStreetsAndAdvance výš).
+  advanceOnEnter(prikazPscInput);
+  prikazPscInput.addEventListener('blur', ()=>{
+    if(prikazPscInput.value.trim()) checkStreetsAndAdvance();
   });
 
   const debouncedUliceSearch = debounce(async ()=>{
@@ -2159,12 +2196,32 @@
     const { items, error } = await mapySuggest(q, ['regional.street'], { locality: selectedMesto.name, limit: 8 });
     renderSuggestList(prikazUliceList, items, (item)=>{
       prikazUliceInput.value = item.name;
-      prikazCisloDomuInput.focus();
+      focusField(prikazCisloDomuInput);
     }, error);
   }, 400);
+  advanceOnEnter(prikazUliceInput);
   prikazUliceInput.addEventListener('input', debouncedUliceSearch);
   prikazUliceInput.addEventListener('blur', ()=>{
     setTimeout(()=> prikazUliceList.classList.remove('open'), 150);
+    if(!prikazUliceInput.disabled && prikazUliceInput.value.trim()) focusField(prikazCisloDomuInput);
+  });
+
+  // Č.p. → Datum dostavení se (jen u Výzvy — jinde je pole skryté, takže
+  // se prostě zavře klávesnice a strážník si dialog jen vizuálně zkontroluje).
+  advanceOnEnter(prikazCisloDomuInput);
+  prikazCisloDomuInput.addEventListener('blur', ()=>{
+    if(prikazMode === 'vyzva' && prikazCisloDomuInput.value.trim()) focusField(prikazVyzvaDatumInput);
+  });
+
+  // Datum → Čas od → Čas do (Čas od/do mají už přednastavené 8:00/16:00 —
+  // viz reset v openPrikazModal — takže tady stačí jen zvolit, a je to
+  // poslední krok řetězce, po němž appka nechává jen vizuální kontrolu
+  // celého dialogu.
+  prikazVyzvaDatumInput.addEventListener('change', ()=>{
+    if(prikazVyzvaDatumInput.value) focusField(prikazVyzvaCasOdInput);
+  });
+  prikazVyzvaCasOdInput.addEventListener('change', ()=>{
+    if(prikazVyzvaCasOdInput.value) focusField(prikazVyzvaCasDoInput);
   });
 
   // Pole "Datum narození" — při psaní jen číslice (DDMMRRRR, bez teček,
