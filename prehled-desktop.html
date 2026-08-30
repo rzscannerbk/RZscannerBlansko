@@ -733,6 +733,22 @@
           <input type="text" id="prikazCisloDomu" inputmode="numeric" autocomplete="off">
         </div>
       </div>
+
+      <div class="field" id="prikazVyzvaDatumField" style="display:none;">
+        <label for="prikazVyzvaDatum">Dostavit se dne</label>
+        <input type="date" id="prikazVyzvaDatum">
+      </div>
+      <div class="prikaz-row2" id="prikazVyzvaCasField" style="display:none;">
+        <div class="field">
+          <label for="prikazVyzvaCasOd">Čas od</label>
+          <input type="time" id="prikazVyzvaCasOd">
+        </div>
+        <div class="field">
+          <label for="prikazVyzvaCasDo">Čas do</label>
+          <input type="time" id="prikazVyzvaCasDo">
+        </div>
+      </div>
+
       <div class="prikaz-note" id="prikazScanNote" style="display:none;"></div>
 
       <div class="prikaz-actions">
@@ -1220,6 +1236,21 @@
     return '<w:p><w:pPr>' + pPr + '</w:pPr>' + r + '</w:p>';
   }
 
+  // Jako docxPara, ale odstavec může mít víc úseků s různým tučným
+  // stavem (např. jen datum/čas nebo jen SPZ tučně uprostřed běžné věty).
+  // segments: [{ text, bold }, ...] — velikost/zarovnání se bere z opts
+  // společně pro celý odstavec, bold se řídí jednotlivými segmenty.
+  function docxParaRuns(segments, opts){
+    opts = opts || {};
+    let pPr = '';
+    if(opts.align) pPr += '<w:jc w:val="' + opts.align + '"/>';
+    if(opts.pageBreakBefore) pPr += '<w:pageBreakBefore/>';
+    pPr += '<w:spacing w:before="' + (opts.spacingBefore != null ? opts.spacingBefore : 0) +
+           '" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 0) + '"/>';
+    const runs = segments.map(seg => docxRun(seg.text, { size: opts.size || 20, bold: !!seg.bold })).join('');
+    return '<w:p><w:pPr>' + pPr + '</w:pPr>' + runs + '</w:p>';
+  }
+
   // Odstavec "štítek" + skutečný tabulátor na pevnou pozici + "hodnota" —
   // na rozdíl od ručně vyťukaných mezer se tak hodnoty u různě dlouhých
   // štítků (RZ vs. tovární značka/barva) zarovnají přesně pod sebe.
@@ -1533,7 +1564,7 @@
     return { city: 'Blansko', locationPhrase: 'na ulici ' + first };
   }
 
-  async function buildVyzvaDopisDocx(record, pachatel){
+  async function buildVyzvaDopisDocx(record, pachatel, dostaveniTermin){
     const offenseLabel = record.offenseLabel || '';
     const offenseCitation = record.offenseCitation || '';
     const parsedCitation = parseOffenseCitation(offenseCitation);
@@ -1542,8 +1573,22 @@
     // poskládá se náhradní text stejným způsobem jako u Oznámení.
     const offenseFullText = record.mpmUdalostText ||
       ('Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích – ' + offenseCitation + ' – ' + offenseLabel);
+    // Konkrétní popis přestupku je poslední úsek stromové cesty (za
+    // posledním " - ") — přesně ta část, co se má v dopise zvýraznit
+    // tučně, zbytek (obecná citace zákona) zůstává normálním písmem.
+    const lastDashIdx = offenseFullText.lastIndexOf(' - ');
+    const offensePrefix = lastDashIdx !== -1 ? offenseFullText.slice(0, lastDashIdx + 3) : '';
+    const offenseBoldPart = lastDashIdx !== -1 ? offenseFullText.slice(lastDashIdx + 3) : offenseFullText;
     const shortRef = parsedCitation ? parsedCitation.ref : offenseCitation;
     const loc = addressForLetter(record.address);
+
+    // Termín dostavení se (datum + časové rozmezí) — appka ho teď bere
+    // z pole v modálu "Výzva" (kalendář + čas od/do). Když by přesto
+    // chybělo (starší volání funkce, chyba v UI), zůstává placeholder
+    // k ručnímu dopsání, stejně jako dřív.
+    const dostaveniDatumCasText = (dostaveniTermin && dostaveniTermin.datum)
+      ? (dostaveniTermin.datum + (dostaveniTermin.casOd ? (' v čase ' + dostaveniTermin.casOd + (dostaveniTermin.casDo ? ' - ' + dostaveniTermin.casDo : '') + ' hod') : ''))
+      : '[DOPLNIT DATUM A ČAS]';
 
     // Jméno/příjmení, datum narození a adresa se vyplní, pokud je appka
     // má z dialogu "Pachatel" (ručně zadané, ze skenu OP, nebo z
@@ -1553,6 +1598,8 @@
     const pachatelUlice = pachatel && (pachatel.ulice || pachatel.cisloDomu)
       ? [pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' ')
       : '';
+    // PSČ + obec vedle sebe (appka posílá "PSČ obec" tak, jak ho vybral
+    // z Mapy.com Suggest — pachatel.mesto tak už tenhle formát má).
     const headerLeft = [
       pachatelJmeno || '[DOPLNIT JMÉNO A PŘÍJMENÍ]',
       '',
@@ -1579,13 +1626,21 @@
     body += docxPara('', { size: 20 });
     body += docxPara('VÝZVA', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
 
-    const text = 'Žádáme Vás, abyste se dostavil(a) dne [DOPLNIT DATUM A ČAS] na Městskou policii Blansko, Sadová č. 2, ' +
-      'k podání vysvětlení podle § 11 odst. 1 zák. č. 553/91 Sb., o obecní policii, ve znění pozdějších předpisů, ve věci objasnění ' +
-      'skutečností důležitých pro odhalení pachatele přestupku ' + offenseFullText + ', zjištěného dne ' + formatDateCz(record.date) +
-      ' v ' + (record.time || '—') + ' hod v ' + loc.city + (loc.locationPhrase ? ', ' + loc.locationPhrase : '') +
-      ', kdy došlo k porušení zákona o provozu na pozemních komunikacích' + (shortRef ? ' - ' + shortRef : '') +
-      ' zák. č. 361/2000 Sb. a to řidičem vozidla ' + (record.brand ? (record.brand + ', ') : '') + 'RZ ' + (record.plate || '') + '.';
-    body += docxPara(text, { size: 20, spacingAfter: 300 });
+    const vehicleBoldPart = (record.brand ? (record.brand + ', ') : '') + 'RZ ' + (record.plate || '');
+    body += docxParaRuns([
+      { text: 'Žádáme Vás, abyste se dostavil(a) dne ' },
+      { text: dostaveniDatumCasText, bold: true },
+      { text: ' na Městskou policii Blansko, Sadová č. 2, k podání vysvětlení podle § 11 odst. 1 zák. č. 553/91 Sb., ' +
+        'o obecní policii, ve znění pozdějších předpisů, ve věci objasnění skutečností důležitých pro odhalení pachatele přestupku ' +
+        offensePrefix },
+      { text: offenseBoldPart, bold: true },
+      { text: ', zjištěného dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') + ' hod v ' + loc.city +
+        (loc.locationPhrase ? ', ' + loc.locationPhrase : '') +
+        ', kdy došlo k porušení zákona o provozu na pozemních komunikacích' + (shortRef ? ' - ' + shortRef : '') +
+        ' zák. č. 361/2000 Sb. a to řidičem vozidla ' },
+      { text: vehicleBoldPart, bold: true },
+      { text: '.' }
+    ], { size: 20, spacingAfter: 300 });
 
     body += docxPara('Přineste s sebou tyto doklady:', { size: 20, spacingAfter: 60 });
     body += docxPara('- tuto výzvu', { size: 20 });
@@ -3322,6 +3377,13 @@
     document.getElementById('prikazUlice').placeholder = 'nejdřív vyber obec';
     document.getElementById('prikazCisloDomu').value = '';
     selectedMesto = null;
+    // Termín dostavení se — jen u Výzvy, jinde se pole vůbec nezobrazí.
+    const showVyzvaTermin = (prikazMode === 'vyzva');
+    document.getElementById('prikazVyzvaDatumField').style.display = showVyzvaTermin ? '' : 'none';
+    document.getElementById('prikazVyzvaCasField').style.display = showVyzvaTermin ? '' : 'none';
+    document.getElementById('prikazVyzvaDatum').value = '';
+    document.getElementById('prikazVyzvaCasOd').value = '';
+    document.getElementById('prikazVyzvaCasDo').value = '';
     const note = document.getElementById('prikazScanNote');
     note.style.display = 'none';
     note.style.color = '';
@@ -3442,7 +3504,7 @@
     const { items, error } = await mapySuggest(q, ['regional.municipality', 'regional.municipality_part'], { limit: 8 });
     renderSuggestList(prikazMestoList, items, (item)=>{
       selectedMesto = { name: item.name, position: item.position };
-      prikazMestoInput.value = (item.zip ? item.zip + ' ' : '') + item.name;
+      prikazMestoInput.value = (item.zip ? item.zip + ', ' : '') + item.name;
       checkStreetsAndAdvance();
     }, error);
   }, 400);
@@ -3546,8 +3608,14 @@
         await markResolved(record, 'prikaz', extra);
       } else if(prikazMode === 'vyzva'){
         document.getElementById('prikazOverlay').classList.remove('open');
+        const vyzvaDatumRaw = document.getElementById('prikazVyzvaDatum').value;
+        const dostaveniTermin = vyzvaDatumRaw ? {
+          datum: formatDateCz(vyzvaDatumRaw),
+          casOd: document.getElementById('prikazVyzvaCasOd').value || null,
+          casDo: document.getElementById('prikazVyzvaCasDo').value || null
+        } : null;
         const filename = buildDocFilename('Výzva', record, pachatel);
-        const opened = await exportVyzva(record, pachatel, filename);
+        const opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
         if(opened) await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
       } else if(prikazMode === 'oznameni'){
         document.getElementById('prikazOverlay').classList.remove('open');
@@ -3827,13 +3895,13 @@
     }
   });
 
-  async function exportVyzva(record, pachatel, filenameOverride){
+  async function exportVyzva(record, pachatel, filenameOverride, dostaveniTermin){
     try{
       if(typeof JSZip === 'undefined'){
         setDetailNote('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).', 'err');
         return false;
       }
-      const blob = await buildVyzvaDopisDocx(record, pachatel);
+      const blob = await buildVyzvaDopisDocx(record, pachatel, dostaveniTermin);
       const filename = filenameOverride || ('Vyzva_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx');
       try{
         const file = new File([blob], filename, { type: blob.type });
