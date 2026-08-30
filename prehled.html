@@ -2138,19 +2138,19 @@
   // iOS Safari se bez ní umí klávesnice krátce zavřít a znovu otevřít
   // (probliknutí), místo aby plynule zůstala nahoře.
   //
-  // U kalendáře/selectu appka NEvolá showPicker() automaticky — ten
-  // spolehlivě funguje jen v rámci téhož gesta, které appku k přeskoku
-  // přimělo, a jakékoliv zpoždění (i jen tenhle setTimeout) to gesto
-  // zruší. Výsledkem bylo, že pole jen krátce bliklo a samo doplnilo
-  // dnešní datum / výchozí hodnotu, aniž by si uživatel opravdu vybral.
-  // Appka teď takové pole jen zaostří (zvýrazní se jako aktuální) a
-  // otevření kolečka nechá na klepnutí.
+  // U kalendáře/selectu appka NEvolá .focus() vůbec — i pouhé programové
+  // zaostření (bez showPicker()) tady na iOS umí spustit "fantomový"
+  // výběr výchozí/aktuální hodnoty (vypadá to jako by proběhl výběr, i
+  // když jsi se pole vůbec nedotkl), a appka to pak vezme jako potvrzené
+  // 'change' a jede rovnou dál. Appka proto takové pole jen doscrolluje
+  // do vidu — samotné otevření necháváme čistě na tvém klepnutí, což
+  // spolehlivě funguje (podruhé, ručně, to už drží normálně).
   function focusField(el){
     if(!el) return;
     const isNativePicker = el.tagName === 'SELECT' ||
       (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'time'));
     if(isNativePicker){
-      el.focus();
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
     setTimeout(()=>{ el.focus(); }, 60);
@@ -2207,9 +2207,10 @@
   prikazPrijmeniInput.addEventListener('blur', ()=>{
     if(prikazPrijmeniInput.value.trim()) focusField(prikazNarozeniInput);
   });
-  // Datum narození je nativní kalendář (den/měsíc/rok) — stejný typ pole
-  // jako "Dostavit se dne", který spolehlivě funguje: výběr rovnou
-  // spouští 'change' a appka jede dál na Číslo dokladu.
+  // Datum narození je nativní kalendář (den/měsíc/rok, stejně jako
+  // "Dostavit se dne") — appka do něj programově nezasahuje (viz
+  // focusField výš), takže výběr rovnou spouští 'change' a appka jede
+  // dál na Číslo dokladu.
   prikazNarozeniInput.addEventListener('change', ()=>{
     if(prikazNarozeniInput.value) focusField(prikazDokladInput);
   });
@@ -2304,11 +2305,11 @@
     if(prikazVyzvaCasOdInput.value) focusField(prikazVyzvaCasDoInput);
   });
 
-  // Pole "Datum narození" je teď nativní <input type="date"> (kalendář
-  // den/měsíc/rok, stejně jako "Dostavit se dne"), takže appka mezi sebou
-  // převádí jen dva formáty: co vrací <input type="date"> (ISO
-  // "RRRR-MM-DD") a co appka jinde ukládá/tiskne (tečkovaný zápis
-  // "DD.MM.RRRR" — stejný formát, jaký čte i OCR skenu OP).
+  // Pole "Datum narození" je nativní <input type="date"> (kalendář
+  // den/měsíc/rok), takže appka mezi sebou převádí jen dva formáty: co
+  // vrací <input type="date"> (ISO "RRRR-MM-DD") a co appka jinde
+  // ukládá/tiskne (tečkovaný zápis "DD.MM.RRRR" — stejný formát, jaký
+  // čte i OCR skenu OP).
   function isoToDotted(iso){
     if(!iso) return '';
     const [y, m, d] = iso.split('-');
