@@ -3660,27 +3660,30 @@
   // iOS Safari se bez ní umí klávesnice krátce zavřít a znovu otevřít
   // (probliknutí), místo aby plynule zůstala nahoře.
   //
-  // Když jde appka na kalendář nebo select, napřed EXPLICITNĚ odežene
-  // (blur) cokoliv, co má teď fokus — jinak (typicky po numerickém poli
-  // jako Č. p.) zůstane klávesnice z předchozího pole otevřená a
-  // překrývá se s kalendářem, který appka otevírá pod ní. Teprve po
-  // krátké prodlevě (ať klávesnice stihne doanimovat pryč) appka otevře
-  // další pole.
+  // Explicitní blur() předchozího pole appka volá JEN při přechodu na
+  // kalendář/select — tam je potřeba (jinak, typicky po numerickém poli
+  // jako Č. p., zůstane klávesnice z předchozího pole otevřená a
+  // překrývá se s kalendářem/selectem, který appka otevírá pod ní).
+  // U běžného přechodu mezi textovými poli appka blur() NEvolá a jen
+  // rovnou fokusuje další pole — to je právě to "plynulé" navázání, na
+  // kterém iOS pozná, že jde o pokračování téhož gesta, a klávesnici
+  // nechá otevřenou. Přidat sem blur() navíc (i když to vypadá
+  // neškodně) tenhle řetězec spolehlivě přeruší — klávesnice zmizí a
+  // příště se sama neotevře (ověřeno, byla to regrese).
   //
   // U selectu appka .focus() volá (na mobilu tím otevře OS kolečko) — u
   // vlastního kalendáře (.js-date-field) appka nic sama nevybírá, jen ho
   // otevře a čeká na klik, takže je to bez rizika.
   function focusField(el){
     if(!el) return;
-    if(document.activeElement && document.activeElement !== el && document.activeElement !== document.body){
-      document.activeElement.blur();
-    }
     if(el.classList && el.classList.contains('js-date-field')){
+      if(document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       if(el._openDatePicker) setTimeout(()=> el._openDatePicker(), 250);
       return;
     }
     if(el.tagName === 'SELECT'){
+      if(document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(()=>{ el.focus(); }, 250);
       return;
