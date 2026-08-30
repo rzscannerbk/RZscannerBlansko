@@ -1607,6 +1607,21 @@
     });
   }
 
+  // window.open(blobUrl) nechá prohlížeč vymyslet vlastní název (obvykle
+  // náhodné UUID blobu, ne skutečný název souboru) — anchor s atributem
+  // download je jediný spolehlivý způsob, jak prohlížeči napovědět
+  // požadované jméno stahovaného souboru.
+  function downloadBlobWithFilename(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=> URL.revokeObjectURL(url), 60000);
+  }
+
   async function exportOznameni(record, pachatel, filenameOverride){
     try{
       if(typeof JSZip === 'undefined'){
@@ -1633,11 +1648,9 @@
         }
       }catch(e){
         // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
-        // otevření v nové kartě, stejně jako u ukládání fotek.
+        // stažení pod skutečným názvem, stejně jako u ukládání fotek.
       }
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(()=> URL.revokeObjectURL(url), 60000);
+      downloadBlobWithFilename(blob, filename);
       return true;
     }catch(e){
       console.error('Export Oznámení selhal:', e);
@@ -2771,9 +2784,7 @@
       }catch(e){
         // Sdílení zrušeno/nedostupné — spadneme na otevření v nové kartě.
       }
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(()=> URL.revokeObjectURL(url), 60000);
+      downloadBlobWithFilename(blob, filename);
     }catch(e){
       console.error('Export souhrnu směny selhal:', e);
       alert('Vytvoření dokumentu se nezdařilo (' + e.message + ').');
@@ -3072,9 +3083,7 @@
 
   document.getElementById('docxOpenBtn').addEventListener('click', async ()=>{
     if(!currentOznameniBlob || !currentDetailRecord) return;
-    const url = URL.createObjectURL(currentOznameniBlob);
-    window.open(url, '_blank');
-    setTimeout(()=> URL.revokeObjectURL(url), 60000);
+    downloadBlobWithFilename(currentOznameniBlob, buildDocFilename('Oznámení', currentDetailRecord));
     if(!currentDetailRecord.resolved) await markResolved(currentDetailRecord, 'oznameni');
   });
 
@@ -3699,9 +3708,7 @@
         // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
         // otevření v nové kartě, stejně jako u Oznámení.
       }
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(()=> URL.revokeObjectURL(url), 60000);
+      downloadBlobWithFilename(blob, filename);
       return true;
     }catch(e){
       console.error('Export Výzvy selhal:', e);

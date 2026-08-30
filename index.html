@@ -2067,45 +2067,6 @@
     });
   }
 
-  function haversineKm(lat1, lon1, lat2, lon2){
-    const toRad = d => d * Math.PI / 180;
-    const R = 6371;
-    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-    const sinLat = Math.sin(dLat / 2), sinLon = Math.sin(dLon / 2);
-    const h = sinLat * sinLat + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * sinLon * sinLon;
-    return 2 * R * Math.asin(Math.sqrt(h));
-  }
-
-  // Souřadnice středů Blanska a jeho místních částí — natvrdo v appce, beze
-  // vší závislosti na síti. Dřívější dva pokusy (Overpass API, pak Nominatim
-  // search s cachí) na mobilní síti tiše selhávaly (CORS/timeout) a appka
-  // pak vždy spadla zpět na PSČ. Souřadnice dopočítané ze vzdáleností a
-  // směrů k jednotlivým místním částem od Těchova (zdroj: mistopisy.cz),
-  // ověřené proti známé přesné poloze Blanska (49.3631, 16.6431) — vyšlo na
-  // pár desítek metrů přesně, takže i ostatní odvozené body jsou dost
-  // přesné na spolehlivé rozlišení sousedících místních částí (typicky
-  // 2+ km od sebe).
-  const LOCAL_PART_COORDS = [
-    { name: 'Blansko',     lat: 49.3631, lon: 16.6431 },
-    { name: 'Těchov',      lat: 49.3691, lon: 16.6975 },
-    { name: 'Obůrka',      lat: 49.3754, lon: 16.6877 },
-    { name: 'Lažánky',     lat: 49.3511, lon: 16.6975 },
-    { name: 'Klepačov',    lat: 49.3437, lon: 16.6584 },
-    { name: 'Hořice',      lat: 49.3691, lon: 16.6147 },
-    { name: 'Horní Lhota', lat: 49.3945, lon: 16.6584 },
-    { name: 'Dolní Lhota', lat: 49.3691, lon: 16.6285 },
-    { name: 'Olešná',      lat: 49.3310, lon: 16.6389 },
-  ];
-
-  function resolveNearestLocalPart(lat, lng){
-    let best = '', bestDist = Infinity;
-    LOCAL_PART_COORDS.forEach(c=>{
-      const d = haversineKm(lat, lng, c.lat, c.lon);
-      if(d < bestDist){ bestDist = d; best = c.name; }
-    });
-    return best;
-  }
-
   // Nominatim u venkovských částí (bez pojmenované ulice) občas vrátí do
   // pole "residential" jen číselný identifikátor zástavby (např. "37440"),
   // ne skutečný název ulice. Bez tohoto ošetření appka takový kód mylně
@@ -2132,17 +2093,8 @@
         return [street, city].filter(Boolean).join(', ');
       }
 
-      // Bez pojmenované ulice (typicky místní části Blanska) — porovnáme
-      // GPS bod se středy Blanska a jeho místních částí a vezmeme
-      // nejbližší, místo abychom se spoléhali na Nominatimův odhad
-      // suburb/village, který se u sousedících částí (Těchov ↔ Lažánky)
-      // uměl splést.
-      const nearestPart = resolveNearestLocalPart(lat, lng);
-      if(nearestPart){
-        return nearestPart === 'Blansko' ? 'Blansko' : nearestPart + ', Blansko';
-      }
-
-      // Nic se nenašlo/selhalo — použij Nominatimův odhad jako předtím,
+      // Bez pojmenované ulice (typicky místní části Blanska) — použij
+      // rovnou Nominatimův vlastní odhad (village/suburb/hamlet/…),
       // s pojistkou proti tomu, aby výsledek spadl na PSČ.
       const localPart = a.village || a.suburb || a.hamlet || a.city_district || '';
       let combined;
