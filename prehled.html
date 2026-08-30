@@ -2110,6 +2110,10 @@
     listEl.classList.add('open');
   }
 
+  const prikazJmenoInput = document.getElementById('prikazJmeno');
+  const prikazPrijmeniInput = document.getElementById('prikazPrijmeni');
+  const prikazNarozeniInput = document.getElementById('prikazNarozeni');
+  const prikazDokladInput = document.getElementById('prikazDoklad');
   const prikazMestoInput = document.getElementById('prikazMesto');
   const prikazMestoList = document.getElementById('prikazMestoSuggest');
   const prikazUliceInput = document.getElementById('prikazUlice');
@@ -2142,6 +2146,24 @@
       if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
     });
   }
+
+  // Jméno → Příjmení → Datum narození → Číslo dokladu → Adresa (obec).
+  advanceOnEnter(prikazJmenoInput);
+  prikazJmenoInput.addEventListener('blur', ()=>{
+    if(prikazJmenoInput.value.trim()) focusField(prikazPrijmeniInput);
+  });
+  advanceOnEnter(prikazPrijmeniInput);
+  prikazPrijmeniInput.addEventListener('blur', ()=>{
+    if(prikazPrijmeniInput.value.trim()) focusField(prikazNarozeniInput);
+  });
+  advanceOnEnter(prikazNarozeniInput);
+  prikazNarozeniInput.addEventListener('blur', ()=>{
+    if(prikazNarozeniInput.value.trim()) focusField(prikazDokladInput);
+  });
+  advanceOnEnter(prikazDokladInput);
+  prikazDokladInput.addEventListener('blur', ()=>{
+    if(prikazDokladInput.value.trim()) focusField(prikazMestoInput);
+  });
 
   async function checkStreetsAndAdvance(){
     prikazUliceInput.value = '';
@@ -2232,7 +2254,6 @@
     if(digits.length !== 8) return raw;
     return digits.slice(0,2) + '.' + digits.slice(2,4) + '.' + digits.slice(4,8);
   }
-  const prikazNarozeniInput = document.getElementById('prikazNarozeni');
   prikazNarozeniInput.addEventListener('input', (e)=>{
     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
   });
