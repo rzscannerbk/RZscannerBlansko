@@ -502,7 +502,16 @@
   // nezaplní celou obrazovku a dole zůstane černá mezera. JS změří
   // skutečnou výšku viditelné plochy a uloží ji do CSS proměnné
   // --app-height, na kterou jsou obrazovky (.screen) navázané.
+  // Když má fokus nativní kalendář/čas (<input type="date"/"time">), přepočet
+  // přeskočíme — na Androidu umí i drobný posun layoutu (typicky těsně po
+  // zavření klávesnice z předchozího pole, což spustí právě
+  // visualViewport 'resize') donutit prohlížeč nativní kalendář hned zavřít
+  // a rovnou potvrdit to, co v něm bylo zrovna zvýrazněné (= dnešní datum) —
+  // navenek to vypadá, že kalendář jen "problikne" a sám vyplní dnešek.
+  // Výšku po odchodu z pole doženeme přes 'focusout' níž.
   function setAppHeight(){
+    const active = document.activeElement;
+    if(active && active.tagName === 'INPUT' && (active.type === 'date' || active.type === 'time')) return;
     const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
     document.documentElement.style.setProperty('--app-height', h + 'px');
   }
@@ -512,6 +521,10 @@
   window.addEventListener('load', setAppHeight);
   document.addEventListener('pageshow', setAppHeight);
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) setAppHeight(); });
+  document.addEventListener('focusout', (e)=>{
+    const t = e.target;
+    if(t && t.tagName === 'INPUT' && (t.type === 'date' || t.type === 'time')) setTimeout(setAppHeight, 50);
+  });
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', setAppHeight);
   }
