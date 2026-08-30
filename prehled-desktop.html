@@ -307,9 +307,12 @@
   .panel-head .id{font-size:12px; color:var(--faint);}
   .detail-head-info{display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; text-align:center;}
   .detail-head-line1{display:flex; align-items:baseline; justify-content:center; flex-wrap:wrap; gap:5px 10px; color:var(--text); font-weight:700;}
+  .detail-head-line2{font-weight:600; font-size:12px;}
   .detail-head-plate{font-weight:800; font-size:14px; color:var(--text); letter-spacing:.02em;}
   .detail-head-meta{font-size:12px; color:var(--text); font-weight:700; white-space:nowrap;}
   .detail-head-offense{font-size:12px; color:var(--text); font-weight:600; line-height:1.35;}
+  .detail-head-click{cursor:pointer; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:3px;}
+  .detail-head-click:hover{color:#2F6FED;}
   .panel-head button{position:absolute; right:22px; top:50%; transform:translateY(-50%); background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:13px;}
   .panel-head button:hover{color:var(--text); border-color:var(--faint);}
   #detailPreviewWrap{
@@ -496,6 +499,23 @@
   .prikaz-suggest-item:hover{background:var(--line);}
   .prikaz-suggest-item .sub{display:block; font-size:11px; color:var(--muted); margin-top:1px;}
   .prikaz-box input:disabled{opacity:.4;}
+
+  /* ---------- Dialog "kde se tahle hodnota ještě objevuje" (klik na SPZ,
+     místo, strážníka, kvalifikaci nebo přestupce v hlavičce detailu) ---------- */
+  .related-box{
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
+    padding:20px 20px 16px; max-width:480px; width:100%; max-height:78vh;
+    display:flex; flex-direction:column; text-align:left;
+  }
+  .related-box h3{font-size:15px; margin:0 0 3px; color:var(--text);}
+  .related-sub{font-size:12px; color:var(--muted); margin-bottom:12px;}
+  .related-list{overflow-y:auto; flex:1 1 auto; margin:0 -20px; padding:0 20px;}
+  .related-item{padding:10px 4px; border-bottom:1px solid var(--line); cursor:pointer;}
+  .related-item:last-child{border-bottom:none;}
+  .related-item:hover{background:var(--asphalt-3);}
+  .related-item .ri-top{font-size:13px; font-weight:700; color:var(--text);}
+  .related-item .ri-bottom{font-size:11.5px; color:var(--muted); margin-top:2px;}
+  .related-empty{padding:18px 4px; text-align:center; color:var(--muted); font-size:13px;}
   .prikaz-pachatel-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 10px;}
   .prikaz-pachatel-head span{font-size:12.5px; color:var(--muted); font-weight:600;}
   .prikaz-scan-btn{
@@ -719,6 +739,15 @@
         <button class="confirm-no confirm-btn" id="prikazCancelBtn">Zrušit</button>
         <button class="confirm-yes confirm-btn" id="prikazConfirmBtn">Potvrdit a uložit</button>
       </div>
+    </div>
+  </div>
+
+  <div class="confirm-overlay" id="relatedOverlay">
+    <div class="related-box">
+      <h3 id="relatedTitle">Související přestupky</h3>
+      <div class="related-sub" id="relatedSub"></div>
+      <div class="related-list" id="relatedList"></div>
+      <button class="confirm-cancel" id="relatedCloseBtn">Zavřít</button>
     </div>
   </div>
 
@@ -2973,18 +3002,126 @@
     });
   }
 
+  function escapeAttr(s){
+    return escapeHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // "str. 1048 Juračka Lukáš" — číslo ze stejné tabulky jako na tiskárně
+  // (officerPrintLabel výše), jen tady zůstává i celé jméno.
+  function officerHeadLabel(officerName){
+    const badge = OFFICER_BADGE_NUMBERS[officerName];
+    return 'str.' + (badge ? ' ' + badge : '') + ' ' + officerName;
+  }
+
+  function pachatelHeadLabel(pachatel){
+    return [pachatel.jmeno, pachatel.prijmeni, pachatel.datumNarozeni].filter(Boolean).join(' ');
+  }
+
+  // Klíč pro dohledání "stejného pachatele" napříč záznamy — příjmení +
+  // datum narození je spolehlivější než celé jméno (shoda jmen/příjmení
+  // je celkem běžná, datum narození k tomu dost dobře disambiguuje).
+  function pachatelMatchKey(pachatel){
+    if(!pachatel || !pachatel.prijmeni) return '';
+    return (pachatel.prijmeni + '|' + (pachatel.datumNarozeni || '')).toLowerCase();
+  }
+
+  function detailHeadClickable(type, value, displayText, extraClass){
+    return '<span class="detail-head-meta detail-head-click' + (extraClass ? ' ' + extraClass : '') +
+      '" data-related-type="' + type + '" data-related-value="' + escapeAttr(value) + '">' +
+      escapeHtml(displayText) + '</span>';
+  }
+
   function buildDetailHeadHtml(record){
-    const parts = [];
-    parts.push('<span class="detail-head-plate mono">' + escapeHtml(record.plate || 'NEZNÁMÁ SPZ') + '</span>');
-    if(record.noticeNumber) parts.push('<span class="detail-head-meta mono">' + escapeHtml(record.noticeNumber) + '</span>');
-    if(record.address) parts.push('<span class="detail-head-meta">' + escapeHtml(record.address) + '</span>');
+    const line1 = [];
+    if(record.noticeNumber) line1.push('<span class="detail-head-meta mono">' + escapeHtml(record.noticeNumber) + '</span>');
+    line1.push(
+      record.plate
+        ? detailHeadClickable('plate', record.plate, record.plate, 'detail-head-plate mono')
+        : '<span class="detail-head-plate mono">NEZNÁMÁ SPZ</span>'
+    );
+    if(record.address) line1.push(detailHeadClickable('address', record.address, record.address));
     const dateTime = [record.date ? formatDateCz(record.date) : null, record.time || null].filter(Boolean).join(' ');
-    if(dateTime) parts.push('<span class="detail-head-meta">' + escapeHtml(dateTime) + '</span>');
-    if(record.officerName) parts.push('<span class="detail-head-meta">' + escapeHtml(record.officerName) + '</span>');
-    let html = '<div class="detail-head-line1">' + parts.join('<span class="detail-head-meta">·</span>') + '</div>';
-    if(record.offenseLabel) html += '<div class="detail-head-offense">' + escapeHtml(record.offenseLabel) + '</div>';
+    if(dateTime) line1.push('<span class="detail-head-meta">' + escapeHtml(dateTime) + '</span>');
+    if(record.officerName) line1.push(detailHeadClickable('officer', record.officerName, officerHeadLabel(record.officerName)));
+    let html = '<div class="detail-head-line1">' + line1.join('<span class="detail-head-meta">·</span>') + '</div>';
+
+    const line2 = [];
+    if(record.offenseLabel) line2.push(detailHeadClickable('offense', record.offenseLabel, record.offenseLabel));
+    const methodLabel = record.resolved ? (UNDO_METHOD_LABEL[record.resolvedMethod] || 'Dořešeno') : 'Nevyřešeno';
+    line2.push('<span class="detail-head-meta">' + escapeHtml(methodLabel) + '</span>');
+    if(record.pachatel && (record.pachatel.jmeno || record.pachatel.prijmeni)){
+      const key = pachatelMatchKey(record.pachatel);
+      const label = pachatelHeadLabel(record.pachatel) || 'Pachatel';
+      line2.push(key ? detailHeadClickable('pachatel', key, label) : '<span class="detail-head-meta">' + escapeHtml(label) + '</span>');
+    }
+    if(line2.length) html += '<div class="detail-head-line1 detail-head-line2">' + line2.join('<span class="detail-head-meta">·</span>') + '</div>';
+
     return html;
   }
+
+  const RELATED_TYPE_LABEL = {
+    plate: 'stejnou SPZ',
+    address: 'stejným místem',
+    officer: 'stejným strážníkem',
+    offense: 'stejnou kvalifikací přestupku',
+    pachatel: 'stejným přestupcem'
+  };
+
+  function recordMatchesRelated(r, type, value){
+    if(type === 'plate') return (r.plate || '') === value;
+    if(type === 'address') return (r.address || '') === value;
+    if(type === 'officer') return (r.officerName || '') === value;
+    if(type === 'offense') return (r.offenseLabel || '') === value;
+    if(type === 'pachatel') return pachatelMatchKey(r.pachatel) === value;
+    return false;
+  }
+
+  function openRelatedRecords(type, value){
+    if(!type || !value || !currentDetailRecord) return;
+    const matches = allRecords
+      .filter(r => r.id !== currentDetailRecord.id && recordMatchesRelated(r, type, value))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || ''));
+
+    document.getElementById('relatedTitle').textContent = 'Další přestupky se ' + (RELATED_TYPE_LABEL[type] || 'stejnou hodnotou');
+    document.getElementById('relatedSub').textContent = matches.length
+      ? matches.length + ' ' + (matches.length === 1 ? 'záznam' : (matches.length < 5 ? 'záznamy' : 'záznamů'))
+      : '';
+
+    const listEl = document.getElementById('relatedList');
+    if(!matches.length){
+      listEl.innerHTML = '<div class="related-empty">Žádné další přestupky se stejnou hodnotou.</div>';
+    } else {
+      listEl.innerHTML = matches.map(r=>{
+        const dateTime = [r.date ? formatDateCz(r.date) : null, r.time || null].filter(Boolean).join(' ');
+        const top = [r.plate || 'NEZNÁMÁ SPZ', r.noticeNumber || ''].filter(Boolean).join(' · ');
+        const bottom = [dateTime, r.address || '', r.offenseLabel || ''].filter(Boolean).join(' · ');
+        return '<div class="related-item" data-record-id="' + escapeAttr(r.id) + '">' +
+          '<div class="ri-top">' + escapeHtml(top) + '</div>' +
+          '<div class="ri-bottom">' + escapeHtml(bottom) + '</div>' +
+          '</div>';
+      }).join('');
+    }
+    document.getElementById('relatedOverlay').classList.add('open');
+  }
+
+  document.getElementById('detailHeadInfo').addEventListener('click', (e)=>{
+    const el = e.target.closest('.detail-head-click');
+    if(!el) return;
+    openRelatedRecords(el.getAttribute('data-related-type'), el.getAttribute('data-related-value'));
+  });
+
+  document.getElementById('relatedList').addEventListener('click', (e)=>{
+    const item = e.target.closest('.related-item');
+    if(!item) return;
+    const rec = allRecords.find(r => r.id === item.getAttribute('data-record-id'));
+    document.getElementById('relatedOverlay').classList.remove('open');
+    if(rec) openDetail(rec);
+  });
+
+  document.getElementById('relatedCloseBtn').addEventListener('click', ()=>{
+    document.getElementById('relatedOverlay').classList.remove('open');
+  });
+
 
   function openDetail(record){
     currentDetailRecord = record;
