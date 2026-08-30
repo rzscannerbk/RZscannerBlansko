@@ -2053,7 +2053,7 @@
     document.getElementById('prikazCastka').value = '';
     document.getElementById('prikazJmeno').value = '';
     document.getElementById('prikazPrijmeni').value = '';
-    document.getElementById('prikazNarozeni').value = '';
+    document.getElementById('prikazNarozeni')._setDatePickerIso('');
     document.getElementById('prikazDoklad').value = '';
     document.getElementById('prikazMesto').value = '';
     document.getElementById('prikazPsc').value = '';
@@ -2066,7 +2066,7 @@
     const showVyzvaTermin = (prikazMode === 'vyzva');
     document.getElementById('prikazVyzvaDatumField').style.display = showVyzvaTermin ? '' : 'none';
     document.getElementById('prikazVyzvaCasField').style.display = showVyzvaTermin ? '' : 'none';
-    document.getElementById('prikazVyzvaDatum').value = '';
+    document.getElementById('prikazVyzvaDatum')._setDatePickerIso('');
     document.getElementById('prikazVyzvaCasOd').value = '08:00';
     document.getElementById('prikazVyzvaCasDo').value = '16:00';
     const note = document.getElementById('prikazScanNote');
@@ -2183,9 +2183,16 @@
     function pad2(n){ return String(n).padStart(2, '0'); }
     function isoOf(y, m, d){ return y + '-' + pad2(m + 1) + '-' + pad2(d); }
     function todayIso(){ return isoOf(today.getFullYear(), today.getMonth(), today.getDate()); }
+    // Pole navenek zobrazuje DD.MM.RRRR (stejně jako zbytek appky) —
+    // interní ISO (kvůli výpočtům/řazení jinde v appce, viz formatDateCz
+    // a vyzvaDatumRaw) appka drží v data-iso atributu.
+    function setValue(iso){
+      input.dataset.iso = iso || '';
+      input.value = iso ? isoToDotted(iso) : '';
+    }
 
     function render(){
-      const selectedIso = input.value || '';
+      const selectedIso = input.dataset.iso || '';
       let html = '<div class="prikaz-datepicker-head">';
       html += '<select class="dp-month">';
       for(let m = 0; m < 12; m++){
@@ -2219,20 +2226,20 @@
       });
       panel.querySelector('.dp-today').addEventListener('click', () => pick(todayIso()));
       panel.querySelector('.dp-clear').addEventListener('click', () => {
-        input.value = '';
+        setValue('');
         input.dispatchEvent(new Event('change', { bubbles: true }));
         close();
       });
     }
 
     function pick(iso){
-      input.value = iso;
+      setValue(iso);
       input.dispatchEvent(new Event('change', { bubbles: true }));
       close();
     }
     function onOutside(e){ if(!panel.contains(e.target) && e.target !== input) close(); }
     function open(){
-      const base = input.value ? input.value.split('-').map(Number) : null;
+      const base = input.dataset.iso ? input.dataset.iso.split('-').map(Number) : null;
       viewYear = base ? base[0] : today.getFullYear();
       viewMonth = base ? base[1] - 1 : today.getMonth();
       render();
@@ -2246,7 +2253,12 @@
     input.addEventListener('click', () => {
       if(panel.classList.contains('open')) close(); else open();
     });
-    return { open, close };
+    // Appka umí pole i otevřít programově (řetězec automatických skoků
+    // mezi poli po Jméno/Příjmení atd., viz focusField) a nastavit
+    // hodnotu zvenčí (reset formuláře, vyplnění ze skenu OP).
+    input._openDatePicker = open;
+    input._setDatePickerIso = setValue;
+    return { open, close, setValue };
   }
 
   const prikazNarozeniInput = document.getElementById('prikazNarozeni');
@@ -2272,19 +2284,19 @@
   // iOS Safari se bez ní umí klávesnice krátce zavřít a znovu otevřít
   // (probliknutí), místo aby plynule zůstala nahoře.
   //
-  // U kalendáře/selectu appka NEvolá .focus() vůbec — i pouhé programové
-  // zaostření (bez showPicker()) tady na iOS umí spustit "fantomový"
-  // výběr výchozí/aktuální hodnoty (vypadá to jako by proběhl výběr, i
-  // když jsi se pole vůbec nedotkl), a appka to pak vezme jako potvrzené
-  // 'change' a jede rovnou dál. Appka proto takové pole jen doscrolluje
-  // do vidu — samotné otevření necháváme čistě na tvém klepnutí, což
-  // spolehlivě funguje (podruhé, ručně, to už drží normálně).
+  // U selectu appka NEvolá .focus() vůbec — i pouhé programové zaostření
+  // tady na iOS umí spustit "fantomový" výběr výchozí hodnoty. U vlastního
+  // kalendáře (.js-date-field) tohle riziko není — appka do něj nic sama
+  // nevybírá, jen ho otevře a čeká na klik — takže ho řetězec skoků
+  // rovnou otevře, ne jen doscrolluje.
   function focusField(el){
     if(!el) return;
-    const isNativePicker = el.tagName === 'SELECT' ||
-      (el.tagName === 'INPUT' && (el.type === 'date' || el.type === 'time')) ||
-      (el.classList && el.classList.contains('js-date-field'));
-    if(isNativePicker){
+    if(el.classList && el.classList.contains('js-date-field')){
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if(el._openDatePicker) setTimeout(()=> el._openDatePicker(), 80);
+      return;
+    }
+    if(el.tagName === 'SELECT'){
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
@@ -2342,10 +2354,8 @@
   prikazPrijmeniInput.addEventListener('blur', ()=>{
     if(prikazPrijmeniInput.value.trim()) focusField(prikazNarozeniInput);
   });
-  // Datum narození je nativní kalendář (den/měsíc/rok, stejně jako
-  // "Dostavit se dne") — appka do něj programově nezasahuje (viz
-  // focusField výš), takže výběr rovnou spouští 'change' a appka jede
-  // dál na Číslo dokladu.
+  // Datum narození je appkou vykreslený kalendář (viz initDatePicker výš)
+  // — výběr dne vyvolá 'change', a appka jede dál na Číslo dokladu.
   prikazNarozeniInput.addEventListener('change', ()=>{
     if(prikazNarozeniInput.value) focusField(prikazDokladInput);
   });
@@ -2440,11 +2450,11 @@
     if(prikazVyzvaCasOdInput.value) focusField(prikazVyzvaCasDoInput);
   });
 
-  // Pole "Datum narození" je nativní <input type="date"> (kalendář
-  // den/měsíc/rok), takže appka mezi sebou převádí jen dva formáty: co
-  // vrací <input type="date"> (ISO "RRRR-MM-DD") a co appka jinde
-  // ukládá/tiskne (tečkovaný zápis "DD.MM.RRRR" — stejný formát, jaký
-  // čte i OCR skenu OP).
+  // Vlastní kalendář (initDatePicker výš) drží interní hodnotu v ISO
+  // (RRRR-MM-DD, kvůli řazení/výpočtům jinde v appce — viz formatDateCz a
+  // vyzvaDatumRaw) a v poli zobrazuje tečkovaný zápis (DD.MM.RRRR — stejný
+  // formát, jaký čte i OCR sken OP a jaký appka ukládá/tiskne). Tyhle dvě
+  // funkce mezi formáty převádí.
   function isoToDotted(iso){
     if(!iso) return '';
     const [y, m, d] = iso.split('-');
@@ -2489,9 +2499,9 @@
 
     const jmeno = document.getElementById('prikazJmeno').value.trim();
     const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
-    // Nativní <input type="date"> vrací ISO formát (RRRR-MM-DD) — appka
-    // ho ukládá/tiskne v tečkovaném zápisu (DD.MM.RRRR).
-    const narozeni = isoToDotted(document.getElementById('prikazNarozeni').value);
+    // Vlastní kalendář ukládá do .value už rovnou tečkovaný formát
+    // (DD.MM.RRRR) — appka ho tak i ukládá/tiskne, žádný převod netřeba.
+    const narozeni = document.getElementById('prikazNarozeni').value.trim();
     const doklad = document.getElementById('prikazDoklad').value.trim();
     const mestoObec = document.getElementById('prikazMesto').value.trim();
     const psc = document.getElementById('prikazPsc').value.trim();
@@ -2520,7 +2530,7 @@
         await markResolved(record, 'prikaz', extra);
       } else if(prikazMode === 'vyzva'){
         document.getElementById('prikazOverlay').classList.remove('open');
-        const vyzvaDatumRaw = document.getElementById('prikazVyzvaDatum').value;
+        const vyzvaDatumRaw = document.getElementById('prikazVyzvaDatum').dataset.iso || '';
         const dostaveniTermin = vyzvaDatumRaw ? {
           datum: formatDateCz(vyzvaDatumRaw),
           casOd: document.getElementById('prikazVyzvaCasOd').value || null,
@@ -2725,7 +2735,7 @@
 
       if(parsed.jmeno) document.getElementById('prikazJmeno').value = toNameCase(parsed.jmeno);
       if(parsed.prijmeni) document.getElementById('prikazPrijmeni').value = toNameCase(parsed.prijmeni);
-      if(parsed.datumNarozeni) document.getElementById('prikazNarozeni').value = dottedToIso(parsed.datumNarozeni);
+      if(parsed.datumNarozeni) document.getElementById('prikazNarozeni')._setDatePickerIso(dottedToIso(parsed.datumNarozeni));
       if(parsed.cisloDokladu) document.getElementById('prikazDoklad').value = parsed.cisloDokladu;
 
       const note = document.getElementById('prikazScanNote');
