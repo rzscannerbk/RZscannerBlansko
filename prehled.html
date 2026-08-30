@@ -2282,37 +2282,60 @@
 
   // Malá prodleva mezi opuštěním jednoho pole a zaostřením dalšího — na
   // iOS Safari se bez ní umí klávesnice krátce zavřít a znovu otevřít
-  // (probliknutí), místo aby plynule zůstala nahoře.
+  // (probliknutí), místo aby plynule zůstala nahoře. Tahle prodleva ale
+  // funguje JEN jako pokračování gesta, když už předtím něco skutečně
+  // mělo fokus (klávesnice/kolečko běželo) — appka tomu říká "teplý"
+  // přechod.
   //
-  // Explicitní blur() předchozího pole appka volá JEN při přechodu na
-  // kalendář/select — tam je potřeba (jinak, typicky po numerickém poli
-  // jako Č. p., zůstane klávesnice z předchozího pole otevřená a
-  // překrývá se s kalendářem/selectem, který appka otevírá pod ní).
-  // U běžného přechodu mezi textovými poli appka blur() NEvolá a jen
-  // rovnou fokusuje další pole — to je právě to "plynulé" navázání, na
-  // kterém iOS pozná, že jde o pokračování téhož gesta, a klávesnici
-  // nechá otevřenou. Přidat sem blur() navíc (i když to vypadá
-  // neškodně) tenhle řetězec spolehlivě přeruší — klávesnice zmizí a
-  // příště se sama neotevře (ověřeno, byla to regrese).
+  // "Studený" přechod (z kalendáře nebo z předchozího selectu nic
+  // fokus nemělo — typicky Datum narození → Číslo dokladu, nebo
+  // Dostavit se dne → Čas od) je jiný případ: appka tam musí zaostřit
+  // úplně SYNCHRONNĚ, přímo v obslužné funkci kliknutí/change, bez
+  // jakéhokoli zpoždění — jakmile appka fokus o zlomek vteřiny odloží
+  // (byť jen přes setTimeout), iOS už to nebere jako přímé pokračování
+  // klepnutí a klávesnici/kolečko vůbec neukáže (ověřeno, přesně tenhle
+  // případ appka dřív poflakovala — po výběru data z kalendáře nic
+  // nezaostřilo).
   //
-  // U selectu appka .focus() volá (na mobilu tím otevře OS kolečko) — u
-  // vlastního kalendáře (.js-date-field) appka nic sama nevybírá, jen ho
-  // otevře a čeká na klik, takže je to bez rizika.
+  // Explicitní blur() předchozího pole appka volá jen u "teplého"
+  // přechodu na kalendář/select — tam je potřeba (jinak, typicky po
+  // numerickém poli jako Č. p., zůstane klávesnice z předchozího pole
+  // otevřená a překrývá se s kalendářem/selectem, který appka otevírá
+  // pod ní). U běžného teplého přechodu mezi textovými poli appka
+  // blur() NEvolá a jen rovnou (po krátké prodlevě) fokusuje další pole
+  // — to je to "plynulé" navázání, na kterém iOS pozná pokračování
+  // téhož gesta. Přidat tam blur() navíc tenhle řetězec spolehlivě
+  // přeruší (ověřeno, byla to regrese).
   function focusField(el){
     if(!el) return;
+    const wasLive = document.activeElement && document.activeElement !== document.body && document.activeElement !== el;
     if(el.classList && el.classList.contains('js-date-field')){
-      if(document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      if(el._openDatePicker) setTimeout(()=> el._openDatePicker(), 250);
+      if(wasLive){
+        document.activeElement.blur();
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if(el._openDatePicker) setTimeout(()=> el._openDatePicker(), 250);
+      } else {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if(el._openDatePicker) el._openDatePicker();
+      }
       return;
     }
     if(el.tagName === 'SELECT'){
-      if(document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(()=>{ el.focus(); }, 250);
+      if(wasLive){
+        document.activeElement.blur();
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(()=>{ el.focus(); }, 250);
+      } else {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus();
+      }
       return;
     }
-    setTimeout(()=>{ el.focus(); }, 60);
+    if(wasLive){
+      setTimeout(()=>{ el.focus(); }, 60);
+    } else {
+      el.focus();
+    }
   }
 
   // Klávesa Return/Next na klávesnici u textových/číselných polí dělá
