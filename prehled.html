@@ -82,6 +82,8 @@
   .field{background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:14px;}
   .field label{display:block; font-size:10.5px; color:var(--muted); font-family:'Roboto Mono',monospace; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px;}
   .field input{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
+  .field select{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
+  .field select option{background:var(--asphalt-2); color:var(--text);}
   #loginError{color:var(--bad); font-size:12.5px; margin:10px 0 0; display:none; line-height:1.4;}
 
   /* ---------- LIST ---------- */
@@ -424,10 +426,16 @@
             <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
           </div>
         </div>
-        <div class="field prikaz-suggest-wrap">
-          <label for="prikazMesto">Adresa trvalého pobytu</label>
-          <input type="text" id="prikazMesto" autocomplete="off" placeholder="PSČ, obec">
-          <div class="prikaz-suggest-list" id="prikazMestoSuggest"></div>
+        <div class="prikaz-row-address">
+          <div class="field prikaz-suggest-wrap prikaz-street-field">
+            <label for="prikazMesto">Adresa trvalého pobytu</label>
+            <input type="text" id="prikazMesto" autocomplete="off" placeholder="obec">
+            <div class="prikaz-suggest-list" id="prikazMestoSuggest"></div>
+          </div>
+          <div class="field prikaz-housenum-field">
+            <label for="prikazPsc">PSČ</label>
+            <input type="text" id="prikazPsc" inputmode="numeric" autocomplete="off">
+          </div>
         </div>
         <div class="prikaz-row-address">
           <div class="field prikaz-suggest-wrap prikaz-street-field">
@@ -448,11 +456,11 @@
         <div class="prikaz-row2" id="prikazVyzvaCasField" style="display:none;">
           <div class="field">
             <label for="prikazVyzvaCasOd">Čas od</label>
-            <input type="time" id="prikazVyzvaCasOd">
+            <select id="prikazVyzvaCasOd"><option value="">—</option><option value="00:00">0:00</option><option value="01:00">1:00</option><option value="02:00">2:00</option><option value="03:00">3:00</option><option value="04:00">4:00</option><option value="05:00">5:00</option><option value="06:00">6:00</option><option value="07:00">7:00</option><option value="08:00">8:00</option><option value="09:00">9:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option><option value="18:00">18:00</option><option value="19:00">19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option></select>
           </div>
           <div class="field">
             <label for="prikazVyzvaCasDo">Čas do</label>
-            <input type="time" id="prikazVyzvaCasDo">
+            <select id="prikazVyzvaCasDo"><option value="">—</option><option value="00:00">0:00</option><option value="01:00">1:00</option><option value="02:00">2:00</option><option value="03:00">3:00</option><option value="04:00">4:00</option><option value="05:00">5:00</option><option value="06:00">6:00</option><option value="07:00">7:00</option><option value="08:00">8:00</option><option value="09:00">9:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option><option value="18:00">18:00</option><option value="19:00">19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option></select>
           </div>
         </div>
 
@@ -1996,6 +2004,7 @@
     document.getElementById('prikazNarozeni').value = '';
     document.getElementById('prikazDoklad').value = '';
     document.getElementById('prikazMesto').value = '';
+    document.getElementById('prikazPsc').value = '';
     document.getElementById('prikazUlice').value = '';
     document.getElementById('prikazUlice').disabled = true;
     document.getElementById('prikazUlice').placeholder = 'nejdřív vyber obec';
@@ -2127,7 +2136,11 @@
     const { items, error } = await mapySuggest(q, ['regional.municipality', 'regional.municipality_part'], { limit: 8 });
     renderSuggestList(prikazMestoList, items, (item)=>{
       selectedMesto = { name: item.name, position: item.position };
-      prikazMestoInput.value = (item.zip ? item.zip + ', ' : '') + item.name;
+      prikazMestoInput.value = item.name;
+      // PSČ doplní appka sama z Mapy.com (stejná data, co dřív šla rovnou
+      // do pole obce) — pole zůstává editovatelné, kdyby Mapy.com PSČ
+      // pro danou obec/část nevrátilo nebo bylo potřeba ho opravit.
+      if(item.zip) document.getElementById('prikazPsc').value = item.zip;
       checkStreetsAndAdvance();
     }, error);
   }, 400);
@@ -2204,7 +2217,9 @@
     document.getElementById('prikazNarozeni').value = formatNarozeniDots(document.getElementById('prikazNarozeni').value);
     const narozeni = document.getElementById('prikazNarozeni').value.trim();
     const doklad = document.getElementById('prikazDoklad').value.trim();
-    const mesto = document.getElementById('prikazMesto').value.trim();
+    const mestoObec = document.getElementById('prikazMesto').value.trim();
+    const psc = document.getElementById('prikazPsc').value.trim();
+    const mesto = [psc, mestoObec].filter(Boolean).join(', ');
     const ulice = document.getElementById('prikazUlice').value.trim();
     const cisloDomu = document.getElementById('prikazCisloDomu').value.trim();
     const pachatel = (jmeno || prijmeni || narozeni || doklad || mesto) ? {
