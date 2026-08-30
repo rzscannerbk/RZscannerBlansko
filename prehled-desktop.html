@@ -700,23 +700,26 @@
         </button>
       </div>
       <div class="prikaz-row2">
-        <div class="field">
+        <div class="field prikaz-suggest-wrap">
           <label for="prikazJmeno">Jméno</label>
           <input type="text" id="prikazJmeno" autocomplete="off">
+          <div class="prikaz-suggest-list" id="prikazJmenoSuggest"></div>
         </div>
-        <div class="field">
+        <div class="field prikaz-suggest-wrap">
           <label for="prikazPrijmeni">Příjmení</label>
           <input type="text" id="prikazPrijmeni" autocomplete="off">
+          <div class="prikaz-suggest-list" id="prikazPrijmeniSuggest"></div>
         </div>
       </div>
       <div class="prikaz-row2">
         <div class="field">
           <label for="prikazNarozeni">Datum narození</label>
-          <input type="text" id="prikazNarozeni" inputmode="numeric" placeholder="DDMMRRRR" maxlength="10" autocomplete="off">
+          <input type="date" id="prikazNarozeni">
         </div>
-        <div class="field">
+        <div class="field prikaz-suggest-wrap">
           <label for="prikazDoklad">Číslo dokladu</label>
           <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
+          <div class="prikaz-suggest-list" id="prikazDokladSuggest"></div>
         </div>
       </div>
       <div class="prikaz-row-address">
@@ -725,9 +728,10 @@
           <input type="text" id="prikazMesto" autocomplete="off" placeholder="obec">
           <div class="prikaz-suggest-list" id="prikazMestoSuggest"></div>
         </div>
-        <div class="field prikaz-housenum-field">
+        <div class="field prikaz-suggest-wrap prikaz-housenum-field">
           <label for="prikazPsc">PSČ</label>
           <input type="text" id="prikazPsc" inputmode="numeric" autocomplete="off">
+          <div class="prikaz-suggest-list" id="prikazPscSuggest"></div>
         </div>
       </div>
       <div class="prikaz-row-address">
@@ -736,9 +740,10 @@
           <input type="text" id="prikazUlice" autocomplete="off" disabled placeholder="nejdřív vyber obec">
           <div class="prikaz-suggest-list" id="prikazUliceSuggest"></div>
         </div>
-        <div class="field prikaz-housenum-field">
+        <div class="field prikaz-suggest-wrap prikaz-housenum-field">
           <label for="prikazCisloDomu">Č. p.</label>
           <input type="text" id="prikazCisloDomu" inputmode="numeric" autocomplete="off">
+          <div class="prikaz-suggest-list" id="prikazCisloDomuSuggest"></div>
         </div>
       </div>
 
@@ -3487,15 +3492,20 @@
   }
 
   const prikazJmenoInput = document.getElementById('prikazJmeno');
+  const prikazJmenoList = document.getElementById('prikazJmenoSuggest');
   const prikazPrijmeniInput = document.getElementById('prikazPrijmeni');
+  const prikazPrijmeniList = document.getElementById('prikazPrijmeniSuggest');
   const prikazNarozeniInput = document.getElementById('prikazNarozeni');
   const prikazDokladInput = document.getElementById('prikazDoklad');
+  const prikazDokladList = document.getElementById('prikazDokladSuggest');
   const prikazMestoInput = document.getElementById('prikazMesto');
   const prikazMestoList = document.getElementById('prikazMestoSuggest');
   const prikazUliceInput = document.getElementById('prikazUlice');
   const prikazUliceList = document.getElementById('prikazUliceSuggest');
   const prikazCisloDomuInput = document.getElementById('prikazCisloDomu');
+  const prikazCisloDomuList = document.getElementById('prikazCisloDomuSuggest');
   const prikazPscInput = document.getElementById('prikazPsc');
+  const prikazPscList = document.getElementById('prikazPscSuggest');
   const prikazVyzvaDatumInput = document.getElementById('prikazVyzvaDatum');
   const prikazVyzvaCasOdInput = document.getElementById('prikazVyzvaCasOd');
   const prikazVyzvaCasDoInput = document.getElementById('prikazVyzvaCasDo');
@@ -3523,20 +3533,55 @@
     });
   }
 
+  // U polí bez reálného zdroje nabídek (jméno, příjmení, čísla) appka
+  // aspoň napodobí STEJNÝ způsob potvrzení, jaký spolehlivě funguje u
+  // adresy/ulice — jak píšeš, pod polem se objeví jedna "nabídka" s tím,
+  // co jsi právě napsal, a klik na ni potvrdí a přeskočí dál (na rozdíl
+  // od "blur" při odchodu z pole, který se na některých polích nespouští
+  // spolehlivě, tohle je vždy explicitní klik).
+  function attachConfirmChip(input, listEl, onConfirm){
+    function render(){
+      const v = input.value.trim();
+      if(!v){ listEl.classList.remove('open'); listEl.innerHTML = ''; return; }
+      listEl.innerHTML = '';
+      const row = document.createElement('div');
+      row.className = 'prikaz-suggest-item';
+      row.innerHTML = escapeHtml(v) + '<span class="sub">Potvrdit a pokračovat</span>';
+      row.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        listEl.classList.remove('open');
+        listEl.innerHTML = '';
+        onConfirm();
+      });
+      listEl.appendChild(row);
+      listEl.classList.add('open');
+    }
+    input.addEventListener('input', render);
+    input.addEventListener('focus', render);
+    input.addEventListener('blur', ()=>{
+      setTimeout(()=> listEl.classList.remove('open'), 150);
+    });
+  }
+
   // Jméno → Příjmení → Datum narození → Číslo dokladu → Adresa (obec).
   advanceOnEnter(prikazJmenoInput);
+  attachConfirmChip(prikazJmenoInput, prikazJmenoList, ()=> focusField(prikazPrijmeniInput));
   prikazJmenoInput.addEventListener('blur', ()=>{
     if(prikazJmenoInput.value.trim()) focusField(prikazPrijmeniInput);
   });
   advanceOnEnter(prikazPrijmeniInput);
+  attachConfirmChip(prikazPrijmeniInput, prikazPrijmeniList, ()=> focusField(prikazNarozeniInput));
   prikazPrijmeniInput.addEventListener('blur', ()=>{
     if(prikazPrijmeniInput.value.trim()) focusField(prikazNarozeniInput);
   });
-  advanceOnEnter(prikazNarozeniInput);
-  prikazNarozeniInput.addEventListener('blur', ()=>{
-    if(prikazNarozeniInput.value.trim()) focusField(prikazDokladInput);
+  // Datum narození je nativní kalendář (den/měsíc/rok) — stejný typ pole
+  // jako "Dostavit se dne", který spolehlivě funguje: výběr rovnou
+  // spouští 'change' a appka jede dál na Číslo dokladu.
+  prikazNarozeniInput.addEventListener('change', ()=>{
+    if(prikazNarozeniInput.value) focusField(prikazDokladInput);
   });
   advanceOnEnter(prikazDokladInput);
+  attachConfirmChip(prikazDokladInput, prikazDokladList, ()=> focusField(prikazMestoInput));
   prikazDokladInput.addEventListener('blur', ()=>{
     if(prikazDokladInput.value.trim()) focusField(prikazMestoInput);
   });
@@ -3585,6 +3630,7 @@
 
   // PSČ → Ulice (odemkne pole, viz checkStreetsAndAdvance výš).
   advanceOnEnter(prikazPscInput);
+  attachConfirmChip(prikazPscInput, prikazPscList, ()=> checkStreetsAndAdvance());
   prikazPscInput.addEventListener('blur', ()=>{
     if(prikazPscInput.value.trim()) checkStreetsAndAdvance();
   });
@@ -3609,6 +3655,9 @@
   // Č.p. → Datum dostavení se (jen u Výzvy — jinde je pole skryté, takže
   // se prostě zavře klávesnice a strážník si dialog jen vizuálně zkontroluje).
   advanceOnEnter(prikazCisloDomuInput);
+  attachConfirmChip(prikazCisloDomuInput, prikazCisloDomuList, ()=>{
+    if(prikazMode === 'vyzva') focusField(prikazVyzvaDatumInput);
+  });
   prikazCisloDomuInput.addEventListener('blur', ()=>{
     if(prikazMode === 'vyzva' && prikazCisloDomuInput.value.trim()) focusField(prikazVyzvaDatumInput);
   });
@@ -3624,20 +3673,25 @@
     if(prikazVyzvaCasOdInput.value) focusField(prikazVyzvaCasDoInput);
   });
 
-  // Pole "Datum narození" — při psaní jen číslice (DDMMRRRR, bez teček,
-  // ať se to na numerické klávesnici píše plynule), po opuštění pole se
-  // přeformátuje na obvyklý zápis s tečkami (DD.MM.RRRR).
-  function formatNarozeniDots(raw){
-    const digits = (raw || '').replace(/\D/g, '');
-    if(digits.length !== 8) return raw;
-    return digits.slice(0,2) + '.' + digits.slice(2,4) + '.' + digits.slice(4,8);
+  // Pole "Datum narození" je teď nativní <input type="date"> (kalendář
+  // den/měsíc/rok, stejně jako "Dostavit se dne"), takže appka mezi sebou
+  // převádí jen dva formáty: co vrací <input type="date"> (ISO
+  // "RRRR-MM-DD") a co appka jinde ukládá/tiskne (tečkovaný zápis
+  // "DD.MM.RRRR" — stejný formát, jaký čte i OCR skenu OP).
+  function isoToDotted(iso){
+    if(!iso) return '';
+    const [y, m, d] = iso.split('-');
+    if(!y || !m || !d) return '';
+    return d + '.' + m + '.' + y;
   }
-  prikazNarozeniInput.addEventListener('input', (e)=>{
-    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
-  });
-  prikazNarozeniInput.addEventListener('blur', (e)=>{
-    e.target.value = formatNarozeniDots(e.target.value);
-  });
+  function dottedToIso(dotted){
+    if(!dotted) return '';
+    const parts = dotted.split('.');
+    if(parts.length !== 3) return '';
+    const [d, m, y] = parts.map(s => s.trim());
+    if(!d || !m || !y || y.length !== 4) return '';
+    return y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
+  }
 
   // Jméno souboru: "Výzva/Oznámení rr-mm-dd - číslo přestupku - spz - příjmení"
   // (datum = den vygenerování dokumentu, ne den přestupku).
@@ -3668,10 +3722,9 @@
 
     const jmeno = document.getElementById('prikazJmeno').value.trim();
     const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
-    // Pro jistotu naformátovat i tady (kdyby náhodou nestihlo proběhnout
-    // "blur" pole datum narození dřív, než appka hodnotu přečte).
-    document.getElementById('prikazNarozeni').value = formatNarozeniDots(document.getElementById('prikazNarozeni').value);
-    const narozeni = document.getElementById('prikazNarozeni').value.trim();
+    // Nativní <input type="date"> vrací ISO formát (RRRR-MM-DD) — appka
+    // ho ukládá/tiskne v tečkovaném zápisu (DD.MM.RRRR).
+    const narozeni = isoToDotted(document.getElementById('prikazNarozeni').value);
     const doklad = document.getElementById('prikazDoklad').value.trim();
     const mestoObec = document.getElementById('prikazMesto').value.trim();
     const psc = document.getElementById('prikazPsc').value.trim();
@@ -3924,7 +3977,7 @@
 
       if(parsed.jmeno) document.getElementById('prikazJmeno').value = toNameCase(parsed.jmeno);
       if(parsed.prijmeni) document.getElementById('prikazPrijmeni').value = toNameCase(parsed.prijmeni);
-      if(parsed.datumNarozeni) document.getElementById('prikazNarozeni').value = parsed.datumNarozeni;
+      if(parsed.datumNarozeni) document.getElementById('prikazNarozeni').value = dottedToIso(parsed.datumNarozeni);
       if(parsed.cisloDokladu) document.getElementById('prikazDoklad').value = parsed.cisloDokladu;
 
       const note = document.getElementById('prikazScanNote');
