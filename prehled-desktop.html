@@ -3697,14 +3697,17 @@
       return;
     }
     if(el.tagName === 'SELECT'){
-      if(wasLive){
-        document.activeElement.blur();
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setTimeout(()=>{ el.focus(); }, 250);
-      } else {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.focus();
-      }
+      // Na rozdíl od kalendáře tu appka žádnou vizuální kolizi s
+      // klávesnicí neřeší (select žádnou klávesnici neotvírá), takže
+      // syntéza "teplý → počkej" tu není potřeba a jen škodí: po výběru
+      // hodnoty zůstává předchozí select sám fokusovaný (wasLive=true),
+      // a odložené .focus() o 250 ms iOS bere stejně jako u kalendáře —
+      // jako přerušení gesta — a druhé kolečko neotevře (přesně tenhle
+      // případ, Čas od → Čas do). Appka proto vždy jen blurne (je-li
+      // co) a hned synchronně zaostří další select.
+      if(wasLive) document.activeElement.blur();
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
       return;
     }
     if(wasLive){
