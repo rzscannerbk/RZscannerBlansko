@@ -855,6 +855,16 @@
     return '<w:r><w:rPr>' + props + '</w:rPr><w:t xml:space="preserve">' + xmlEscape(text) + '</w:t></w:r>';
   }
 
+  // Prokliknutelný text (modrý, podtržený) uvnitř odstavce — relId musí
+  // být předem zaregistrované v relEntries dané appkou (viz volání níž,
+  // typ 'hyperlink' + targetMode 'External').
+  function docxHyperlinkRun(relId, text, opts){
+    opts = opts || {};
+    let props = '<w:color w:val="0563C1"/><w:u w:val="single"/><w:sz w:val="' + (opts.size || 20) + '"/>';
+    if(opts.bold) props += '<w:b/>';
+    return '<w:hyperlink r:id="rId' + relId + '"><w:r><w:rPr>' + props + '</w:rPr><w:t xml:space="preserve">' + xmlEscape(text) + '</w:t></w:r></w:hyperlink>';
+  }
+
   function docxPara(text, opts){
     opts = opts || {};
     let pPr = '';
@@ -1125,6 +1135,12 @@
   async function buildOznameniDocx(record, photosB64, pachatel){
     const offenseCitation = record.offenseCitation || '';
     const offenseLabel = record.offenseLabel || '';
+    // Přesunuto sem (dřív se deklarovalo až u fotek) — appka teď relEntries
+    // potřebuje dřív, kvůli prokliknutelnému GPS odkazu v "Popisu skutku".
+    const mediaFiles = [];
+    const relEntries = [];
+    let relId = 100;
+    let docId = 1;
 
     let body = '';
     body += docxHeaderTable(
@@ -1156,18 +1172,24 @@
     const pachatelJmeno = pachatel ? [pachatel.prijmeni, pachatel.jmeno].filter(Boolean).join(' ') : '';
     body += docxLabelValuePara('Příjmení a jméno:', pachatelJmeno, { size: 20, spacingAfter: 200, valueBold: true });
     body += docxLabelValuePara('Datum narození:', (pachatel && pachatel.datumNarozeni) || '', { size: 20, spacingAfter: 200, valueBold: true });
-    if(pachatel && pachatel.cisloDokladu){
-      body += docxLabelValuePara('Číslo OP:', pachatel.cisloDokladu, { size: 20, spacingAfter: 200, valueBold: true });
-    }
+    // Číslo OP appka do Oznámení záměrně nedává (na výslovné přání).
     const bydlisteAdresa = pachatel && (pachatel.ulice || pachatel.cisloDomu || pachatel.mesto)
       ? [[pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' '), pachatel.mesto].filter(Boolean).join(', ')
       : '';
     body += docxPara('Bydliště: ' + bydlisteAdresa, { size: 20, spacingAfter: 200 });
 
     body += docxPara('Popis skutku:', { bold: true, size: 20, spacingAfter: 100 });
-    let gpsPart = '';
+    // GPS appka dává jako prokliknutelný odkaz na mapy.com (oficiální,
+    // bezklíčové URL — viz https://mapy.com/fnc/v1/showmap) — relId se
+    // registruje do stejného relEntries pole jako fotky, jen s typem
+    // 'hyperlink' (viz docRels níž).
+    let gpsRunXml = '';
     if(record.lat != null && record.lng != null){
-      gpsPart = ' (GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6) + ')';
+      const gpsText = 'GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6);
+      const mapyUrl = 'https://mapy.com/fnc/v1/showmap?center=' + Number(record.lng) + ',' + Number(record.lat) + '&marker=true&zoom=17';
+      relEntries.push({ id: relId, target: mapyUrl, type: 'hyperlink', targetMode: 'External' });
+      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 20, bold: true });
+      relId++;
     }
     // Základní ustanovení (např. § 27 odst. 1 písm. a)) hned za "ustanovení",
     // sankční ustanovení (§ 125c...) až na konci u "dle" — viz komentář u
@@ -1179,11 +1201,21 @@
     const sankceCite = parsedCitation
       ? (parsedCitation.sankce ? (parsedCitation.sankce + ' (zákon č. ' + parsedCitation.law + ')') : baseCite)
       : offenseCitation;
-    const skutek = 'Dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') + ' hodin se dosud neustanovený ' +
-      'řidič vozidla registrační značky ' + (record.plate || '') + '. Na ulici ' + (record.address || '') +
-      gpsPart + ' dopustil porušení ustanovení ' + baseCite + ' – ' + offenseLabel +
-      ', a tím je podezřelý ze spáchání přestupku dle ' + sankceCite;
-    body += docxPara(skutek, { size: 20, spacingAfter: 200 });
+    // Datum+čas, SPZ a právní kvalifikace skutku appka dává tučně (na
+    // výslovné přání) — zbytek věty běžným řezem. GPS (je-li k
+    // dispozici) je navíc tučný prokliknutelný odkaz na mapy.com.
+    let skutekRuns = docxRun('Dne ', { size: 20 }) +
+      docxRun(formatDateCz(record.date) + ' v ' + (record.time || '—'), { size: 20, bold: true }) +
+      docxRun(' hodin se dosud neustanovený řidič vozidla registrační značky ', { size: 20 }) +
+      docxRun(record.plate || '', { size: 20, bold: true }) +
+      docxRun('. Na ulici ' + (record.address || ''), { size: 20 });
+    if(gpsRunXml){
+      skutekRuns += docxRun(' (', { size: 20 }) + gpsRunXml + docxRun(')', { size: 20 });
+    }
+    skutekRuns += docxRun(' dopustil porušení ustanovení ' + baseCite + ' – ', { size: 20 }) +
+      docxRun(offenseLabel, { size: 20, bold: true }) +
+      docxRun(', a tím je podezřelý ze spáchání přestupku dle ' + sankceCite, { size: 20 });
+    body += '<w:p><w:pPr><w:spacing w:before="0" w:after="200"/></w:pPr>' + skutekRuns + '</w:p>';
 
 
     body += docxPara('Lustrací byl(a), jako provozovatel výše uvedeného vozidla, zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
@@ -1198,11 +1230,6 @@
     body += docxPara('- fotodokumentace', { size: 20 });
 
     // Fotky — každá na vlastní A4 stránce v běžné velikosti.
-    const mediaFiles = [];
-    const relEntries = [];
-    let relId = 100;
-    let docId = 1;
-
     if(photosB64.length){
       body += docxPara('Fotodokumentace', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
       for(let i=0;i<photosB64.length;i++){
@@ -1307,7 +1334,10 @@
 
     const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-      relEntries.map(e => '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' + e.target + '"/>').join('') +
+      relEntries.map(e => e.type === 'hyperlink'
+        ? '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + xmlEscape(e.target) + '" TargetMode="External"/>'
+        : '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' + e.target + '"/>'
+      ).join('') +
       '</Relationships>';
 
     const zip = new JSZip();
@@ -2240,7 +2270,10 @@
     function onOutside(e){ if(!panel.contains(e.target) && e.target !== input) close(); }
     function open(){
       const base = input.dataset.iso ? input.dataset.iso.split('-').map(Number) : null;
-      viewYear = base ? base[0] : today.getFullYear();
+      // Bez existující hodnoty appka kalendář neotvírá na aktuálním roce
+      // (u data narození nedává smysl — appka rovnou skočí blíž
+      // typickému věku pachatele, viz opts.defaultYear).
+      viewYear = base ? base[0] : (opts.defaultYear || today.getFullYear());
       viewMonth = base ? base[1] - 1 : today.getMonth();
       render();
       panel.classList.add('open');
@@ -2273,7 +2306,7 @@
   const prikazPscInput = document.getElementById('prikazPsc');
   const prikazPscList = document.getElementById('prikazPscSuggest');
   const prikazVyzvaDatumInput = document.getElementById('prikazVyzvaDatum');
-  initDatePicker(prikazNarozeniInput, document.getElementById('prikazNarozeniPanel'));
+  initDatePicker(prikazNarozeniInput, document.getElementById('prikazNarozeniPanel'), { defaultYear: 1990 });
   initDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'), {
     minYear: new Date().getFullYear(), maxYear: new Date().getFullYear() + 1
   });
