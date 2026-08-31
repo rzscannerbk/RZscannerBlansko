@@ -1605,8 +1605,10 @@
     // (stejný účet/klíč jako Suggest/rgeocode výš) vrátí přímo obrázek
     // s vyznačeným bodem — appka ho vloží úplně stejně jako fotky.
     // Když se o obrázek z nějakého důvodu nepodaří (výpadek API, chybný
-    // klíč), appka mapu prostě vynechá a zbytek dokumentu tím není
-    // dotčený.
+    // klíč, CORS...), appka mapu vynechá a zbytek dokumentu tím není
+    // dotčený — ale NAVÍC (dočasně, kvůli ladění na mobilu bez
+    // DevTools) appka přesnou chybu ukáže přes alert(), ať appka nemusí
+    // sahat po Safari Web Inspectoru na počítači.
     if(record.lat != null && record.lng != null){
       try{
         const staticMapUrl = 'https://api.mapy.com/v1/static/map?' + new URLSearchParams({
@@ -1627,8 +1629,11 @@
           body += docxPara('Mapa místa přestupku', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
           body += docxImageParagraph(relId, mapDims.w, mapDims.h, 170, 240, docId, false);
           relId++; docId++;
+        } else {
+          alert('Mapa se nepodařila (HTTP ' + mapRes.status + ' ' + mapRes.statusText + ') — dokument bude bez mapy. URL: ' + staticMapUrl);
         }
       }catch(e){
+        alert('Mapa se nepodařila (' + (e && e.message ? e.message : e) + ') — dokument bude bez mapy. Nejpravděpodobněji jde o CORS blokaci Static Maps endpointu prohlížečem.');
         console.error('Mapy.com static map selhala (appka mapu do dokumentu nepřidá):', e);
       }
     }
