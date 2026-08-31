@@ -1613,7 +1613,7 @@
       try{
         const staticMapUrl = 'https://api.mapy.com/v1/static/map?' + new URLSearchParams({
           lon: String(record.lng), lat: String(record.lat), zoom: '17',
-          width: '1200', height: '900', mapset: 'basic',
+          width: '640', height: '480', mapset: 'basic',
           markers: 'color:red;size:normal;' + record.lng + ',' + record.lat,
           apikey: MAPY_API_KEY
         }).toString();
