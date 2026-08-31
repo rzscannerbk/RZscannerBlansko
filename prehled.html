@@ -2486,7 +2486,14 @@
   });
   prikazMestoInput.addEventListener('blur', ()=>{
     setTimeout(()=> prikazMestoList.classList.remove('open'), 150);
-    if(prikazMestoInput.value.trim()) focusField(prikazPscInput);
+    // PSČ appka doplňuje sama (viz debouncedMestoSearch výš), takže i
+    // tady po opuštění pole Obec (typicky po ručním napsání obce beze
+    // kliknutí na nabídku) appka jde rovnou na Ulici — ne na PSČ. Dřív
+    // tu byl focusField(prikazPscInput), který furt vyhrával nad novým
+    // skokem na Ulici (viz onPick výš) — obec ztratila fokus kvůli
+    // naplánovanému přeskoku na Ulici, což spustilo TENHLE blur, a ten
+    // fokus poslal zpátky na PSČ (ověřeno, byla to regrese).
+    if(prikazMestoInput.value.trim()) checkStreetsAndAdvance();
   });
 
   // PSČ → Ulice (odemkne pole, viz checkStreetsAndAdvance výš).
