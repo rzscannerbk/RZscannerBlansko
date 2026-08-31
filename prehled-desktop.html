@@ -1398,6 +1398,15 @@
     return arr;
   }
 
+  // Opak base64ToUint8Array — appka to potřebuje pro obrázek mapy
+  // stažený jako binární data z Mapy.com (fetch().arrayBuffer()), aby
+  // ho mohla poslat do getImagePixelSize (ta čeká data URL).
+  function uint8ArrayToBase64(bytes){
+    let binary = '';
+    for(let i=0;i<bytes.length;i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
   // Appka ukládá do Firestore jen spojenou citaci (např. "§ 27 odst. 1
   // písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000
   // Sb.)"), ne samostatně základní paragraf a sankci. Pro "Popis skutku"
@@ -1591,6 +1600,39 @@
 
     body += docxNarrowBoxTable(58, inner);
 
+    // Mapa místa přestupku — poslední stránka dokumentu (za fotkami a
+    // Výzvou), jen když appka má souřadnice. Mapy.com Static Maps API
+    // (stejný účet/klíč jako Suggest/rgeocode výš) vrátí přímo obrázek
+    // s vyznačeným bodem — appka ho vloží úplně stejně jako fotky.
+    // Když se o obrázek z nějakého důvodu nepodaří (výpadek API, chybný
+    // klíč), appka mapu prostě vynechá a zbytek dokumentu tím není
+    // dotčený.
+    if(record.lat != null && record.lng != null){
+      try{
+        const staticMapUrl = 'https://api.mapy.com/v1/static/map?' + new URLSearchParams({
+          lon: String(record.lng), lat: String(record.lat), zoom: '17',
+          width: '1200', height: '900', mapset: 'basic',
+          markers: 'color:red;size:normal;' + record.lng + ',' + record.lat,
+          apikey: MAPY_API_KEY
+        }).toString();
+        const mapRes = await fetch(staticMapUrl);
+        if(mapRes.ok){
+          const mapBytes = new Uint8Array(await mapRes.arrayBuffer());
+          const contentType = mapRes.headers.get('content-type') || 'image/jpeg';
+          const ext = contentType.includes('png') ? 'png' : 'jpeg';
+          const mapFilename = 'map.' + ext;
+          mediaFiles.push({ name: mapFilename, bytes: mapBytes });
+          relEntries.push({ id: relId, target: 'media/' + mapFilename });
+          const mapDims = await getImagePixelSize('data:' + contentType + ';base64,' + uint8ArrayToBase64(mapBytes));
+          body += docxPara('Mapa místa přestupku', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
+          body += docxImageParagraph(relId, mapDims.w, mapDims.h, 170, 240, docId, false);
+          relId++; docId++;
+        }
+      }catch(e){
+        console.error('Mapy.com static map selhala (appka mapu do dokumentu nepřidá):', e);
+      }
+    }
+
     const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
       'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
@@ -1605,6 +1647,7 @@
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
+      '<Default Extension="png" ContentType="image/png"/>' +
       '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
       '</Types>';
 
