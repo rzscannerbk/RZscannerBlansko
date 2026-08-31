@@ -3795,6 +3795,42 @@
     focusField(prikazUliceInput);
   }
 
+  // Suggest API u obce PSČ nevrací (ověřeno — appka ho dřív čekala v
+  // item.zip, ale to pole tam prostě není). PSČ appka dotáhne zvlášť
+  // přes rgeocode na souřadnice vybrané obce (position ze Suggest
+  // odpovědi) — stejný endpoint, jaký appka používá v index.html pro
+  // určení místa podle GPS, jen appka teď hledá "zip"/"psc" v odpovědi
+  // místo jména ulice/obce. Zkouší víc možných názvů pole, protože bez
+  // funkčního API klíče appka nemohla ověřit přesný tvar odpovědi naživo.
+  function extractZipFromRgeoEntity(entity){
+    if(!entity) return '';
+    const candidates = [entity, ...(entity.regionalStructure || [])];
+    for(const c of candidates){
+      if(c && c.zip) return String(c.zip);
+      if(c && c.psc) return String(c.psc);
+      if(c && c.postalCode) return String(c.postalCode);
+    }
+    return '';
+  }
+  async function mapyLookupZip(position){
+    if(!position || typeof position.lat !== 'number' || typeof position.lon !== 'number') return '';
+    try{
+      const url = 'https://api.mapy.com/v1/rgeocode?' + new URLSearchParams({
+        lon: String(position.lon), lat: String(position.lat), lang: 'cs', apikey: MAPY_API_KEY
+      }).toString();
+      const res = await fetch(url);
+      if(!res.ok) return '';
+      const data = await res.json();
+      const items = data.items || [];
+      if(!items.length) return '';
+      return extractZipFromRgeoEntity(items[0]);
+    }catch(e){
+      console.error('Mapy.com rgeocode (PSČ) selhal:', e);
+      return '';
+    }
+  }
+  let mestoZipRequestId = 0;
+
   const debouncedMestoSearch = debounce(async ()=>{
     const q = prikazMestoInput.value.trim();
     if(q.length < 2){ prikazMestoList.classList.remove('open'); return; }
@@ -3802,11 +3838,17 @@
     renderSuggestList(prikazMestoList, items, (item)=>{
       selectedMesto = { name: item.name, position: item.position };
       prikazMestoInput.value = item.name;
-      // PSČ doplní appka sama z Mapy.com (stejná data, co dřív šla rovnou
-      // do pole obce) — pole zůstává editovatelné, kdyby Mapy.com PSČ
-      // pro danou obec/část nevrátilo nebo bylo potřeba ho opravit.
-      if(item.zip) document.getElementById('prikazPsc').value = item.zip;
+      document.getElementById('prikazPsc').value = '';
       focusField(prikazPscInput);
+      // PSČ appka doplní na pozadí, jakmile rgeocode odpoví — pole
+      // zůstává editovatelné, kdyby ho Mapy.com nevrátilo/bylo potřeba
+      // opravit. requestId hlídá, aby pozdější (pomalejší) odpověď pro
+      // dřív vybranou obec nepřepsala PSČ obce, kterou uživatel mezitím
+      // vybral znovu.
+      const requestId = ++mestoZipRequestId;
+      mapyLookupZip(item.position).then(zip=>{
+        if(zip && requestId === mestoZipRequestId) document.getElementById('prikazPsc').value = zip;
+      });
     }, error);
   }, 400);
   advanceOnEnter(prikazMestoInput);
