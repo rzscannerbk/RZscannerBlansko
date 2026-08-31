@@ -2463,15 +2463,19 @@
       selectedMesto = { name: item.name, position: item.position };
       prikazMestoInput.value = item.name;
       document.getElementById('prikazPsc').value = '';
-      focusField(prikazPscInput);
+      // PSČ appka doplní automaticky (viz mapyLookupZip níž) — pole
+      // pro PSČ appka proto při výběru obce vůbec nezaostřuje, jde
+      // rovnou na Ulici (stejná logika jako dřív po ručním zadání PSČ).
+      checkStreetsAndAdvance();
       // PSČ appka doplní na pozadí, jakmile rgeocode odpoví — pole
       // zůstává editovatelné, kdyby ho Mapy.com nevrátilo/bylo potřeba
       // opravit. requestId hlídá, aby pozdější (pomalejší) odpověď pro
       // dřív vybranou obec nepřepsala PSČ obce, kterou uživatel mezitím
-      // vybral znovu.
+      // vybral znovu. Mapy.com PSČ vrací s mezerou ("680 01") — appka ji
+      // odstraní, ať se celé číslo vejde do úzkého pole PSČ.
       const requestId = ++mestoZipRequestId;
       mapyLookupZip(item.position).then(zip=>{
-        if(zip && requestId === mestoZipRequestId) document.getElementById('prikazPsc').value = zip;
+        if(zip && requestId === mestoZipRequestId) document.getElementById('prikazPsc').value = zip.replace(/\s+/g, '');
       });
     }, error);
   }, 400);
