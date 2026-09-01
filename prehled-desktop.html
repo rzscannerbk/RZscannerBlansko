@@ -1309,7 +1309,14 @@
       authorizationIds: authorizationIds,
       solutionIds: solutionIds,
       udalostId: record.mpmUdalostId || null,
-      udalostText: record.mpmUdalostText || null
+      udalostText: record.mpmUdalostText || null,
+      // Jméno/příjmení/datum narození/číslo dokladu appka posílá jen když
+      // je z dialogu "Pachatel" opravdu má (ručně zadané nebo ze skenu
+      // OP) — bookmarklet pole beze změny přeskočí, když jsou prázdná.
+      pachatelJmeno: (record.pachatel && record.pachatel.jmeno) || null,
+      pachatelPrijmeni: (record.pachatel && record.pachatel.prijmeni) || null,
+      pachatelDatumNarozeni: (record.pachatel && record.pachatel.datumNarozeni) || null,
+      pachatelCisloDokladu: (record.pachatel && record.pachatel.cisloDokladu) || null
     };
 
     try{

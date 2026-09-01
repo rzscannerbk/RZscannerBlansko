@@ -1,4 +1,10 @@
 (function(){
+  // DOČASNĚ VYPNUTO (na žádost) — appka po vyplnění formuláře už sama
+  // needá "Uložit a pokračovat", jen nechá formulář vyplněný k ruční
+  // kontrole a uložení. Až budeš chtít vrátit původní chování (rovnou
+  // uložit), stačí přepnout zpátky na true.
+  var AUTO_SAVE = false;
+
   // Krok 2 (nebo jakékoliv další kliknutí): pozná se podle skrytého pole
   // EventID, které MP Manager sám vyplní po prvním uložení. Na čerstvém,
   // ještě neuloženém "Událost - nová" má EventID hodnotu "0". Jakmile má
@@ -37,6 +43,12 @@
     set('tEventTime1', d.timeStart);
     set('tEventDate2', d.dateEnd);
     set('tEventTime2', d.timeEnd);
+    // Údaje o pachateli (jen jméno/příjmení/datum narození/číslo dokladu —
+    // adresu appka do MP Manageru zatím neposílá, nebylo potřeba).
+    set('tKontaktJM', d.pachatelJmeno);
+    set('tKontaktPR', d.pachatelPrijmeni);
+    set('tKontaktDN', d.pachatelDatumNarozeni);
+    set('tKontaktPapers', d.pachatelCisloDokladu);
     var sel = document.getElementById('tTown');
     if(sel && d.town){
       for(var i=0;i<sel.options.length;i++){
@@ -90,18 +102,23 @@
 
     window.__rzScannerMPMFilled = true;
 
-    // Rovnou uložit a pokračovat — jakmile se stránka po uložení
-    // přenačte a dostane reálné EventID, klepni na tuhle záložku znovu:
-    // pozná se podle EventID (viz začátek souboru) a rovnou klikne na
-    // "Ověřit v RSV".
-    var saveBtn = document.getElementById('tSubmitContinue');
-    if(saveBtn){
-      saveBtn.click();
-    } else {
-      alert(d.udalostId
-        ? 'Vyplněno z RZ Scanneru včetně konkrétní kvalifikace, ale nenašel jsem tlačítko "Uložit a pokračovat" — ulož formulář ručně.'
-        : 'Vyplněno z RZ Scanneru, ale nenašel jsem tlačítko "Uložit a pokračovat" — ulož formulář ručně.');
+    if(AUTO_SAVE){
+      // Rovnou uložit a pokračovat — jakmile se stránka po uložení
+      // přenačte a dostane reálné EventID, klepni na tuhle záložku znovu:
+      // pozná se podle EventID (viz začátek souboru) a rovnou klikne na
+      // "Ověřit v RSV".
+      var saveBtn = document.getElementById('tSubmitContinue');
+      if(saveBtn){
+        saveBtn.click();
+      } else {
+        alert(d.udalostId
+          ? 'Vyplněno z RZ Scanneru včetně konkrétní kvalifikace, ale nenašel jsem tlačítko "Uložit a pokračovat" — ulož formulář ručně.'
+          : 'Vyplněno z RZ Scanneru, ale nenašel jsem tlačítko "Uložit a pokračovat" — ulož formulář ručně.');
+      }
     }
+    // AUTO_SAVE === false: appka formulář jen vyplní a nechá ho ke
+    // kontrole — uložení (a tím i druhý krok s "Ověřit v RSV") je teď
+    // na tobě, ručně.
   }).catch(function(){
     alert('Nepodařilo se přečíst schránku ze zásuvky prohlížeče. Zkus to znovu nebo zkontroluj oprávnění ke schránce pro tuto stránku.');
   });
