@@ -333,8 +333,16 @@
   #noticeCardContainer{flex:1 1 340px; max-width:400px;}
   .photo-gallery-first{flex:1 1 340px; max-width:460px;}
   .photo-gallery-first .photo-item{margin-bottom:0;}
-  .panel-actions{display:flex; justify-content:flex-end; padding:8px 22px; border-top:1px solid var(--line); flex:0 0 auto; gap:6px;}
-  .panel-actions .btn{flex:0 0 auto; padding:5px 14px; font-size:6.75px;}
+  .panel-actions{display:flex; align-items:center; justify-content:flex-end; padding:8px 22px; border-top:1px solid var(--line); flex:0 0 auto; gap:6px;}
+  .panel-actions .btn{flex:0 0 auto; padding:7px 19px; font-size:9px;}
+  .doc-link-btn{
+    display:flex; flex-direction:column; align-items:center; gap:1px; flex:0 0 auto;
+    background:transparent; border:1px solid var(--line); border-radius:8px; padding:4px 9px;
+    cursor:pointer; color:var(--muted); font-family:inherit;
+  }
+  .doc-link-btn:hover{border-color:var(--faint); color:var(--text);}
+  .doc-link-icon{font-size:14px; line-height:1;}
+  .doc-link-label{font-size:8.5px; font-family:'Roboto Mono',monospace; letter-spacing:.02em;}
   .resolution-history{padding:8px 22px 0; border-top:1px solid var(--line); flex:0 0 auto; display:none;}
   .resolution-history.has-entries{display:block;}
   .resolution-history-entry{display:flex; gap:12px; font-size:11px; color:var(--muted); padding:3px 0; font-family:'Roboto Mono',monospace;}
@@ -668,7 +676,7 @@
           <span>Pachatel</span>
           <span>Částka</span>
           <span class="head-left sortable" data-sort="status">Stav</span>
-          <span class="sortable" data-sort="sent">Odesláno</span>
+          <span class="sortable" data-sort="sent">Vytvořeno</span>
           <span></span>
         </div>
         <div id="listBody">
@@ -708,6 +716,12 @@
       </div>
       <div class="resolution-history" id="resolutionHistory"></div>
       <div class="panel-actions">
+        <button class="doc-link-btn" id="docLinkVyzva" style="display:none;" title="Znovu stáhnout Výzvu">
+          <span class="doc-link-icon">📄</span><span class="doc-link-label">Výzva</span>
+        </button>
+        <button class="doc-link-btn" id="docLinkOznameni" style="display:none;" title="Znovu stáhnout Oznámení">
+          <span class="doc-link-icon">📄</span><span class="doc-link-label">Oznámení</span>
+        </button>
         <button class="btn btn-ghost" id="mpmExportBtn" title="Zkopírovat údaje pro MP Manager">MPM</button>
         <button class="btn btn-primary" id="resolveMenuBtn">Dořešit</button>
       </div>
@@ -2442,8 +2456,8 @@
     gStatus.appendChild(item('Nevyřešené', statusCounts.pending, filterStatus === 'pending', ()=>{ filterStatus='pending'; refreshView(); }, 'var(--faint)'));
     gStatus.appendChild(item('Oznámeno', statusCounts.oznameni, filterStatus === 'oznameni', ()=>{ filterStatus='oznameni'; refreshView(); }, 'var(--good)'));
     gStatus.appendChild(item('Odeslána výzva', statusCounts.vyzva, filterStatus === 'vyzva', ()=>{ filterStatus='vyzva'; refreshView(); }, 'var(--bad)'));
-    gStatus.appendChild(item('Dořešeno příkazem', statusCounts.prikaz, filterStatus === 'prikaz', ()=>{ filterStatus='prikaz'; refreshView(); }, 'var(--good)'));
-    gStatus.appendChild(item('Dořešeno domluvou', statusCounts.domluva, filterStatus === 'domluva', ()=>{ filterStatus='domluva'; refreshView(); }, 'var(--good)'));
+    gStatus.appendChild(item('Příkazem', statusCounts.prikaz, filterStatus === 'prikaz', ()=>{ filterStatus='prikaz'; refreshView(); }, 'var(--good)'));
+    gStatus.appendChild(item('Domluva', statusCounts.domluva, filterStatus === 'domluva', ()=>{ filterStatus='domluva'; refreshView(); }, 'var(--good)'));
     rail.appendChild(gStatus);
 
     const gType = group('Typ dokumentu');
@@ -2682,15 +2696,19 @@
       const status = document.createElement('span');
       status.className = 'record-status st-' + sKey;
       let statusHtml = '<span class="record-status-top"><span class="dot" title="' + escapeHtml(statusLabel[sKey]) + '"></span>' + escapeHtml(statusLabel[sKey]) + '</span>';
-      if(r.resolved){
-        const resolvedDateStr = formatResolvedDate(r.resolvedAt);
-        // Starší záznamy (appka před touhle úpravou) resolvedByOfficer
-        // ještě nemají — appka radši ukáže prázdno, než aby hádala,
-        // který strážník to tehdy vyřešil.
-        const resolvedOfficer = r.resolvedByOfficer ? officerHeadLabel(r.resolvedByOfficer) : '';
-        if(resolvedDateStr) statusHtml += '<span class="record-status-sub">' + escapeHtml(resolvedDateStr) + '</span>';
-        if(resolvedOfficer) statusHtml += '<span class="record-status-sub">' + escapeHtml(resolvedOfficer) + '</span>';
-      }
+      // Vždy aktuální stav: nevyřešeno → kdy/kým byl přestupek založen;
+      // vyřešeno/editováno → poslední datum a strážník podle
+      // resolvedAt/resolvedByOfficer (markResolved je při každé editaci
+      // posouvá na nejnovější změnu, takže tu není potřeba sahat do
+      // celé resolutionHistory — ta je jen pro patičku detailu).
+      const subDateStr = r.resolved ? formatResolvedDate(r.resolvedAt) : formatResolvedDate(r.createdAt);
+      // Starší vyřešené záznamy (appka před touhle úpravou) resolvedByOfficer
+      // ještě nemají — appka radši ukáže prázdno, než aby hádala,
+      // který strážník to tehdy vyřešil.
+      const subOfficerName = r.resolved ? r.resolvedByOfficer : r.officerName;
+      const subOfficerStr = subOfficerName ? officerHeadLabel(subOfficerName) : '';
+      if(subDateStr) statusHtml += '<span class="record-status-sub">' + escapeHtml(subDateStr) + '</span>';
+      if(subOfficerStr) statusHtml += '<span class="record-status-sub">' + escapeHtml(subOfficerStr) + '</span>';
       status.innerHTML = statusHtml;
       status.title = 'Klikni pro změnu způsobu řešení';
       status.addEventListener('click', (e)=>{
@@ -3514,30 +3532,38 @@
     if(!currentDetailRecord.resolved) await markResolved(currentDetailRecord, 'oznameni');
   });
 
-  // Historie řešení v patičce detailu — první řádek je první doopravdy
-  // uložené řešení, další řádky (pokud appka zaznamenala dodatečné
-  // změny způsobu řešení, viz markResolved) následují pod ním ve
-  // formátu "způsob řešení · datum · str. číslo jméno".
+  // Historie řešení v patičce detailu — úplně první řádek je "Vytvořeno"
+  // (kdy a kým appka přestupek vůbec založila, viz index.html), pak
+  // následuje první doopravdy uložené řešení a případné další změny
+  // způsobu řešení (viz markResolved), všechno ve stejném formátu
+  // "štítek · datum · str. číslo jméno".
   function renderResolutionHistory(record){
     const container = document.getElementById('resolutionHistory');
     if(!container) return;
-    const entries = record.resolutionHistory || [];
-    if(!entries.length){
-      container.innerHTML = '';
-      container.classList.remove('has-entries');
-      return;
-    }
+    const rows = [];
+    rows.push({ label: 'Vytvořeno', dateStr: formatResolvedDate(record.createdAt), officerName: record.officerName });
+    (record.resolutionHistory || []).forEach(e=>{
+      rows.push({ label: UNDO_METHOD_LABEL[e.method] || 'Dořešeno', dateStr: formatResolvedDate(e.resolvedAt), officerName: e.officerName });
+    });
     container.classList.add('has-entries');
-    container.innerHTML = entries.map(e=>{
-      const label = UNDO_METHOD_LABEL[e.method] || 'Dořešeno';
-      const dateStr = formatResolvedDate(e.resolvedAt);
-      const officer = e.officerName ? officerHeadLabel(e.officerName) : '';
+    container.innerHTML = rows.map(r=>{
+      const officer = r.officerName ? officerHeadLabel(r.officerName) : '';
       return '<div class="resolution-history-entry">' +
-        '<span class="rh-method">' + escapeHtml(label) + '</span>' +
-        (dateStr ? '<span class="rh-date">' + escapeHtml(dateStr) + '</span>' : '') +
+        '<span class="rh-method">' + escapeHtml(r.label) + '</span>' +
+        (r.dateStr ? '<span class="rh-date">' + escapeHtml(r.dateStr) + '</span>' : '') +
         (officer ? '<span class="rh-officer">' + escapeHtml(officer) + '</span>' : '') +
         '</div>';
     }).join('');
+
+    // Odkazy na Word dokumenty vedle MPM — appka je ukáže, jen když se
+    // Výzva/Oznámení pro tenhle přestupek opravdu někdy vygenerovaly
+    // (aktuální způsob řešení, nebo dřívější v resolutionHistory, kdyby
+    // se mezitím způsob řešení přeeditoval na jiný — viz editace stavu).
+    const everUsed = method => record.resolvedMethod === method || (record.resolutionHistory || []).some(e => e.method === method);
+    const vyzvaLink = document.getElementById('docLinkVyzva');
+    const oznameniLink = document.getElementById('docLinkOznameni');
+    if(vyzvaLink) vyzvaLink.style.display = everUsed('vyzva') ? '' : 'none';
+    if(oznameniLink) oznameniLink.style.display = everUsed('oznameni') ? '' : 'none';
   }
 
   function updateResolveBtn(record){
@@ -4578,6 +4604,25 @@
   document.getElementById('resolveMenuBtn').addEventListener('click', ()=>{
     document.getElementById('resolveMenuOverlay').classList.add('open');
     menuFocusIndex = -1;
+  });
+
+  // Znovustažení Výzvy/Oznámení z patičky detailu (ikonky vedle MPM) —
+  // appka dokument prostě znovu vygeneruje ze současných dat záznamu
+  // (stejné funkce jako při prvním odeslání), nic si k tomu neukládá
+  // zvlášť. U starší, mezitím přeeditované Výzvy proto termín dostavení
+  // se v dokumentu znovu neobjeví (appka ho nikde neukládá) — pole se
+  // ukáže jako placeholder k ručnímu dopsání, stejně jako u nevyplněné.
+  document.getElementById('docLinkVyzva').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record) return;
+    const filename = buildDocFilename('Výzva', record, record.pachatel);
+    await exportVyzva(record, record.pachatel, filename, null);
+  });
+  document.getElementById('docLinkOznameni').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record) return;
+    const filename = buildDocFilename('Oznámení', record, record.pachatel);
+    await exportOznameni(record, record.pachatel, filename);
   });
 
   document.getElementById('mpmExportBtn').addEventListener('click', async ()=>{
