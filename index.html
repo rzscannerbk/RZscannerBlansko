@@ -3260,6 +3260,22 @@
       document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(lastGeneratedPdf);
       refreshPdfPreviewGallery();
 
+      // Tlačítko "Odeslat" a poznámka pod ním appka resetuje na výchozí
+      // stav vždy, když se tahle obrazovka otevírá pro nový přestupek —
+      // jinak (druhý a další přestupek ve stejné session appky) zůstávalo
+      // tlačítko zaseklé v "Odesílám…"/disabled ze submitAndPrintFromPreview
+      // předchozího přestupku (ta ho na úspěšné cestě záměrně nevrací
+      // zpátky, protože normálně appka rovnou odejde na jinou obrazovku —
+      // jenže "Kontrola údajů" je jedna sdílená obrazovka/tlačítko pro
+      // všechny přestupky, ne nová pro každý).
+      const submitBtn = document.getElementById('pdfPreviewPrintBtn');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Odeslat';
+      const printerNote = document.getElementById('pdfPreviewPrinterNote');
+      printerNote.style.display = 'none';
+      printerNote.style.color = '';
+      printerNote.textContent = '';
+
       // Allow pinch-to-zoom just for this screen, so the photo can be
       // inspected closely — the rest of the app locks zoom out (it
       // interferes with the camera UI).

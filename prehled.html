@@ -1017,19 +1017,24 @@
   async function buildVyzvaDopisDocx(record, pachatel, dostaveniTermin){
     const offenseLabel = record.offenseLabel || '';
     const offenseCitation = record.offenseCitation || '';
+    // Stejné rozdělení "základní/sankční" citace jako u Oznámení (viz
+    // buildOznameniDocx níž) — základní ustanovení (např. § 27 odst. 1
+    // písm. l)) appka dá hned za "přestupku podle", sankční (§ 125c...)
+    // až na konci jako "téhož zákona". Když se citaci nepodaří
+    // rozparsovat (neobvyklý/ruční formát), použije se celá citace na
+    // obou místech beze zkratky.
     const parsedCitation = parseOffenseCitation(offenseCitation);
-    // mpmUdalostText (přesná cesta stromem MP Manageru, viz index.html)
-    // sedí slovně nejblíž vzoru — když ho appka pro daný přestupek nezná,
-    // poskládá se náhradní text stejným způsobem jako u Oznámení.
-    const offenseFullText = record.mpmUdalostText ||
-      ('Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích – ' + offenseCitation + ' – ' + offenseLabel);
-    // Konkrétní popis přestupku je poslední úsek stromové cesty (za
-    // posledním " - ") — přesně ta část, co se má v dopise zvýraznit
-    // tučně, zbytek (obecná citace zákona) zůstává normálním písmem.
-    const lastDashIdx = offenseFullText.lastIndexOf(' - ');
-    const offensePrefix = lastDashIdx !== -1 ? offenseFullText.slice(0, lastDashIdx + 3) : '';
-    const offenseBoldPart = lastDashIdx !== -1 ? offenseFullText.slice(lastDashIdx + 3) : offenseFullText;
-    const shortRef = parsedCitation ? parsedCitation.ref : offenseCitation;
+    const offenseLabelLower = offenseLabel ? (offenseLabel.charAt(0).toLowerCase() + offenseLabel.slice(1)) : '';
+    const skutekBaseCite = parsedCitation ? (parsedCitation.ref + ' zákona č. ' + parsedCitation.law) : offenseCitation;
+    const skutekSankceCite = parsedCitation
+      ? (parsedCitation.sankce ? (parsedCitation.sankce + ' téhož zákona') : ('§ 125c odst. 1 téhož zákona'))
+      : offenseCitation;
+    // Slovesný tvar appka dostává přímo ze záznamu (record.offenseVerb —
+    // ukládá se už z index.html, viz katalog OFFENSES/offenseVerbForm) —
+    // u starších záznamů bez tohoto pole appka spadne zpátky na
+    // podstatné jméno (offenseLabelLower), aby dopis šel vygenerovat
+    // i za cenu drobně horší gramatiky.
+    const offenseVerbText = record.offenseVerb || offenseLabelLower;
     const loc = addressForLetter(record.address);
 
     // Termín dostavení se (datum + časové rozmezí) — appka ho teď bere
@@ -1060,6 +1065,19 @@
       (pachatel && pachatel.mesto) || '[DOPLNIT PSČ A OBEC]'
     ];
 
+    // GPS jako prokliknutelný odkaz na mapy.com — stejné bezklíčové URL
+    // a stejný relEntries mechanismus jako u Oznámení (viz docRels níž).
+    const relEntries = [];
+    let relId = 100;
+    let gpsRunXml = '';
+    if(record.lat != null && record.lng != null){
+      const gpsText = 'GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6);
+      const mapyUrl = 'https://mapy.com/fnc/v1/showmap?center=' + Number(record.lng) + ',' + Number(record.lat) + '&marker=true&zoom=17';
+      relEntries.push({ id: relId, target: mapyUrl, type: 'hyperlink', targetMode: 'External' });
+      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 20 });
+      relId++;
+    }
+
     let body = '';
     body += docxHeaderTable(
       headerLeft,
@@ -1076,21 +1094,25 @@
     body += docxPara('', { size: 20 });
     body += docxPara('VÝZVA', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
 
+    // Stejná stavba věty jako u Oznámení (viz skutekRuns v
+    // buildOznameniDocx) — datum+čas dostavení, popis skutku (slovesný
+    // tvar) a vozidlo appka dává tučně, zbytek běžným řezem.
     const vehicleBoldPart = (record.brand ? (record.brand + ', ') : '') + 'RZ ' + (record.plate || '');
-    body += docxParaRuns([
-      { text: 'Žádáme Vás, abyste se dostavil(a) dne ' },
-      { text: dostaveniDatumCasText, bold: true },
-      { text: ' na Městskou policii Blansko, Sadová č. 2, k podání vysvětlení podle § 11 odst. 1 zák. č. 553/91 Sb., ' +
-        'o obecní policii, ve znění pozdějších předpisů, ve věci objasnění skutečností důležitých pro odhalení pachatele přestupku ' +
-        offensePrefix },
-      { text: offenseBoldPart, bold: true },
-      { text: ', zjištěného dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') + ' hod v ' + loc.city +
-        (loc.locationPhrase ? ', ' + loc.locationPhrase : '') +
-        ', kdy došlo k porušení zákona o provozu na pozemních komunikacích' + (shortRef ? ' - ' + shortRef : '') +
-        ' zák. č. 361/2000 Sb. a to řidičem vozidla ' },
-      { text: vehicleBoldPart, bold: true },
-      { text: '.' }
-    ], { size: 20, spacingAfter: 300 });
+    let vyzvaRuns = docxRun('Žádáme Vás, abyste se dostavil(a) dne ', { size: 20 }) +
+      docxRun(dostaveniDatumCasText, { size: 20, bold: true }) +
+      docxRun(' na Městskou policii Blansko, Sadová č. 2, k podání vysvětlení podle § 11 odst. 1 zákona č. 553/1991 Sb., ' +
+        'o obecní policii, ve znění pozdějších předpisů, ve věci objasnění skutečností důležitých pro odhalení pachatele ' +
+        'přestupku podle ' + skutekBaseCite + ', kterého se dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') +
+        ' hodin dopustil dosud neustanovený řidič vozidla ', { size: 20 }) +
+      docxRun(vehicleBoldPart, { size: 20, bold: true }) +
+      docxRun(' v ' + loc.city + (loc.locationPhrase ? ', ' + loc.locationPhrase : ''), { size: 20 });
+    if(gpsRunXml){
+      vyzvaRuns += docxRun(' (', { size: 20 }) + gpsRunXml + docxRun(')', { size: 20 });
+    }
+    vyzvaRuns += docxRun(' tím, že ', { size: 20 }) +
+      docxRun(offenseVerbText, { size: 20, bold: true }) +
+      docxRun(', čímž naplnil znaky přestupku podle ' + skutekSankceCite + '.', { size: 20 });
+    body += '<w:p><w:pPr><w:spacing w:before="0" w:after="300"/></w:pPr>' + vyzvaRuns + '</w:p>';
 
     body += docxPara('Přineste s sebou tyto doklady:', { size: 20, spacingAfter: 60 });
     body += docxPara('- tuto výzvu', { size: 20 });
@@ -1127,7 +1149,9 @@
       '</Relationships>';
 
     const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      relEntries.map(e => '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + xmlEscape(e.target) + '" TargetMode="External"/>').join('') +
+      '</Relationships>';
 
     const zip = new JSZip();
     zip.file('[Content_Types].xml', contentTypes);
