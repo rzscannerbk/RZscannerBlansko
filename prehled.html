@@ -2203,7 +2203,13 @@
 
   function openPrikazModal(mode){
     prikazMode = mode || 'prikaz';
-    document.getElementById('prikazDialogTitle').textContent = PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz;
+    const titleEl = document.getElementById('prikazDialogTitle');
+    const baseTitle = PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz;
+    // U příkazu appka přidá druhý řádek se zvoleným způsobem platby (viz
+    // prikazPlatbaOverlay) — jinde titulek zůstává jednořádkový jako dřív.
+    titleEl.innerHTML = (prikazMode === 'prikaz' && prikazPlatbaMetoda)
+      ? escapeHtml(baseTitle) + '<br>(' + escapeHtml(prikazPlatbaMetoda) + ')'
+      : escapeHtml(baseTitle);
     document.getElementById('prikazCastkaField').style.display = (prikazMode === 'prikaz') ? '' : 'none';
     document.getElementById('prikazCastka').value = '';
     document.getElementById('prikazJmeno').value = '';
