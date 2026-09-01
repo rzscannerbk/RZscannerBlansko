@@ -1293,6 +1293,18 @@
 
     const solutionIds = ['51772'];
     if(!isBoticka) solutionIds.push('51919');
+    // Způsob řešení (Rej) v MP Manageru appka teď doplní podle toho, jak
+    // byl přestupek doopravdy vyřešený v RZ Scanneru — ID zjištěná přímo
+    // z formuláře MP Manageru (viz "Přístup na služby" strom u tlačítka
+    // Vybrat u pole "Způsob řešení").
+    const MPM_SOLUTION_ID_BY_METHOD = {
+      prikaz: '51761',   // Bloková pokuta (PB)
+      vyzva: '51773',    // Zaslána výzva k podání vysvětlení
+      oznameni: '52146', // ODSA
+      domluva: '51760'   // Domluva
+    };
+    const methodSolutionId = MPM_SOLUTION_ID_BY_METHOD[record.resolvedMethod];
+    if(methodSolutionId) solutionIds.push(methodSolutionId);
 
     const data = {
       rz: record.plate || '',
@@ -1316,7 +1328,11 @@
       pachatelJmeno: (record.pachatel && record.pachatel.jmeno) || null,
       pachatelPrijmeni: (record.pachatel && record.pachatel.prijmeni) || null,
       pachatelDatumNarozeni: (record.pachatel && record.pachatel.datumNarozeni) || null,
-      pachatelCisloDokladu: (record.pachatel && record.pachatel.cisloDokladu) || null
+      pachatelCisloDokladu: (record.pachatel && record.pachatel.cisloDokladu) || null,
+      // Částka pokuty appka posílá jen u "Příkaz na místě" — jinde ji
+      // appka nemá (Výzva/Oznámení/Domluva částku v RZ Scanneru vůbec
+      // nesbírají).
+      penalty: (record.resolvedMethod === 'prikaz' && record.castka != null) ? String(record.castka) : null
     };
 
     try{

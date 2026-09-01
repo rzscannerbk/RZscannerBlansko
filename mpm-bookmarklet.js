@@ -49,6 +49,8 @@
     set('tKontaktPR', d.pachatelPrijmeni);
     set('tKontaktDN', d.pachatelDatumNarozeni);
     set('tKontaktPapers', d.pachatelCisloDokladu);
+    // Částka pokuty (jen u "Příkaz na místě" — jinde appka pole vůbec neposílá).
+    set('tPenalty', d.penalty);
     var sel = document.getElementById('tTown');
     if(sel && d.town){
       for(var i=0;i<sel.options.length;i++){
