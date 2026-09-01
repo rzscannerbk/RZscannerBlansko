@@ -2737,7 +2737,7 @@
       // resolvedAt/resolvedByOfficer (markResolved je při každé editaci
       // posouvá na nejnovější změnu, takže tu není potřeba sahat do
       // celé resolutionHistory — ta je jen pro patičku detailu).
-      const subDateStr = r.resolved ? formatResolvedDate(r.resolvedAt) : formatResolvedDate(r.createdAt);
+      const subDateStr = r.resolved ? formatResolvedDateTime(r.resolvedAt) : formatResolvedDateTime(r.createdAt);
       // Starší vyřešené záznamy (appka před touhle úpravou) resolvedByOfficer
       // ještě nemají — appka pak radši spadne zpátky na strážníka, který
       // přestupek založil, než aby řádek nechala úplně bez jména (v drtivé
