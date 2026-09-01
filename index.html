@@ -855,7 +855,7 @@
 
   <div class="confirm-overlay" id="printerOfflineOverlay">
     <div class="confirm-box">
-      <div class="confirm-text">🖨 Tiskárna není připojena</div>
+      <div class="confirm-text">🖨 Připoj tiskárnu</div>
       <div class="printer-check-note" id="printerOfflineNote">Zkouším se připojit…</div>
       <div class="confirm-btns">
         <button class="confirm-btn confirm-no" id="printerOfflineSkipBtn">Netisknout</button>
@@ -1188,10 +1188,12 @@
 
   // Tlačítko "Odeslat" na Kontrole údajů — nejdřív ověří, že existuje
   // aspoň jedna fotka (bez ní se přestupek vůbec neodešle ani nevytiskne),
-  // pak odešle do přehledu a hned zkusí vytisknout. Když tiskárna zrovna
-  // není dostupná, appka zůstane na téhle obrazovce a nabídne dialog
-  // s možností počkat (appka zkouší připojení na pozadí) nebo přestupek
-  // nechat nevytištěný.
+  // pak VŽDY rovnou odešle do přehledu a zkusí vytisknout — appka už
+  // dopředu nezjišťuje, jestli je tiskárna dostupná (tlačítko je pořád
+  // zeleně aktivní). Když se pak (uvnitř submitAndPrintFromPreview)
+  // ukáže, že tiskárna zrovna není dostupná, appka nabídne dialog
+  // "Připoj tiskárnu" s tlačítkem Tisk, které se samo odemkne, jakmile
+  // appka tiskárnu najde.
   document.getElementById('pdfPreviewPrintBtn').addEventListener('click', ()=>{
     if(!lastGeneratedPdf){
       show('result');
@@ -1199,18 +1201,10 @@
       return;
     }
     if(!lastGeneratedPdf.photos || lastGeneratedPdf.photos.length === 0){
-      // Zastavit průběžné sledování tiskárny, ať ho za pár vteřin
-      // nepřepíše zpátky na "připoj tiskárnu"/schová docela.
-      stopPdfPreviewPrinterPoll();
       const note = document.getElementById('pdfPreviewPrinterNote');
       note.style.display = 'block';
       note.style.color = 'var(--bad)';
       note.textContent = 'Doplň fotodokumentaci.';
-      return;
-    }
-    if(!printerReady){
-      // Krátký ťuk na zašedlé tlačítko schválně nic nedělá — jen dlouhé
-      // podržení (3 s, viz startPrinterHold) odešle přestupek bez tisku.
       return;
     }
     document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
@@ -1223,45 +1217,6 @@
     }
     submitAndPrintFromPreview();
   });
-
-  // Dlouhé podržení (3 s) tlačítka "Odeslat", zatímco je vizuálně
-  // zašedlé (tiskárna nedostupná) — odešle přestupek do přehledu bez
-  // pokusu o tisk. Používá Pointer Events, ať to funguje stejně na
-  // dotyku i myši. Krátké puštění před uplynutím 3 s podržení zruší
-  // beze změny (viz click listener výše — krátký ťuk je no-op).
-  (function(){
-    const btn = document.getElementById('pdfPreviewPrintBtn');
-    let holdTimer = null;
-    let holding = false;
-    let originalText = null;
-
-    function startHold(){
-      if(printerReady || holding || btn.disabled) return;
-      holding = true;
-      originalText = btn.textContent;
-      btn.textContent = 'Držte pro odeslání bez tisku…';
-      holdTimer = setTimeout(()=>{
-        holding = false;
-        btn.textContent = originalText;
-        submitAndPrintFromPreview({ skipPrint: true });
-      }, 3000);
-    }
-    function cancelHold(){
-      if(holdTimer){ clearTimeout(holdTimer); holdTimer = null; }
-      if(holding){
-        holding = false;
-        btn.textContent = originalText;
-      }
-    }
-    btn.addEventListener('pointerdown', startHold);
-    btn.addEventListener('pointerup', cancelHold);
-    btn.addEventListener('pointercancel', cancelHold);
-    btn.addEventListener('pointerleave', cancelHold);
-    // Zablokuje nativní nabídku (Kopírovat/výběr textu) na dlouhý dotyk —
-    // CSS (user-select/touch-callout) to řeší na iOS, tohle je pojistka
-    // pro prohlížeče, kde by se přesto spustilo kontextové menu.
-    btn.addEventListener('contextmenu', (e)=> e.preventDefault());
-  })();
 
   // Živě zkouší dostupnost tiskárny, dokud je dialog "Tiskárna není
   // připojena" otevřený — jakmile appka zjistí, že jde tiskárnu použít,
@@ -1353,10 +1308,7 @@
       note.style.color = 'var(--bad)';
       note.textContent = 'Odeslání se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
       btn.textContent = originalText;
-      // Znovu zkontroluje tiskárnu a obnoví průběžné sledování — tlačítko
-      // tak zůstane zašedlé/aktivní podle skutečného stavu, ne prostě
-      // vždycky odemčené po chybě.
-      updatePrintButtonAvailability();
+      btn.disabled = false;
     }
   }
 
@@ -3149,34 +3101,16 @@
     });
   }
 
-  // Zkontroluje tiskárnu při otevření Kontroly údajů a pak dál na pozadí
-  // v pravidelných intervalech, dokud je appka na téhle obrazovce —
-  // tlačítko "Odeslat" zůstává zašedlé, dokud appka nepotvrdí, že se na
-  // tiskárnu dá přes síť dosáhnout, a samo se aktivuje, jakmile ji
-  // strážník připojí (bez nutnosti cokoliv ručně obnovovat).
+  // Zastaví průběžné sledování tiskárny na obrazovce Kontrola údajů —
+  // appka ho spouštěla, dokud tlačítko "Odeslat" ještě podle dostupnosti
+  // tiskárny šedlo/aktivovalo se; teď je tlačítko vždycky zeleně aktivní
+  // (viz click listener výš) a appka tiskárnu zjišťuje až PO odeslání
+  // (submitAndPrintFromPreview), takže tahle funkce už žádný interval
+  // nikde nespouští — jen tu zůstává jako no-op pro volání, která ji
+  // ještě volají (Zpět, submitAndPrintFromPreview).
   let pdfPreviewPrinterPollTimer = null;
   function stopPdfPreviewPrinterPoll(){
     if(pdfPreviewPrinterPollTimer){ clearInterval(pdfPreviewPrinterPollTimer); pdfPreviewPrinterPollTimer = null; }
-  }
-  // Tlačítko "Odeslat" je bez tiskárny jen VIZUÁLNĚ zašedlé (třída
-  // .btn-dim), ne opravdové [disabled] — to by totiž blokovalo i
-  // dotyková gesta, a appka potřebuje zachytit dlouhé podržení (viz
-  // startPrinterHold níže) i v tomhle stavu. Krátký ťuk beze změny nic
-  // neudělá (viz click listener), jen podržení 3s odešle bez tisku.
-  let printerReady = true;
-  async function updatePrintButtonAvailability(){
-    const btn = document.getElementById('pdfPreviewPrintBtn');
-    const note = document.getElementById('pdfPreviewPrinterNote');
-    async function check(){
-      const reachable = await pingPrinter();
-      printerReady = reachable;
-      btn.classList.toggle('btn-dim', !reachable);
-      note.textContent = reachable ? '' : 'připoj tiskárnu';
-      note.style.display = reachable ? 'none' : 'block';
-    }
-    await check();
-    stopPdfPreviewPrinterPoll();
-    pdfPreviewPrinterPollTimer = setInterval(check, 3000);
   }
 
   function askPrintAfterSubmit(successText){
@@ -3331,7 +3265,6 @@
       // interferes with the camera UI).
       document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5');
       show('pdfPreview');
-      updatePrintButtonAvailability();
 
       saveCurrentToHistory({ plate, date, time, address, offense: selectedOffense });
     }catch(e){
@@ -3406,11 +3339,12 @@
       lastGeneratedPdf.photos.push(processed.split(',')[1]);
       refreshPdfPreviewGallery();
       // Fotka teď existuje, takže případná hláška "Doplň fotodokumentaci"
-      // (a s ní zastavené sledování tiskárny) už neplatí — obnovit.
+      // už neplatí — appka ji jen schová.
       const note = document.getElementById('pdfPreviewPrinterNote');
       if(note.textContent === 'Doplň fotodokumentaci.'){
         note.style.color = '';
-        updatePrintButtonAvailability();
+        note.style.display = 'none';
+        note.textContent = '';
       }
     };
     reader.readAsDataURL(file);
