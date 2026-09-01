@@ -1166,68 +1166,87 @@
     body += docxPara('', { size: 20 });
     body += docxPara('Oznámení přestupku', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
 
-    const intro = 'Podle § 10 odst. 2 zák. č. 553/91 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
-      'Vám oznamuji podezření ze spáchání přestupku: Zákon č. 361/2000 Sb., o provozu na ' +
-      'pozemních komunikacích – ' + offenseCitation + ', jímž se dopustil(a) jednání – ' + offenseLabel +
-      ', z jehož spáchání je důvodně podezřelý(á):';
+    // Základní ustanovení (např. § 4 písm. c)) a sankční ustanovení
+    // (§ 125c...) appka potřebuje zvlášť (na dvou různých místech textu,
+    // každé jednou s celým "zákona č. ..." a podruhé jako "téhož zákona").
+    // Když se citaci z nějakého důvodu nepodaří rozparsovat (neobvyklý/
+    // ruční formát), appka použije celou citaci tak, jak je, a "téhož
+    // zákona" triky vynechá.
+    const parsedCitation = parseOffenseCitation(offenseCitation);
+    const offenseLabelLower = offenseLabel ? (offenseLabel.charAt(0).toLowerCase() + offenseLabel.slice(1)) : '';
+
+    const introCite = parsedCitation
+      ? (parsedCitation.sankce || parsedCitation.ref) + ' zákona č. ' + parsedCitation.law
+      : offenseCitation;
+    const intro = parsedCitation
+      ? ('Podle § 10 odst. 2 zákona č. 553/1991 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
+         'Vám oznamuji podezření ze spáchání přestupku podle ' + introCite + ', porušením ' + parsedCitation.ref +
+         ' téhož zákona' + (offenseLabelLower ? ' (' + offenseLabelLower + ')' : '') +
+         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené RZ a tovární značky, jehož jste provozovatelem.')
+      : ('Podle § 10 odst. 2 zákona č. 553/1991 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
+         'Vám oznamuji podezření ze spáchání přestupku podle ' + introCite +
+         (offenseLabelLower ? ' (' + offenseLabelLower + ')' : '') +
+         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené RZ a tovární značky, jehož jste provozovatelem.');
     body += docxPara(intro, { size: 20, spacingAfter: 200 });
 
-    body += docxLabelValuePara('Provozovatel vozidla RZ:', record.plate || '', { size: 20, spacingAfter: 200, valueBold: true });
+    body += docxLabelValuePara('Registrační značka:', record.plate || '', { size: 20, spacingAfter: 200, valueBold: true });
     if(record.brand || record.color){
-      body += docxLabelValuePara('Tovární značka, barva:', [record.brand, record.color].filter(Boolean).join(', '), { size: 20, spacingAfter: 200 });
+      body += docxLabelValuePara('Tovární značka, barva:', [record.brand, record.color].filter(Boolean).join(', '), { size: 20, spacingAfter: 200, valueBold: true });
     }
-    // Jméno/datum narození/číslo OP se vyplní, pokud je má appka
-    // z dialogu "Pachatel" (ručně zadané nebo ze skenu OP).
+    // Jméno/datum narození se vyplní, pokud je má appka z dialogu
+    // "Pachatel" (ručně zadané nebo ze skenu OP).
     const pachatelJmeno = pachatel ? [pachatel.prijmeni, pachatel.jmeno].filter(Boolean).join(' ') : '';
     body += docxLabelValuePara('Příjmení a jméno:', pachatelJmeno, { size: 20, spacingAfter: 200, valueBold: true });
     body += docxLabelValuePara('Datum narození:', (pachatel && pachatel.datumNarozeni) || '', { size: 20, spacingAfter: 200, valueBold: true });
     // Číslo OP appka do Oznámení záměrně nedává (na výslovné přání).
-    const bydlisteAdresa = pachatel && (pachatel.ulice || pachatel.cisloDomu || pachatel.mesto)
-      ? [[pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' '), pachatel.mesto].filter(Boolean).join(', ')
-      : '';
-    body += docxPara('Bydliště: ' + bydlisteAdresa, { size: 20, spacingAfter: 200 });
+    // Bydliště na dvou řádcích (ulice+č.p. / PSČ+obec — pachatel.mesto už
+    // je appkou uložené jako spojené "PSČ, Obec"), obojí tučně.
+    const bydlisteUlice = pachatel ? [pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' ') : '';
+    body += docxLabelValuePara('Bydliště:', bydlisteUlice, { size: 20, spacingAfter: 0, valueBold: true });
+    body += docxLabelValuePara('', (pachatel && pachatel.mesto) || '', { size: 20, spacingAfter: 200, valueBold: true });
 
     body += docxPara('Popis skutku:', { bold: true, size: 20, spacingAfter: 100 });
     // GPS appka dává jako prokliknutelný odkaz na mapy.com (oficiální,
     // bezklíčové URL — viz https://mapy.com/fnc/v1/showmap) — relId se
     // registruje do stejného relEntries pole jako fotky, jen s typem
-    // 'hyperlink' (viz docRels níž).
+    // 'hyperlink' (viz docRels níž). Podle vzoru appka GPS odkaz nechává
+    // běžným (netučným) řezem — proklik ale zůstává funkční stejně jako
+    // předtím.
     let gpsRunXml = '';
     if(record.lat != null && record.lng != null){
       const gpsText = 'GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6);
       const mapyUrl = 'https://mapy.com/fnc/v1/showmap?center=' + Number(record.lng) + ',' + Number(record.lat) + '&marker=true&zoom=17';
       relEntries.push({ id: relId, target: mapyUrl, type: 'hyperlink', targetMode: 'External' });
-      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 20, bold: true });
+      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 20 });
       relId++;
     }
-    // Základní ustanovení (např. § 27 odst. 1 písm. a)) hned za "ustanovení",
-    // sankční ustanovení (§ 125c...) až na konci u "dle" — viz komentář u
-    // parseOffenseCitation výše. Když se citaci z nějakého důvodu nepodaří
-    // rozparsovat (neobvyklý/ruční formát), appka se vrátí k původnímu
-    // chování a použije celou citaci na obou místech.
-    const parsedCitation = parseOffenseCitation(offenseCitation);
-    const baseCite = parsedCitation ? (parsedCitation.ref + ' (zákon č. ' + parsedCitation.law + ')') : offenseCitation;
-    const sankceCite = parsedCitation
-      ? (parsedCitation.sankce ? (parsedCitation.sankce + ' (zákon č. ' + parsedCitation.law + ')') : baseCite)
+    // Skutek appka staví zrcadlově k úvodnímu odstavci — tam měla "téhož
+    // zákona" základní ustanovení, tady ho má sankční (aby se stejný
+    // "zákon č. ..." v jednom souvislém textu neopakoval dvakrát zbytečně).
+    const skutekSankceCite = parsedCitation
+      ? (parsedCitation.sankce ? (parsedCitation.sankce + ' téhož zákona') : ('§ 125c odst. 1 téhož zákona'))
       : offenseCitation;
-    // Datum+čas, SPZ a právní kvalifikace skutku appka dává tučně (na
-    // výslovné přání) — zbytek věty běžným řezem. GPS (je-li k
-    // dispozici) je navíc tučný prokliknutelný odkaz na mapy.com.
+    const skutekBaseCite = parsedCitation ? (parsedCitation.ref + ' zákona č. ' + parsedCitation.law) : offenseCitation;
+    // Datum+čas, SPZ a právní kvalifikace appka dává tučně (na výslovné
+    // přání) — zbytek věty běžným řezem. offenseLabel je v appce uložený
+    // jako podstatné jméno (katalog 36 přestupků), ne jako sloveso — appka
+    // ho proto místo "tím, že {sloveso}" napojuje pomlčkou jako přístavek
+    // ("jednání – X"), ať to gramaticky sedí pro každý přestupek z katalogu.
     let skutekRuns = docxRun('Dne ', { size: 20 }) +
       docxRun(formatDateCz(record.date) + ' v ' + (record.time || '—'), { size: 20, bold: true }) +
       docxRun(' hodin se dosud neustanovený řidič vozidla registrační značky ', { size: 20 }) +
       docxRun(record.plate || '', { size: 20, bold: true }) +
-      docxRun('. Na ulici ' + (record.address || ''), { size: 20 });
+      docxRun(' v ulici ' + (record.address || ''), { size: 20 });
     if(gpsRunXml){
       skutekRuns += docxRun(' (', { size: 20 }) + gpsRunXml + docxRun(')', { size: 20 });
     }
-    skutekRuns += docxRun(' dopustil porušení ustanovení ' + baseCite + ' – ', { size: 20 }) +
-      docxRun(offenseLabel, { size: 20, bold: true }) +
-      docxRun(', a tím je podezřelý ze spáchání přestupku dle ' + sankceCite, { size: 20 });
+    skutekRuns += docxRun(' dopustil jednání v rozporu s ' + skutekBaseCite + ' – ', { size: 20 }) +
+      docxRun(offenseLabelLower, { size: 20, bold: true }) +
+      docxRun(', čímž naplnil znaky přestupku podle ' + skutekSankceCite + '.', { size: 20 });
     body += '<w:p><w:pPr><w:spacing w:before="0" w:after="200"/></w:pPr>' + skutekRuns + '</w:p>';
 
 
-    body += docxPara('Lustrací byl(a), jako provozovatel výše uvedeného vozidla, zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
+    body += docxPara('Lustrací byl(a) jako provozovatel výše uvedeného vozidla zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
 
     // Podpisový blok + přílohy se odsazují velkou mezerou shora, aby padly
     // co nejblíž ke spodnímu okraji stránky 1 (přibližné — přesná pozice
