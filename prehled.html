@@ -424,6 +424,17 @@
       </div>
     </div>
 
+    <div class="confirm-overlay" id="prikazPlatbaOverlay">
+      <div class="confirm-box">
+        <div class="confirm-btns confirm-btns-col">
+          <button class="confirm-btn confirm-yes" id="platbaHotoveBtn">Hotově</button>
+          <button class="confirm-btn confirm-yes" id="platbaKartouBtn">Kartou</button>
+          <button class="confirm-btn confirm-yes" id="platbaBpnBtn">BPN</button>
+          <button class="confirm-cancel" id="platbaCancelBtn">Zrušit</button>
+        </div>
+      </div>
+    </div>
+
     <div class="confirm-overlay" id="prikazOverlay">
       <div class="prikaz-box">
         <h3 id="prikazDialogTitle">Příkaz na místě</h3>
@@ -2088,14 +2099,17 @@
       resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
       expireAt: expireAt
     };
-    // "Příkaz na místě" nese navíc částku a údaje o pachateli (viz modál
-    // prikazOverlay) — posílá se jen když skutečně existují.
+    // "Příkaz na místě" nese navíc částku, způsob platby a údaje
+    // o pachateli (viz modál prikazOverlay) — posílá se jen když
+    // skutečně existují.
     if(extra && extra.castka != null) updateData.castka = extra.castka;
+    if(extra && extra.platba) updateData.platba = extra.platba;
     if(extra && extra.pachatel) updateData.pachatel = extra.pachatel;
     await db.collection('prestupky').doc(record.id).update(updateData);
     record.resolved = true;
     record.resolvedMethod = method;
     if(extra && extra.castka != null) record.castka = extra.castka;
+    if(extra && extra.platba) record.platba = extra.platba;
     if(extra && extra.pachatel) record.pachatel = extra.pachatel;
     updateResolveBtn(record);
     renderList(document.getElementById('searchInput').value);
@@ -2154,11 +2168,28 @@
     openPrikazModal('vyzva');
   });
 
+  // "Příkaz na místě" appka nejdřív ptá na způsob platby (Hotově/Kartou/
+  // BPN) — teprve po výběru se otevře dialog s údaji přestupce, stejně
+  // jako dřív. Vybraná platba se posílá spolu s částkou (viz
+  // prikazConfirmBtn níž).
+  let prikazPlatbaMetoda = null;
   document.getElementById('menuVyresenoBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
     if(!record || record.resolved) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
+    document.getElementById('prikazPlatbaOverlay').classList.add('open');
+  });
+
+  function choosePlatba(metoda){
+    prikazPlatbaMetoda = metoda;
+    document.getElementById('prikazPlatbaOverlay').classList.remove('open');
     openPrikazModal('prikaz');
+  }
+  document.getElementById('platbaHotoveBtn').addEventListener('click', ()=> choosePlatba('Hotově'));
+  document.getElementById('platbaKartouBtn').addEventListener('click', ()=> choosePlatba('Kartou'));
+  document.getElementById('platbaBpnBtn').addEventListener('click', ()=> choosePlatba('BPN'));
+  document.getElementById('platbaCancelBtn').addEventListener('click', ()=>{
+    document.getElementById('prikazPlatbaOverlay').classList.remove('open');
   });
 
   // ---------- Modál "Příkaz na místě" / "Výzva" / "Oznámení" (pachatel, volitelně sken OP) ----------
@@ -2744,6 +2775,7 @@
         const extra = {};
         if(castkaRaw !== '' && !isNaN(Number(castkaRaw))) extra.castka = Number(castkaRaw);
         if(pachatel) extra.pachatel = pachatel;
+        if(prikazPlatbaMetoda) extra.platba = prikazPlatbaMetoda;
         document.getElementById('prikazOverlay').classList.remove('open');
         await markResolved(record, 'prikaz', extra);
       } else if(prikazMode === 'vyzva'){

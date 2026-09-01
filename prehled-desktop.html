@@ -757,6 +757,17 @@
     </div>
   </div>
 
+  <div class="confirm-overlay" id="prikazPlatbaOverlay">
+    <div class="confirm-box">
+      <div class="confirm-btns confirm-btns-col">
+        <button class="confirm-btn confirm-yes" id="platbaHotoveBtn">Hotově</button>
+        <button class="confirm-btn confirm-yes" id="platbaKartouBtn">Kartou</button>
+        <button class="confirm-btn confirm-yes" id="platbaBpnBtn">BPN</button>
+        <button class="confirm-cancel" id="platbaCancelBtn">Zrušit</button>
+      </div>
+    </div>
+  </div>
+
   <div class="confirm-overlay" id="prikazOverlay">
     <div class="prikaz-box">
       <h3 id="prikazDialogTitle">Příkaz na místě</h3>
@@ -2749,7 +2760,9 @@
 
       const castkaCell = document.createElement('span');
       castkaCell.className = 'record-castka';
-      castkaCell.textContent = (r.castka != null && r.castka !== '') ? (Number(r.castka).toLocaleString('cs-CZ') + ' Kč') : '—';
+      castkaCell.textContent = (r.castka != null && r.castka !== '')
+        ? (Number(r.castka).toLocaleString('cs-CZ') + ' Kč' + (r.platba ? ' (' + r.platba + ')' : ''))
+        : '—';
       item.appendChild(castkaCell);
 
       const status = document.createElement('span');
@@ -3714,10 +3727,12 @@
       resolutionHistory: firebase.firestore.FieldValue.arrayUnion(historyEntry),
       expireAt: expireAt
     };
-    // "Příkaz na místě" nese navíc částku a údaje o pachateli (viz modál
-    // prikazOverlay) — appka je posílá jen když skutečně existují, ať
-    // u ostatních způsobů řešení nepřibývají v Firestore prázdná pole.
+    // "Příkaz na místě" nese navíc částku, způsob platby a údaje
+    // o pachateli (viz modál prikazOverlay) — appka je posílá jen když
+    // skutečně existují, ať u ostatních způsobů řešení nepřibývají
+    // v Firestore prázdná pole.
     if(extra && extra.castka != null) updateData.castka = extra.castka;
+    if(extra && extra.platba) updateData.platba = extra.platba;
     if(extra && extra.pachatel) updateData.pachatel = extra.pachatel;
     await db.collection('prestupky').doc(record.id).update(updateData);
     record.resolved = true;
@@ -3726,6 +3741,7 @@
     record.resolvedAt = new Date();
     record.resolutionHistory = (record.resolutionHistory || []).concat([historyEntry]);
     if(extra && extra.castka != null) record.castka = extra.castka;
+    if(extra && extra.platba) record.platba = extra.platba;
     if(extra && extra.pachatel) record.pachatel = extra.pachatel;
     updateResolveBtn(record);
     if(currentDetailRecord && currentDetailRecord.id === record.id) renderResolutionHistory(record);
@@ -4358,6 +4374,7 @@
         const extra = {};
         if(castkaRaw !== '' && !isNaN(Number(castkaRaw))) extra.castka = Number(castkaRaw);
         if(pachatel) extra.pachatel = pachatel;
+        if(prikazPlatbaMetoda) extra.platba = prikazPlatbaMetoda;
         document.getElementById('prikazOverlay').classList.remove('open');
         await markResolved(record, 'prikaz', extra);
       } else if(prikazMode === 'vyzva'){
@@ -4736,11 +4753,28 @@
     openPrikazModal('vyzva');
   });
 
+  // "Příkaz na místě" appka nejdřív ptá na způsob platby (Hotově/Kartou/
+  // BPN) — teprve po výběru se otevře dialog s údaji přestupce, stejně
+  // jako dřív. Vybraná platba se posílá spolu s částkou (viz
+  // prikazConfirmBtn níž).
+  let prikazPlatbaMetoda = null;
   document.getElementById('menuVyresenoBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
     if(!record) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
+    document.getElementById('prikazPlatbaOverlay').classList.add('open');
+  });
+
+  function choosePlatba(metoda){
+    prikazPlatbaMetoda = metoda;
+    document.getElementById('prikazPlatbaOverlay').classList.remove('open');
     openPrikazModal('prikaz');
+  }
+  document.getElementById('platbaHotoveBtn').addEventListener('click', ()=> choosePlatba('Hotově'));
+  document.getElementById('platbaKartouBtn').addEventListener('click', ()=> choosePlatba('Kartou'));
+  document.getElementById('platbaBpnBtn').addEventListener('click', ()=> choosePlatba('BPN'));
+  document.getElementById('platbaCancelBtn').addEventListener('click', ()=>{
+    document.getElementById('prikazPlatbaOverlay').classList.remove('open');
   });
 
   document.getElementById('menuDomluvaBtn').addEventListener('click', async ()=>{
