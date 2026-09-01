@@ -347,7 +347,7 @@
   .resolution-history.has-entries{display:block;}
   .resolution-history-entry{display:flex; gap:12px; font-size:11px; color:var(--muted); padding:3px 0; font-family:'Roboto Mono',monospace;}
   .resolution-history-entry .rh-method{color:var(--text); font-weight:600; min-width:150px;}
-  .resolution-history-entry .rh-date{min-width:80px;}
+  .resolution-history-entry .rh-date{min-width:120px;}
 
   /* ---------- Souhrn směny ---------- */
   .shift-summary-overlay{
@@ -1135,6 +1135,16 @@
     const d = typeof ts.toDate === 'function' ? ts.toDate() : ts;
     if(!(d instanceof Date) || isNaN(d)) return '';
     return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear();
+  }
+
+  // Stejné jako formatResolvedDate, jen navíc s časem — používá se
+  // v logu historie řešení v patičce detailu.
+  function formatResolvedDateTime(ts){
+    if(!ts) return '';
+    const d = typeof ts.toDate === 'function' ? ts.toDate() : ts;
+    if(!(d instanceof Date) || isNaN(d)) return '';
+    const pad2 = n => String(n).padStart(2, '0');
+    return d.getDate() + '. ' + (d.getMonth() + 1) + '. ' + d.getFullYear() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
   }
 
   // Jméno přihlášeného strážníka odvozené z e-mailu (formát
@@ -2703,10 +2713,11 @@
       // celé resolutionHistory — ta je jen pro patičku detailu).
       const subDateStr = r.resolved ? formatResolvedDate(r.resolvedAt) : formatResolvedDate(r.createdAt);
       // Starší vyřešené záznamy (appka před touhle úpravou) resolvedByOfficer
-      // ještě nemají — appka radši ukáže prázdno, než aby hádala,
-      // který strážník to tehdy vyřešil.
-      const subOfficerName = r.resolved ? r.resolvedByOfficer : r.officerName;
-      const subOfficerStr = subOfficerName ? officerHeadLabel(subOfficerName) : '';
+      // ještě nemají — appka pak radši spadne zpátky na strážníka, který
+      // přestupek založil, než aby řádek nechala úplně bez jména (v drtivé
+      // většině případů je to týž strážník, co ho pak i dořeší).
+      const subOfficerName = r.resolved ? (r.resolvedByOfficer || r.officerName) : r.officerName;
+      const subOfficerStr = subOfficerName ? officerShortLabel(subOfficerName) : '';
       if(subDateStr) statusHtml += '<span class="record-status-sub">' + escapeHtml(subDateStr) + '</span>';
       if(subOfficerStr) statusHtml += '<span class="record-status-sub">' + escapeHtml(subOfficerStr) + '</span>';
       status.innerHTML = statusHtml;
@@ -3320,6 +3331,22 @@
     return 'str.' + (badge ? ' ' + badge : '') + ' ' + officerName;
   }
 
+  // Zkrácený formát pro úzký sloupec STAV v seznamu — "str. 1048
+  // Juračka" (jen příjmení). Když appka zná víc strážníků se stejným
+  // příjmením (aktuálně Tóth Ondřej / Tóth Pavel), přidá k příjmení
+  // iniciálu jména ("Tóth O." / "Tóth P."), ať jde od sebe rozeznat
+  // i ve zkráceném tvaru.
+  function officerShortLabel(officerName){
+    if(!officerName) return '';
+    const badge = OFFICER_BADGE_NUMBERS[officerName];
+    const spaceIdx = officerName.indexOf(' ');
+    const prijmeni = spaceIdx !== -1 ? officerName.slice(0, spaceIdx) : officerName;
+    const jmeno = spaceIdx !== -1 ? officerName.slice(spaceIdx + 1) : '';
+    const sameSurnameCount = Object.keys(OFFICER_BADGE_NUMBERS).filter(n => n.indexOf(prijmeni + ' ') === 0).length;
+    const shortName = (sameSurnameCount > 1 && jmeno) ? (prijmeni + ' ' + jmeno.charAt(0) + '.') : prijmeni;
+    return 'str.' + (badge ? ' ' + badge : '') + ' ' + shortName;
+  }
+
   function pachatelHeadLabel(pachatel){
     return [pachatel.jmeno, pachatel.prijmeni, pachatel.datumNarozeni].filter(Boolean).join(' ');
   }
@@ -3541,9 +3568,9 @@
     const container = document.getElementById('resolutionHistory');
     if(!container) return;
     const rows = [];
-    rows.push({ label: 'Vytvořeno', dateStr: formatResolvedDate(record.createdAt), officerName: record.officerName });
+    rows.push({ label: 'Vytvořeno', dateStr: formatResolvedDateTime(record.createdAt), officerName: record.officerName });
     (record.resolutionHistory || []).forEach(e=>{
-      rows.push({ label: UNDO_METHOD_LABEL[e.method] || 'Dořešeno', dateStr: formatResolvedDate(e.resolvedAt), officerName: e.officerName });
+      rows.push({ label: UNDO_METHOD_LABEL[e.method] || 'Dořešeno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName });
     });
     container.classList.add('has-entries');
     container.innerHTML = rows.map(r=>{
