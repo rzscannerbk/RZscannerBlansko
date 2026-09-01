@@ -2731,14 +2731,14 @@
 
       const sentCol = document.createElement('span');
       sentCol.className = 'record-sent-col';
+      const sentOfficer = document.createElement('span');
+      sentOfficer.className = 'record-sent-time';
+      sentOfficer.textContent = r.officerName ? officerShortLabel(r.officerName) : '—';
+      sentCol.appendChild(sentOfficer);
       const sentDate = document.createElement('span');
       sentDate.className = 'record-sent-date';
-      sentDate.textContent = formatDateCz(r.date);
+      sentDate.textContent = [formatDateCz(r.date), r.time].filter(Boolean).join(' ');
       sentCol.appendChild(sentDate);
-      const sentTime = document.createElement('span');
-      sentTime.className = 'record-sent-time';
-      sentTime.textContent = (r.time || '') + (r.officerName ? ' · ' + r.officerName.split(' ')[0] : '');
-      sentCol.appendChild(sentTime);
       item.appendChild(sentCol);
 
       // Náhled fotky — dotahuje se líně, teprve když řádek vjede do
