@@ -1100,7 +1100,7 @@
     body += docxHeaderTable(
       headerLeft,
       [
-        'Naše  č. j.: [DOPLNIT]',
+        'Naše  č. j.: MP ' + new Date().getFullYear() + '/',
         'Vyřizuje: str. ' + (record.officerName || ''),
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
@@ -1197,7 +1197,7 @@
     body += docxHeaderTable(
       ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'Nám. Republiky 1', '678 01 BLANSKO'],
       [
-        'Naše  č. j.: ' + (record.noticeNumber || ''),
+        'Naše  č. j.: MP ' + new Date().getFullYear() + '/',
         'Vyřizuje: str. ' + (record.officerName || ''),
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
@@ -2156,11 +2156,17 @@
   // odkudkoliv).
   async function markResolved(record, method, extra){
     if(!record) return;
-    // Shortens this record's Firestore TTL from the default 90 days
-    // (set when it was created) to 60 days from now — the "expireAt"
-    // field is what the TTL policy actually watches, so updating it is
-    // enough; no need to move the document anywhere.
-    const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
+    // TTL appka počítá vždycky od VYTVOŘENÍ (ne od okamžiku řešení/
+    // editace) — Příkaz/Domluva/Oznámení dostanou kratší 60denní lhůtu,
+    // Výzva a nevyřešené zůstávají na běžných 90 dnech (stejně jako při
+    // založení v index.html). Appka to přepočítává při každém volání,
+    // takže i zpětná editace (např. Výzva → Příkaz, nebo naopak) lhůtu
+    // vždy správně přenastaví.
+    const createdDate = (record.createdAt && typeof record.createdAt.toDate === 'function')
+      ? record.createdAt.toDate() : new Date();
+    const KEEP_DAYS_BY_METHOD = { prikaz: 60, domluva: 60, oznameni: 60, vyzva: 90 };
+    const keepDays = KEEP_DAYS_BY_METHOD[method] != null ? KEEP_DAYS_BY_METHOD[method] : 90;
+    const expireAt = firebase.firestore.Timestamp.fromDate(new Date(createdDate.getTime() + keepDays*24*60*60*1000));
     const officerName = currentOfficerName() || record.officerName || '';
     // FieldValue.serverTimestamp() nejde použít jako prvek pole
     // (arrayUnion) — Firestore ho tam nechá vyhodnotit jako null. Pro
