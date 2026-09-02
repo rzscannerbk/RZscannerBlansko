@@ -193,7 +193,7 @@
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
   .list-head{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px 36px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
     font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
     color:var(--faint); border-bottom:1px solid var(--line); gap:0 10px;
@@ -212,7 +212,7 @@
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
   .record-item{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px 36px;
     align-items:start; padding:12px 22px; min-height:74px; cursor:pointer;
     border-bottom:1px solid var(--line-soft); position:relative; gap:0 10px;
     background:rgba(51,211,153,.05);
@@ -274,6 +274,11 @@
     position:absolute; right:2px; bottom:2px; background:rgba(0,0,0,.7); color:#fff;
     font-size:9px; font-weight:700; padding:0 4px; border-radius:7px; font-family:'Roboto Mono',monospace;
   }
+  .record-edit-btn{
+    justify-self:center; align-self:center; width:26px; height:26px; border-radius:7px;
+    background:none; border:1px solid var(--line); color:var(--faint); cursor:pointer; font-size:13px;
+  }
+  .record-edit-btn:hover{color:var(--text); border-color:var(--faint);}
 
   /* ---------- FULLSCREEN PROHLÍŽEČ FOTEK ---------- */
   .lightbox-overlay{
@@ -519,6 +524,21 @@
   }
   .prikaz-box h3{font-size:16px; margin:0 0 18px; color:var(--text); text-align:center;}
   .prikaz-box .field{margin-bottom:12px;}
+  .admin-edit-box{max-width:560px;}
+  .admin-edit-scroll{max-height:64vh; overflow-y:auto; padding-right:6px; margin-bottom:16px;}
+  .admin-edit-section{
+    font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint);
+    font-weight:700; margin:18px 0 8px;
+  }
+  .admin-edit-section:first-child{margin-top:0;}
+  .admin-edit-row{display:flex; gap:12px;}
+  .admin-edit-row .field{flex:1; min-width:0;}
+  .admin-edit-note{font-size:12.5px; color:var(--bad); min-height:1.2em; margin-top:4px;}
+  .admin-edit-actions{display:flex; gap:10px;}
+  .admin-edit-actions #adminEditDeleteBtn{color:var(--bad); border-color:var(--bad); flex:0 0 auto;}
+  .admin-edit-actions #adminEditDeleteBtn:hover{background:var(--bad); color:#fff;}
+  .admin-edit-actions #adminEditCancelBtn{flex:0 0 auto;}
+  .admin-edit-actions #adminEditSaveBtn{flex:1;}
   .prikaz-row2{display:flex; gap:12px;}
   .prikaz-row2 .field{flex:1; min-width:0;}
   .prikaz-row-address{display:flex; gap:12px;}
@@ -695,6 +715,7 @@
           <span>Částka</span>
           <span class="head-left sortable" data-sort="status">Stav</span>
           <span class="sortable" data-sort="sent">Vytvořeno</span>
+          <span></span>
           <span></span>
         </div>
         <div id="listBody">
@@ -898,6 +919,76 @@
       </div>
       <div class="panel-actions">
         <button class="btn btn-primary" id="shiftSummaryExportBtn">Exportovat jako .docx</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="confirm-overlay" id="adminEditOverlay">
+    <div class="prikaz-box admin-edit-box">
+      <h3>Upravit přestupek (admin)</h3>
+      <div class="admin-edit-scroll">
+        <div class="admin-edit-section">Vozidlo</div>
+        <div class="admin-edit-row">
+          <div class="field"><label for="aeSpz">SPZ</label><input type="text" id="aeSpz"></div>
+          <div class="field"><label for="aeDocType">Typ</label>
+            <select id="aeDocType"><option value="vyzva">Parkovačka</option><option value="boticka">Botička</option></select>
+          </div>
+        </div>
+        <div class="admin-edit-row">
+          <div class="field"><label for="aeBrand">Značka</label><input type="text" id="aeBrand"></div>
+          <div class="field"><label for="aeColor">Barva</label><input type="text" id="aeColor"></div>
+        </div>
+
+        <div class="admin-edit-section">Místo a čas</div>
+        <div class="field"><label for="aeAddress">Adresa</label><input type="text" id="aeAddress"></div>
+        <div class="admin-edit-row">
+          <div class="field"><label for="aeDate">Datum (RRRR-MM-DD)</label><input type="text" id="aeDate" placeholder="2026-09-02"></div>
+          <div class="field"><label for="aeTime">Čas (HH:MM)</label><input type="text" id="aeTime" placeholder="12:34"></div>
+        </div>
+
+        <div class="admin-edit-section">Přestupek a strážník</div>
+        <div class="field"><label for="aeOffenseLabel">Kvalifikace přestupku</label><input type="text" id="aeOffenseLabel"></div>
+        <div class="field"><label for="aeOffenseCitation">Citace paragrafu</label><input type="text" id="aeOffenseCitation"></div>
+        <div class="field"><label for="aeOfficerName">Strážník (vytvořil)</label><input type="text" id="aeOfficerName" placeholder="Příjmení Jméno"></div>
+
+        <div class="admin-edit-section">Řešení</div>
+        <div class="admin-edit-row">
+          <div class="field"><label for="aeResolvedMethod">Způsob řešení</label>
+            <select id="aeResolvedMethod">
+              <option value="">Nevyřešeno</option>
+              <option value="prikaz">Příkaz na místě</option>
+              <option value="vyzva">Odeslána výzva</option>
+              <option value="domluva">Domluva</option>
+              <option value="oznameni">Oznámeno</option>
+            </select>
+          </div>
+          <div class="field"><label for="aeCastka">Částka (Kč)</label><input type="number" id="aeCastka" min="0" step="1"></div>
+        </div>
+        <div class="field"><label for="aePlatba">Způsob platby</label>
+          <select id="aePlatba"><option value="">—</option><option value="Hotově">Hotově</option><option value="Kartou">Kartou</option><option value="BPN">BPN</option></select>
+        </div>
+
+        <div class="admin-edit-section">Pachatel</div>
+        <div class="admin-edit-row">
+          <div class="field"><label for="aePachatelJmeno">Jméno</label><input type="text" id="aePachatelJmeno"></div>
+          <div class="field"><label for="aePachatelPrijmeni">Příjmení</label><input type="text" id="aePachatelPrijmeni"></div>
+        </div>
+        <div class="admin-edit-row">
+          <div class="field"><label for="aePachatelDatumNarozeni">Datum narození (DD.MM.RRRR)</label><input type="text" id="aePachatelDatumNarozeni"></div>
+          <div class="field"><label for="aePachatelDoklad">Číslo dokladu</label><input type="text" id="aePachatelDoklad"></div>
+        </div>
+        <div class="admin-edit-row">
+          <div class="field"><label for="aePachatelMesto">Obec (příp. "PSČ, Obec")</label><input type="text" id="aePachatelMesto"></div>
+          <div class="field"><label for="aePachatelCisloDomu">Č. p.</label><input type="text" id="aePachatelCisloDomu"></div>
+        </div>
+        <div class="field"><label for="aePachatelUlice">Ulice</label><input type="text" id="aePachatelUlice"></div>
+
+        <div class="admin-edit-note" id="adminEditNote"></div>
+      </div>
+      <div class="admin-edit-actions">
+        <button class="confirm-no confirm-btn" id="adminEditDeleteBtn">🗑 Smazat přestupek</button>
+        <button class="confirm-no confirm-btn" id="adminEditCancelBtn">Zrušit</button>
+        <button class="confirm-yes confirm-btn" id="adminEditSaveBtn">Uložit změny</button>
       </div>
     </div>
   </div>
@@ -2468,6 +2559,146 @@
     if(e.key === 'ArrowRight') document.getElementById('lightboxNext').click();
   });
 
+  // ---------- Admin editace přestupku (tužka úplně vpravo v seznamu) ----------
+  // Heslo appka kontroluje čistě jako pojistku proti omylem kliknutí — je to
+  // klientský JS kód, takže to NENÍ opravdové zabezpečení (kdokoliv se
+  // zdrojovým kódem appky ho uvidí). Nikam se neukládá, jen se porovná.
+  const ADMIN_EDIT_PASSWORD = 'Admin1048';
+  let adminEditRecord = null;
+
+  function openAdminEditGate(record){
+    const input = prompt('Heslo pro úpravu/smazání přestupku:');
+    if(input === null) return;
+    if(input !== ADMIN_EDIT_PASSWORD){
+      alert('Nesprávné heslo.');
+      return;
+    }
+    openAdminEditModal(record);
+  }
+
+  function openAdminEditModal(record){
+    adminEditRecord = record;
+    const note = document.getElementById('adminEditNote');
+    note.textContent = '';
+    document.getElementById('aeSpz').value = record.plate || '';
+    document.getElementById('aeDocType').value = record.docType === 'boticka' ? 'boticka' : 'vyzva';
+    document.getElementById('aeBrand').value = record.brand || '';
+    document.getElementById('aeColor').value = record.color || '';
+    document.getElementById('aeAddress').value = record.address || '';
+    document.getElementById('aeDate').value = record.date || '';
+    document.getElementById('aeTime').value = record.time || '';
+    document.getElementById('aeOffenseLabel').value = record.offenseLabel || '';
+    document.getElementById('aeOffenseCitation').value = record.offenseCitation || '';
+    document.getElementById('aeOfficerName').value = record.officerName || '';
+    document.getElementById('aeResolvedMethod').value = record.resolved ? (record.resolvedMethod || '') : '';
+    document.getElementById('aeCastka').value = record.castka != null ? record.castka : '';
+    document.getElementById('aePlatba').value = record.platba || '';
+    const p = record.pachatel || {};
+    document.getElementById('aePachatelJmeno').value = p.jmeno || '';
+    document.getElementById('aePachatelPrijmeni').value = p.prijmeni || '';
+    document.getElementById('aePachatelDatumNarozeni').value = p.datumNarozeni || '';
+    document.getElementById('aePachatelDoklad').value = p.cisloDokladu || '';
+    document.getElementById('aePachatelMesto').value = p.mesto || '';
+    document.getElementById('aePachatelUlice').value = p.ulice || '';
+    document.getElementById('aePachatelCisloDomu').value = p.cisloDomu || '';
+    document.getElementById('adminEditOverlay').classList.add('open');
+  }
+
+  function closeAdminEditModal(){
+    document.getElementById('adminEditOverlay').classList.remove('open');
+    adminEditRecord = null;
+  }
+
+  document.getElementById('adminEditCancelBtn').addEventListener('click', closeAdminEditModal);
+
+  document.getElementById('adminEditSaveBtn').addEventListener('click', async ()=>{
+    const record = adminEditRecord;
+    if(!record) return;
+    const note = document.getElementById('adminEditNote');
+    const dateVal = document.getElementById('aeDate').value.trim();
+    if(dateVal && !/^\d{4}-\d{2}-\d{2}$/.test(dateVal)){
+      note.textContent = 'Datum musí být ve formátu RRRR-MM-DD.';
+      return;
+    }
+    const resolvedMethod = document.getElementById('aeResolvedMethod').value;
+    const castkaRaw = document.getElementById('aeCastka').value.trim();
+    const pachatel = {
+      jmeno: document.getElementById('aePachatelJmeno').value.trim(),
+      prijmeni: document.getElementById('aePachatelPrijmeni').value.trim(),
+      datumNarozeni: document.getElementById('aePachatelDatumNarozeni').value.trim(),
+      cisloDokladu: document.getElementById('aePachatelDoklad').value.trim(),
+      mesto: document.getElementById('aePachatelMesto').value.trim(),
+      ulice: document.getElementById('aePachatelUlice').value.trim(),
+      cisloDomu: document.getElementById('aePachatelCisloDomu').value.trim()
+    };
+    const hasPachatel = Object.values(pachatel).some(v => v);
+    const updateData = {
+      plate: document.getElementById('aeSpz').value.trim(),
+      docType: document.getElementById('aeDocType').value,
+      brand: document.getElementById('aeBrand').value.trim(),
+      color: document.getElementById('aeColor').value.trim(),
+      address: document.getElementById('aeAddress').value.trim(),
+      date: dateVal,
+      time: document.getElementById('aeTime').value.trim(),
+      offenseLabel: document.getElementById('aeOffenseLabel').value.trim(),
+      offenseCitation: document.getElementById('aeOffenseCitation').value.trim(),
+      officerName: document.getElementById('aeOfficerName').value.trim(),
+      resolved: !!resolvedMethod,
+      castka: castkaRaw !== '' && !isNaN(Number(castkaRaw)) ? Number(castkaRaw) : firebase.firestore.FieldValue.delete(),
+      platba: document.getElementById('aePlatba').value || firebase.firestore.FieldValue.delete(),
+      pachatel: hasPachatel ? pachatel : firebase.firestore.FieldValue.delete()
+    };
+    if(resolvedMethod){
+      updateData.resolvedMethod = resolvedMethod;
+    } else {
+      updateData.resolvedMethod = firebase.firestore.FieldValue.delete();
+      updateData.resolvedAt = firebase.firestore.FieldValue.delete();
+      updateData.resolvedByOfficer = firebase.firestore.FieldValue.delete();
+    }
+    const saveBtn = document.getElementById('adminEditSaveBtn');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Ukládám…';
+    try{
+      await db.collection('prestupky').doc(record.id).update(updateData);
+      Object.assign(record, updateData);
+      if(!hasPachatel) delete record.pachatel;
+      if(castkaRaw === '' || isNaN(Number(castkaRaw))) delete record.castka;
+      if(!document.getElementById('aePlatba').value) delete record.platba;
+      if(!resolvedMethod){ delete record.resolvedMethod; delete record.resolvedAt; delete record.resolvedByOfficer; }
+      refreshView();
+      if(currentDetailRecord && currentDetailRecord.id === record.id) openDetail(record);
+      closeAdminEditModal();
+    }catch(e){
+      console.error('Uložení admin editace selhalo:', e);
+      note.textContent = 'Uložení se nepodařilo (' + (e && e.message ? e.message : e) + ').';
+    }finally{
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Uložit změny';
+    }
+  });
+
+  document.getElementById('adminEditDeleteBtn').addEventListener('click', async ()=>{
+    const record = adminEditRecord;
+    if(!record) return;
+    if(!confirm('Opravdu trvale smazat přestupek ' + (record.plate || '') + ' (' + (record.noticeNumber || record.id) + ')? Tuhle akci appka nejde vzít zpět.')) return;
+    const delBtn = document.getElementById('adminEditDeleteBtn');
+    delBtn.disabled = true;
+    delBtn.textContent = 'Mažu…';
+    try{
+      await db.collection('prestupky').doc(record.id).delete();
+      allRecords = allRecords.filter(r => r.id !== record.id);
+      if(currentDetailRecord && currentDetailRecord.id === record.id) closeDetailModal();
+      refreshView();
+      closeAdminEditModal();
+    }catch(e){
+      console.error('Smazání přestupku selhalo:', e);
+      document.getElementById('adminEditNote').textContent = 'Smazání se nepodařilo (' + (e && e.message ? e.message : e) + ').';
+    }finally{
+      delBtn.disabled = false;
+      delBtn.textContent = '🗑 Smazat přestupek';
+    }
+  });
+
   // Zkracuje opakující se úvod řady kvalifikací přestupků ("Řidič nesmí
   // zastavit a stát ..." / "Řidič smí zastavit a stát jen ...") jen pro
   // zobrazení v řádku seznamu — appka tím ušetří místo, protože tahle
@@ -2871,6 +3102,19 @@
         thumb.innerHTML = '<span class="record-thumb-placeholder">—</span>';
       }
       item.appendChild(thumb);
+
+      // Editační tužka — jen pro admina (heslo), otevře okno se všemi
+      // poli přestupku + smazání. Klik nemá otevírat detail, proto
+      // stopPropagation stejně jako u náhledu fotky.
+      const editBtn = document.createElement('button');
+      editBtn.className = 'record-edit-btn';
+      editBtn.innerHTML = '✎';
+      editBtn.title = 'Upravit/smazat přestupek (admin)';
+      editBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openAdminEditGate(r);
+      });
+      item.appendChild(editBtn);
 
       item.addEventListener('click', ()=>{
         document.querySelectorAll('.record-item.selected').forEach(el=>el.classList.remove('selected'));
