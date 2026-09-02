@@ -98,6 +98,10 @@
   #loginScreen h1{font-size:22px; text-transform:uppercase; margin-bottom:6px;}
   #loginScreen p.hint{color:var(--muted); font-size:13px; line-height:1.5; margin:0 0 26px;}
   .field{background:var(--asphalt-3); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:14px;}
+  #prikazCastkaField{text-align:center;}
+  #prikazCastkaField label{text-align:center;}
+  #prikazCastkaField input{text-align:center;}
+  #prikazCastkaField.prikaz-castka-missing{border-color:var(--bad);}
   .field label{display:block; font-size:10.5px; color:var(--muted); font-family:'Roboto Mono',monospace; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px;}
   .field input{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
   .field select{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
@@ -189,7 +193,7 @@
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
   .list-head{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 84px 150px 130px 64px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
     font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
     color:var(--faint); border-bottom:1px solid var(--line); gap:0 10px;
@@ -208,7 +212,7 @@
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
   .record-item{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 84px 150px 130px 64px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px;
     align-items:start; padding:12px 22px; min-height:74px; cursor:pointer;
     border-bottom:1px solid var(--line-soft); position:relative; gap:0 10px;
     background:rgba(51,211,153,.05);
@@ -3773,6 +3777,7 @@
       : escapeHtml(baseTitle);
     document.getElementById('prikazCastkaField').style.display = (prikazMode === 'prikaz') ? '' : 'none';
     document.getElementById('prikazCastka').value = '';
+    document.getElementById('prikazCastkaField').classList.toggle('prikaz-castka-missing', prikazMode === 'prikaz');
     // Když appka o pachateli už něco ví (typicky editace — mění se jen
     // způsob řešení, ale pachatel se dostaví/je stejný jako předtím,
     // např. Výzva → Příkaz), pole rovnou předvyplní. Poprvé, kdy se
@@ -3818,6 +3823,13 @@
 
   document.getElementById('prikazCancelBtn').addEventListener('click', ()=>{
     document.getElementById('prikazOverlay').classList.remove('open');
+  });
+
+  // Pole Částka appka zvýrazní červeně, dokud u příkazu na místě není
+  // vyplněné (je povinné) — jakmile se do něj něco napíše, zvýraznění
+  // zmizí.
+  document.getElementById('prikazCastka').addEventListener('input', (e)=>{
+    document.getElementById('prikazCastkaField').classList.toggle('prikaz-castka-missing', e.target.value.trim() === '');
   });
 
   // "Vymazat pole" — pro editaci, kdy se dostaví jiný pachatel než
