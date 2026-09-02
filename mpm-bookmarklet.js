@@ -51,6 +51,8 @@
     set('tKontaktPapers', d.pachatelCisloDokladu);
     // Částka pokuty (jen u "Příkaz na místě" — jinde appka pole vůbec neposílá).
     set('tPenalty', d.penalty);
+    // Způsob platby (Hotově/Kartou — BPN v MP Manageru možnost nemá).
+    set('tPayType', d.payType);
     var sel = document.getElementById('tTown');
     if(sel && d.town){
       for(var i=0;i<sel.options.length;i++){

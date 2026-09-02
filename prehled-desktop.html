@@ -1347,7 +1347,11 @@
       // Částka pokuty appka posílá jen u "Příkaz na místě" — jinde ji
       // appka nemá (Výzva/Oznámení/Domluva částku v RZ Scanneru vůbec
       // nesbírají).
-      penalty: (record.resolvedMethod === 'prikaz' && record.castka != null) ? String(record.castka) : null
+      penalty: (record.resolvedMethod === 'prikaz' && record.castka != null) ? String(record.castka) : null,
+      // Způsob platby (select tPayType v MP Manageru zná jen Hotově/
+      // Kartou — BPN tam možnost nemá, takže se nemapuje a pole zůstane
+      // na výchozí prázdné hodnotě).
+      payType: record.platba === 'Hotově' ? 'H' : (record.platba === 'Kartou' ? 'K' : null)
     };
 
     try{
