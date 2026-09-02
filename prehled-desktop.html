@@ -1286,12 +1286,27 @@
     return pad(+d) + '.' + pad(+m) + '.' + y;
   }
 
+  // Firestore Timestamp (nebo obyčejný JS Date) → {date, time} přesně ve
+  // formátu, jaký čekají pole "Začátek/Konec události" v MP Manageru
+  // (tEventDate1/2, tEventTime1/2) — DD.MM.RRRR a HH:MM.
+  function timestampToMpmDateTime(ts){
+    if(!ts) return { date: '', time: '' };
+    const d = typeof ts.toDate === 'function' ? ts.toDate() : ts;
+    if(!(d instanceof Date) || isNaN(d)) return { date: '', time: '' };
+    const pad = n => String(n).padStart(2, '0');
+    return {
+      date: pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear(),
+      time: pad(d.getHours()) + ':' + pad(d.getMinutes())
+    };
+  }
+
   async function exportToMPManager(record){
     if(!record) return;
     const { town, street } = parseAddressForMPM(record.address);
     const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
     const descLines = [];
     descLines.push('Vozidlo RZ ' + (record.plate || '?') + (vehicleBits ? ' (' + vehicleBits + ')' : ''));
+    descLines.push('Datum a čas přestupku: ' + isoToCzDate(record.date) + ' ' + (record.time || ''));
     if(record.offenseLabel){
       descLines.push('Přestupek: ' + record.offenseLabel + (record.offenseCitation ? ' — ' + record.offenseCitation : ''));
     }
@@ -1300,7 +1315,14 @@
       descLines.push('GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6));
     }
 
-    const dateCz = isoToCzDate(record.date);
+    // Začátek události appka posílá jako datum/čas, kdy appka přestupek
+    // vůbec založila (record.createdAt); Konec události jako datum/čas
+    // posledního řešení/editace (record.resolvedAt — markResolved ho
+    // posouvá na nejnovější změnu). Dokud přestupek není vyřešený,
+    // appka pro Konec použije totéž jako Začátek, ať pole nezůstane
+    // prázdné.
+    const eventStart = timestampToMpmDateTime(record.createdAt);
+    const eventEnd = record.resolved ? timestampToMpmDateTime(record.resolvedAt) : eventStart;
     const isBoticka = record.docType === 'boticka';
 
     const authorizationIds = ['40001', '40003'];
@@ -1327,10 +1349,10 @@
       town: town,
       street: street,
       desc: descLines.join('\n'),
-      dateStart: dateCz,
-      timeStart: record.time || '',
-      dateEnd: dateCz,
-      timeEnd: record.time || '',
+      dateStart: eventStart.date,
+      timeStart: eventStart.time,
+      dateEnd: eventEnd.date,
+      timeEnd: eventEnd.time,
       department: { name: 'Výkon služby', id: '16' },
       eventTypeRadioId: 'tKodUdalostiKUP',
       authorizationIds: authorizationIds,
