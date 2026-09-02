@@ -1293,19 +1293,22 @@
 
     body += docxPara('Lustrací byl(a) jako provozovatel výše uvedeného vozidla zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
 
-    // Podpisový blok + přílohy appka nechává v přirozeném toku (žádné
-    // umělé "spacingBefore" tlačící to natvrdo ke spodu stránky — to dřív
-    // uměl u delšího textu skutku přetéct část bloku na druhou stranu,
-    // viz screenshot). Konec stránky 1 appka zaručuje jinak: hned další
-    // část (Fotodokumentace, nebo když není, rovnou Výzva) má
-    // pageBreakBefore, takže "Přílohy:" vždycky zůstane jako poslední
-    // obsah stránky 1, ať je nad ním textu málo nebo hodně.
-    body += docxPara('Ing. Martin Lepka', { size: 20, spacingBefore: 400 });
-    body += docxPara('ředitel MP Blansko', { size: 20, spacingAfter: 400 });
-    body += docxPara('Přílohy:', { size: 20 });
-    body += docxPara('- Výzva', { size: 20 });
-    body += docxPara('- Fotodokumentace', { size: 20 });
-    body += docxPara('- mapa místa přestupku', { size: 20 });
+    // Podpisový blok + přílohy appka dává do patičky STRÁNKY 1 (Word
+    // "different first page footer": w:titlePg + footerReference
+    // type="first", viz sectPr/footer1.xml níž) — ne do běžného toku
+    // textu. To je jediný spolehlivý způsob, jak to mít vždycky
+    // fyzicky na spodním okraji stránky 1, ať je textu skutku nad tím
+    // málo nebo hodně (umělá "spacingBefore" mezera to dřív u delšího
+    // textu uměla přetéct na druhou stranu, viz screenshot) — a
+    // zároveň se to nezopakuje na dalších stránkách (fotky/výzva/mapa),
+    // protože appka pro ně žádnou "default" patičku nedefinuje.
+    let footerBody = '';
+    footerBody += docxPara('Ing. Martin Lepka', { size: 20 });
+    footerBody += docxPara('ředitel MP Blansko', { size: 20, spacingAfter: 400 });
+    footerBody += docxPara('Přílohy:', { size: 20 });
+    footerBody += docxPara('- Výzva', { size: 20 });
+    footerBody += docxPara('- Fotodokumentace', { size: 20 });
+    footerBody += docxPara('- mapa místa přestupku', { size: 20 });
 
     // Fotky — každá na vlastní A4 stránce v běžné velikosti.
     if(photosB64.length){
@@ -1431,9 +1434,18 @@
       'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
       'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
       '<w:body>' + body +
-      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:sectPr><w:footerReference w:type="first" r:id="rIdFooter1"/><w:pgSz w:w="11906" w:h="16838"/>' +
       '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>' +
+      '<w:titlePg/>' +
       '</w:sectPr></w:body></w:document>';
+
+    // Patička jen pro stránku 1 (w:titlePg výše zapíná odlišnou "first
+    // page" patičku — appka žádnou "default" patičku pro další stránky
+    // nedefinuje, takže se tam nic neopakuje).
+    const footerXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      footerBody +
+      '</w:ftr>';
 
     const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
@@ -1442,6 +1454,7 @@
       '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
       '<Default Extension="png" ContentType="image/png"/>' +
       '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' +
       '</Types>';
 
     const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
@@ -1451,6 +1464,7 @@
 
     const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' +
       relEntries.map(e => e.type === 'hyperlink'
         ? '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + xmlEscape(e.target) + '" TargetMode="External"/>'
         : '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' + e.target + '"/>'
@@ -1461,6 +1475,7 @@
     zip.file('[Content_Types].xml', contentTypes);
     zip.file('_rels/.rels', rootRels);
     zip.file('word/document.xml', documentXml);
+    zip.file('word/footer1.xml', footerXml);
     zip.file('word/_rels/document.xml.rels', docRels);
     mediaFiles.forEach(m => zip.file('word/media/' + m.name, m.bytes));
 
