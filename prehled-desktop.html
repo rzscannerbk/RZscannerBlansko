@@ -1567,6 +1567,19 @@
     return '<w:p><w:pPr>' + pPr + '</w:pPr>' + labelRun + tabRun + valueRun + '</w:p>';
   }
 
+  // První řádek bydliště pachatele — "ulice č.p." když obec ulice má,
+  // jinak appka radši dá před číslo popisné jméno obce ("Obora 147"),
+  // ať v dokumentu nezůstane osamocené číslo bez kontextu (u obcí bez
+  // pojmenovaných ulic appka ulici nemá odkud vzít).
+  function pachatelBydlisteRadek1(pachatel){
+    if(!pachatel) return '';
+    if(pachatel.ulice) return [pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' ');
+    const mesto = pachatel.mesto || '';
+    const commaIdx = mesto.indexOf(', ');
+    const obecName = commaIdx !== -1 ? mesto.slice(commaIdx + 2) : mesto;
+    return [obecName, pachatel.cisloDomu].filter(Boolean).join(' ');
+  }
+
   function docxHeaderTable(leftLines, rightLines, leftBold){
     // Mezisloupec (gutter) mezi adresou úřadu a blokem s č.j. — bez něj by
     // sloupce splývaly těsně vedle sebe. Pravý blok tak začíná výrazně
@@ -1713,7 +1726,7 @@
     // Číslo OP appka do Oznámení záměrně nedává (na výslovné přání).
     // Bydliště na dvou řádcích (ulice+č.p. / PSČ+obec — pachatel.mesto už
     // je appkou uložené jako spojené "PSČ, Obec"), obojí tučně.
-    const bydlisteUlice = pachatel ? [pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' ') : '';
+    const bydlisteUlice = pachatelBydlisteRadek1(pachatel);
     body += docxLabelValuePara('Bydliště:', bydlisteUlice, { size: 20, spacingAfter: 0, valueBold: true });
     body += docxLabelValuePara('', (pachatel && pachatel.mesto) || '', { size: 20, spacingAfter: 200, valueBold: true });
 
@@ -2010,9 +2023,7 @@
     // našeptávače Mapy.com u adresy trvalého pobytu) — co chybí, zůstává
     // jako placeholder k ručnímu dopsání.
     const pachatelJmeno = pachatel ? [pachatel.jmeno, pachatel.prijmeni].filter(Boolean).join(' ') : '';
-    const pachatelUlice = pachatel && (pachatel.ulice || pachatel.cisloDomu)
-      ? [pachatel.ulice, pachatel.cisloDomu].filter(Boolean).join(' ')
-      : '';
+    const pachatelUlice = pachatelBydlisteRadek1(pachatel);
     // PSČ + obec vedle sebe (appka posílá "PSČ obec" tak, jak ho vybral
     // z Mapy.com Suggest — pachatel.mesto tak už tenhle formát má).
     const headerLeft = [
