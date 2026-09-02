@@ -518,6 +518,7 @@
 
         <div class="prikaz-actions">
           <button class="confirm-no confirm-btn" id="prikazCancelBtn">Zrušit</button>
+          <button class="confirm-no confirm-btn" id="prikazClearBtn">Vymazat pole</button>
           <button class="confirm-yes confirm-btn" id="prikazConfirmBtn">Potvrdit a uložit</button>
         </div>
       </div>
@@ -1547,6 +1548,22 @@
     return badge ? ('str. ' + badge) : ('str. ' + officerName);
   }
 
+  // Jméno přihlášeného strážníka odvozené z e-mailu (formát
+  // "prijmeni.cislo@rzscanner.cz", viz auth) — appka číslo najde ve
+  // OFFICER_BADGE_NUMBERS obráceně. Bez shody appka radši nechá prázdno,
+  // než aby do "kdo řešil" zapsala nesmyslnou hodnotu z e-mailu.
+  function currentOfficerName(){
+    const email = auth.currentUser && auth.currentUser.email;
+    if(!email) return '';
+    const m = email.match(/\.(\d+)@/);
+    if(!m) return '';
+    const badge = m[1];
+    for(const name in OFFICER_BADGE_NUMBERS){
+      if(OFFICER_BADGE_NUMBERS[name] === badge) return name;
+    }
+    return '';
+  }
+
   function getPrinterHost(){
     return (localStorage.getItem('eposPrinterHost') || '').trim();
   }
@@ -2069,10 +2086,14 @@
       } else {
         menuBtn.textContent = '✓ Dořešeno';
       }
-      vyresenoBtn.textContent = '✓ ' + penaltyText;
-      vyresenoBtn.disabled = true;
+      // Tlačítka v nabídce appka NEzakazuje, i když je přestupek už
+      // vyřešený — klik na jinou možnost teď slouží k dodatečné změně
+      // způsobu řešení (viz markResolved níž, umí i editaci), jen appka
+      // u toho aktuálně platného způsobu nechává značku ✓ pro přehled.
+      vyresenoBtn.textContent = (record.resolvedMethod === 'prikaz' ? '✓ ' : '') + penaltyText;
+      vyresenoBtn.disabled = false;
       domluvaBtn.textContent = record.resolvedMethod === 'domluva' ? '✓ Domluva' : 'Domluva';
-      domluvaBtn.disabled = true;
+      domluvaBtn.disabled = false;
     } else {
       menuBtn.textContent = 'Dořešit';
       vyresenoBtn.textContent = penaltyText;
@@ -2085,18 +2106,32 @@
   // Sdílené označení přestupku jako vyřešeného — volá se jak po úspěšném
   // otevření dokumentu "Oznámení", tak po klepnutí na "Příkaz na místě".
   // "method" rozlišuje, jaký text appka pak zobrazí (viz updateResolveBtn
-  // a vykreslení odznaku v seznamu).
+  // a vykreslení odznaku v seznamu). Funguje i na už vyřešený přestupek —
+  // to je "editace" (změna způsobu řešení, klik na jinou možnost v
+  // nabídce Dořešit) — appka pak jen posune resolvedMethod/resolvedAt na
+  // novou hodnotu a předchozí řešení nechá zaznamenané v
+  // resolutionHistory (log appka zobrazuje jen v přehledu desktop, ale
+  // appka ho zapisuje z obou appek stejně, ať je úplný, ať se řeší
+  // odkudkoliv).
   async function markResolved(record, method, extra){
-    if(!record || record.resolved) return;
+    if(!record) return;
     // Shortens this record's Firestore TTL from the default 90 days
     // (set when it was created) to 60 days from now — the "expireAt"
     // field is what the TTL policy actually watches, so updating it is
     // enough; no need to move the document anywhere.
     const expireAt = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 60*24*60*60*1000));
+    const officerName = currentOfficerName() || record.officerName || '';
+    // FieldValue.serverTimestamp() nejde použít jako prvek pole
+    // (arrayUnion) — Firestore ho tam nechá vyhodnotit jako null. Pro
+    // záznam v historii proto appka bere aktuální čas z klienta; pro
+    // "resolvedAt" nahoře (aktuální/poslední řešení) zůstává serverAt.
+    const historyEntry = { method, resolvedAt: firebase.firestore.Timestamp.now(), officerName };
     const updateData = {
       resolved: true,
       resolvedMethod: method,
       resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      resolvedByOfficer: officerName,
+      resolutionHistory: firebase.firestore.FieldValue.arrayUnion(historyEntry),
       expireAt: expireAt
     };
     // "Příkaz na místě" nese navíc částku, způsob platby a údaje
@@ -2108,6 +2143,9 @@
     await db.collection('prestupky').doc(record.id).update(updateData);
     record.resolved = true;
     record.resolvedMethod = method;
+    record.resolvedByOfficer = officerName;
+    record.resolvedAt = new Date();
+    record.resolutionHistory = (record.resolutionHistory || []).concat([historyEntry]);
     if(extra && extra.castka != null) record.castka = extra.castka;
     if(extra && extra.platba) record.platba = extra.platba;
     if(extra && extra.pachatel) record.pachatel = extra.pachatel;
@@ -2156,14 +2194,14 @@
 
   document.getElementById('menuOznameniBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
-    if(!record || record.resolved) return;
+    if(!record) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
     openPrikazModal('oznameni');
   });
 
   document.getElementById('menuVyzvaBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
-    if(!record || record.resolved) return;
+    if(!record) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
     openPrikazModal('vyzva');
   });
@@ -2175,7 +2213,7 @@
   let prikazPlatbaMetoda = null;
   document.getElementById('menuVyresenoBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
-    if(!record || record.resolved) return;
+    if(!record) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
     document.getElementById('prikazPlatbaOverlay').classList.add('open');
   });
@@ -2212,17 +2250,34 @@
       : escapeHtml(baseTitle);
     document.getElementById('prikazCastkaField').style.display = (prikazMode === 'prikaz') ? '' : 'none';
     document.getElementById('prikazCastka').value = '';
-    document.getElementById('prikazJmeno').value = '';
-    document.getElementById('prikazPrijmeni').value = '';
-    document.getElementById('prikazNarozeni')._setDatePickerIso('');
-    document.getElementById('prikazDoklad').value = '';
-    document.getElementById('prikazMesto').value = '';
-    document.getElementById('prikazPsc').value = '';
-    document.getElementById('prikazUlice').value = '';
-    document.getElementById('prikazUlice').disabled = true;
-    document.getElementById('prikazUlice').placeholder = 'nejdřív vyber obec';
-    document.getElementById('prikazCisloDomu').value = '';
-    selectedMesto = null;
+    // Když appka o pachateli už něco ví (typicky editace — mění se jen
+    // způsob řešení, ale pachatel se dostaví/je stejný jako předtím,
+    // např. Výzva → Příkaz), pole rovnou předvyplní. Poprvé, kdy se
+    // dialog otevírá, record.pachatel ještě neexistuje, takže pole
+    // zůstanou prázdná stejně jako dřív.
+    const p = currentDetailRecord && currentDetailRecord.pachatel;
+    document.getElementById('prikazJmeno').value = (p && p.jmeno) || '';
+    document.getElementById('prikazPrijmeni').value = (p && p.prijmeni) || '';
+    document.getElementById('prikazNarozeni')._setDatePickerIso(p && p.datumNarozeni ? dottedToIso(p.datumNarozeni) : '');
+    document.getElementById('prikazDoklad').value = (p && p.cisloDokladu) || '';
+    // pachatel.mesto appka ukládá jako spojené "PSČ, Obec" (viz confirm
+    // handler níž) — appka ho tady zase rozdělí zpátky do dvou polí.
+    let prefillPsc = '', prefillObec = '';
+    if(p && p.mesto){
+      const commaIdx = p.mesto.indexOf(', ');
+      if(commaIdx !== -1){ prefillPsc = p.mesto.slice(0, commaIdx); prefillObec = p.mesto.slice(commaIdx + 2); }
+      else { prefillObec = p.mesto; }
+    }
+    document.getElementById('prikazMesto').value = prefillObec;
+    document.getElementById('prikazPsc').value = prefillPsc;
+    document.getElementById('prikazUlice').value = (p && p.ulice) || '';
+    // Bez uloženého Mapy.com "position" appka nemá přesnou geolokaci
+    // obce k dispozici (jen její název) — pro doplňkový typeahead ulic
+    // to stačí, appka jím jen omezuje hledání na tuhle obec.
+    selectedMesto = prefillObec ? { name: prefillObec, position: null } : null;
+    document.getElementById('prikazUlice').disabled = !prefillObec;
+    document.getElementById('prikazUlice').placeholder = prefillObec ? 'ulice (nepovinné)' : 'nejdřív vyber obec';
+    document.getElementById('prikazCisloDomu').value = (p && p.cisloDomu) || '';
     // Termín dostavení se — jen u Výzvy, jinde se pole vůbec nezobrazí.
     const showVyzvaTermin = (prikazMode === 'vyzva');
     document.getElementById('prikazVyzvaDatumField').style.display = showVyzvaTermin ? '' : 'none';
@@ -2239,6 +2294,24 @@
 
   document.getElementById('prikazCancelBtn').addEventListener('click', ()=>{
     document.getElementById('prikazOverlay').classList.remove('open');
+  });
+
+  // "Vymazat pole" — pro editaci, kdy se dostaví jiný pachatel než
+  // předtím: appka smaže jen předvyplněné údaje o pachateli (viz
+  // openPrikazModal), Částku a termín Výzvy nechává beze změny.
+  document.getElementById('prikazClearBtn').addEventListener('click', ()=>{
+    document.getElementById('prikazJmeno').value = '';
+    document.getElementById('prikazPrijmeni').value = '';
+    document.getElementById('prikazNarozeni')._setDatePickerIso('');
+    document.getElementById('prikazDoklad').value = '';
+    document.getElementById('prikazMesto').value = '';
+    document.getElementById('prikazPsc').value = '';
+    document.getElementById('prikazUlice').value = '';
+    document.getElementById('prikazUlice').disabled = true;
+    document.getElementById('prikazUlice').placeholder = 'nejdřív vyber obec';
+    document.getElementById('prikazCisloDomu').value = '';
+    selectedMesto = null;
+    document.getElementById('prikazJmeno').focus();
   });
 
   // ---------- Adresa trvalého pobytu — Mapy.com Suggest API ----------
@@ -2741,7 +2814,7 @@
 
   document.getElementById('prikazConfirmBtn').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
-    if(!record || record.resolved) return;
+    if(!record) return;
     const castkaRaw = document.getElementById('prikazCastka').value.trim();
 
     // U příkazu na místě je částka povinná — bez ní appka neuloží a
@@ -3010,7 +3083,7 @@
 
   document.getElementById('menuDomluvaBtn').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
-    if(!record || record.resolved) return;
+    if(!record) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
     const btn = document.getElementById('menuDomluvaBtn');
     btn.disabled = true;
