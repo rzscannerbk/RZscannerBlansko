@@ -1126,11 +1126,11 @@
       offenseCitation: lastGeneratedPdf.offenseCitation,
       hasPhotos: photos.length > 0,
       resolved: false,
-      // Default retention for an unresolved offense: 90 days. Marking it
+      // Default retention for an unresolved offense: 180 days. Marking it
       // "Dořešeno" in the přehled shortens this to 60 days from that
       // moment — Firestore's TTL policy (configured on this same field)
       // deletes the document automatically once it's past.
-      expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 90*24*60*60*1000)),
+      expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180*24*60*60*1000)),
       submittedBy: auth.currentUser ? auth.currentUser.email : null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };

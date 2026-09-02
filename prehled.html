@@ -2158,14 +2158,14 @@
     if(!record) return;
     // TTL appka počítá vždycky od VYTVOŘENÍ (ne od okamžiku řešení/
     // editace) — Příkaz/Domluva/Oznámení dostanou kratší 60denní lhůtu,
-    // Výzva a nevyřešené zůstávají na běžných 90 dnech (stejně jako při
+    // Výzva a nevyřešené zůstávají na 180 dnech (6 měsíců, stejně jako při
     // založení v index.html). Appka to přepočítává při každém volání,
     // takže i zpětná editace (např. Výzva → Příkaz, nebo naopak) lhůtu
     // vždy správně přenastaví.
     const createdDate = (record.createdAt && typeof record.createdAt.toDate === 'function')
       ? record.createdAt.toDate() : new Date();
-    const KEEP_DAYS_BY_METHOD = { prikaz: 60, domluva: 60, oznameni: 60, vyzva: 90 };
-    const keepDays = KEEP_DAYS_BY_METHOD[method] != null ? KEEP_DAYS_BY_METHOD[method] : 90;
+    const KEEP_DAYS_BY_METHOD = { prikaz: 60, domluva: 60, oznameni: 60, vyzva: 180 };
+    const keepDays = KEEP_DAYS_BY_METHOD[method] != null ? KEEP_DAYS_BY_METHOD[method] : 180;
     const expireAt = firebase.firestore.Timestamp.fromDate(new Date(createdDate.getTime() + keepDays*24*60*60*1000));
     const officerName = currentOfficerName() || record.officerName || '';
     // FieldValue.serverTimestamp() nejde použít jako prvek pole

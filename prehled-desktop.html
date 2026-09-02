@@ -3759,14 +3759,14 @@
     const isEdit = !!record.resolved;
     // TTL appka počítá vždycky od VYTVOŘENÍ (ne od okamžiku řešení/
     // editace) — Příkaz/Domluva/Oznámení dostanou kratší 60denní lhůtu,
-    // Výzva a nevyřešené zůstávají na běžných 90 dnech (stejně jako při
+    // Výzva a nevyřešené zůstávají na 180 dnech (6 měsíců, stejně jako při
     // založení v index.html). Appka to přepočítává při každém volání,
     // takže i zpětná editace (např. Výzva → Příkaz, nebo naopak) lhůtu
     // vždy správně přenastaví.
     const createdDate = (record.createdAt && typeof record.createdAt.toDate === 'function')
       ? record.createdAt.toDate() : new Date();
-    const KEEP_DAYS_BY_METHOD = { prikaz: 60, domluva: 60, oznameni: 60, vyzva: 90 };
-    const keepDays = KEEP_DAYS_BY_METHOD[method] != null ? KEEP_DAYS_BY_METHOD[method] : 90;
+    const KEEP_DAYS_BY_METHOD = { prikaz: 60, domluva: 60, oznameni: 60, vyzva: 180 };
+    const keepDays = KEEP_DAYS_BY_METHOD[method] != null ? KEEP_DAYS_BY_METHOD[method] : 180;
     const expireAt = firebase.firestore.Timestamp.fromDate(new Date(createdDate.getTime() + keepDays*24*60*60*1000));
     const officerName = currentOfficerName() || record.officerName || '';
     // FieldValue.serverTimestamp() nejde použít jako prvek pole
@@ -4700,7 +4700,7 @@
   // Vrátí přestupek zpět na nevyřešený — používá se jen z tlačítka "Zpět"
   // v toastu do 5 vteřin po Dořešit, pro omylem kliknuté případy.
   async function undoResolved(record){
-    // Stejně jako v markResolved — 90 dní appka počítá od VYTVOŘENÍ, ne
+    // Stejně jako v markResolved — 180 dní appka počítá od VYTVOŘENÍ, ne
     // od téhle chvíle, ať "Zpět" nedá nevyřešenému přestupku o pár
     // sekund delší lhůtu, než by měl mít normálně.
     const createdDate = (record.createdAt && typeof record.createdAt.toDate === 'function')
@@ -4709,7 +4709,7 @@
       resolved: false,
       resolvedMethod: firebase.firestore.FieldValue.delete(),
       resolvedAt: firebase.firestore.FieldValue.delete(),
-      expireAt: firebase.firestore.Timestamp.fromDate(new Date(createdDate.getTime() + 90*24*60*60*1000))
+      expireAt: firebase.firestore.Timestamp.fromDate(new Date(createdDate.getTime() + 180*24*60*60*1000))
     });
     record.resolved = false;
     delete record.resolvedMethod;
