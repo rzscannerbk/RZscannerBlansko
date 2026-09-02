@@ -303,6 +303,7 @@
   }
   .record-officer{font-size:11.5px; color:var(--text); font-weight:600;}
   .record-submitted{font-size:10.5px; color:var(--muted); overflow-wrap:anywhere; text-align:right;}
+  .record-resolved-by{font-size:10.5px; color:var(--muted); overflow-wrap:anywhere; text-align:right;}
 
   /* ---------- DETAIL ---------- */
   #detailScreen{background:#111; position:relative;}
@@ -748,8 +749,9 @@
   }
 
   function formatCreatedAt(ts){
-    if(!ts || !ts.toDate) return '';
-    const d = ts.toDate();
+    if(!ts) return '';
+    const d = typeof ts.toDate === 'function' ? ts.toDate() : ts;
+    if(!(d instanceof Date) || isNaN(d)) return '';
     const pad = n => String(n).padStart(2,'0');
     return pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
@@ -1878,8 +1880,21 @@
 
       const sub = document.createElement('div');
       sub.className = 'record-submitted';
-      sub.textContent = 'Odesláno ' + formatCreatedAt(r.createdAt) + (r.submittedBy ? ' · ' + r.submittedBy : '');
+      sub.textContent = 'Vytvořeno ' + formatCreatedAt(r.createdAt) + (r.submittedBy ? ' · ' + r.submittedBy : '');
       footer.appendChild(sub);
+
+      // "Řešeno" appka ukáže jen u vyřešených přestupků — poslední
+      // úprava (viz resolvedByOfficer, markResolved ho posouvá na
+      // nejnovější řešení/editaci), ve formátu "str. číslo jméno".
+      if(r.resolved && r.resolvedByOfficer){
+        const resolvedBy = document.createElement('div');
+        resolvedBy.className = 'record-resolved-by';
+        const badge = OFFICER_BADGE_NUMBERS[r.resolvedByOfficer];
+        const resolvedAtStr = formatCreatedAt(r.resolvedAt);
+        resolvedBy.textContent = 'Řešeno' + (resolvedAtStr ? ' ' + resolvedAtStr : '') +
+          ' · str.' + (badge ? ' ' + badge : '') + ' ' + r.resolvedByOfficer;
+        footer.appendChild(resolvedBy);
+      }
 
       if(footer.children.length) item.appendChild(footer);
 
