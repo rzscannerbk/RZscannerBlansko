@@ -278,10 +278,12 @@
   .record-item:active{transform:scale(.98);}
   .record-item.resolved{background:rgba(51,211,153,.07); border-color:rgba(51,211,153,.5); opacity:.75;}
   .record-top-row{display:flex; flex-direction:column; gap:6px;}
+  .record-notice-row{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;}
   .record-notice-number{
     font-family:'Roboto Mono',monospace; font-size:10px; color:var(--muted);
     letter-spacing:.03em; white-space:nowrap;
   }
+  .record-pachatel-info{font-size:11px; color:var(--faint);}
   .record-plate-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
   .record-plate{font-family:'Oswald',sans-serif; font-weight:600; font-size:20px; letter-spacing:.05em;}
   .record-resolved-badge{
@@ -1883,11 +1885,29 @@
       }
       topRow.appendChild(plateRow);
 
-      if(r.noticeNumber){
-        const num = document.createElement('div');
-        num.className = 'record-notice-number';
-        num.textContent = r.noticeNumber;
-        topRow.appendChild(num);
+      if(r.noticeNumber || (r.pachatel && (r.pachatel.jmeno || r.pachatel.prijmeni))){
+        const numRow = document.createElement('div');
+        numRow.className = 'record-notice-row';
+        if(r.noticeNumber){
+          const num = document.createElement('span');
+          num.className = 'record-notice-number';
+          num.textContent = r.noticeNumber;
+          numRow.appendChild(num);
+        }
+        // Pachatel appka ukáže jen když ho z dialogu "Pachatel" zná
+        // (jméno/příjmení + obec) — obec appka bere ze stejného
+        // uloženého "PSČ, Obec" formátu, jen bez té PSČ části.
+        if(r.pachatel && (r.pachatel.jmeno || r.pachatel.prijmeni)){
+          const jmenoPrijmeni = [r.pachatel.jmeno, r.pachatel.prijmeni].filter(Boolean).join(' ');
+          const mesto = r.pachatel.mesto || '';
+          const commaIdx = mesto.indexOf(', ');
+          const obecName = commaIdx !== -1 ? mesto.slice(commaIdx + 2) : mesto;
+          const pachatelInfo = document.createElement('span');
+          pachatelInfo.className = 'record-pachatel-info';
+          pachatelInfo.textContent = [jmenoPrijmeni, obecName].filter(Boolean).join(', ');
+          numRow.appendChild(pachatelInfo);
+        }
+        topRow.appendChild(numRow);
       }
       item.appendChild(topRow);
 
