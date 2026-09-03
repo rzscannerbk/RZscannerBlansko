@@ -401,12 +401,35 @@
     cursor:pointer; padding:0;
   }
   .pdf-preview-thumb-remove:active{transform:scale(.9);}
+  .pdf-preview-thumb-blur{
+    position:absolute; left:2px; bottom:2px; width:24px; height:24px; border-radius:50%;
+    background:rgba(0,0,0,.65); color:#fff; border:none; font-size:13px; line-height:1;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .pdf-preview-thumb-blur:active{transform:scale(.9);}
   .photo-lightbox-overlay{
     display:none; position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:200;
     align-items:center; justify-content:center; padding:20px;
   }
   .photo-lightbox-overlay.open{display:flex;}
   .photo-lightbox-overlay img{max-width:100%; max-height:100%; border-radius:8px; object-fit:contain;}
+
+  /* ---------- Ruční rozmazání (obličeje/cizí značky ve fotce) ---------- */
+  .blur-overlay{
+    display:none; position:fixed; inset:0; background:#000; z-index:210;
+    flex-direction:column; padding:calc(env(safe-area-inset-top,0px) + 10px) 10px calc(env(safe-area-inset-bottom,0px) + 10px);
+  }
+  .blur-overlay.open{display:flex;}
+  .blur-hint{color:#ccc; font-size:12.5px; text-align:center; margin-bottom:8px; padding:0 12px;}
+  .blur-canvas-wrap{flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; touch-action:none;}
+  .blur-canvas-wrap canvas{max-width:100%; max-height:100%; border-radius:8px; touch-action:none;}
+  .blur-toolbar{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; justify-content:center;}
+  .blur-toolbar button{
+    flex:1 1 auto; min-width:80px; padding:12px 10px; border-radius:10px; border:1px solid #444;
+    background:#1c1c1e; color:#fff; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .blur-toolbar button.blur-primary{background:#2F6FED; border-color:#2F6FED;}
+  .blur-toolbar button.blur-danger{background:transparent; border-color:#555; color:#ff6b6b;}
 
   /* ---------- HISTORY ---------- */
   #historyScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
@@ -866,6 +889,19 @@
 
   <div class="photo-lightbox-overlay" id="photoLightboxOverlay">
     <img id="photoLightboxImg" alt="Fotodokumentace">
+  </div>
+
+  <div class="blur-overlay" id="blurOverlay">
+    <div class="blur-hint">Prstem přejeďte přes obličeje nebo cizí registrační značky, ať se rozmažou.</div>
+    <div class="blur-canvas-wrap">
+      <canvas id="blurCanvas"></canvas>
+    </div>
+    <div class="blur-toolbar">
+      <button type="button" id="blurUndoBtn">↺ Zpět</button>
+      <button type="button" id="blurResetBtn" class="blur-danger">Vymazat vše</button>
+      <button type="button" id="blurCancelBtn">Zrušit</button>
+      <button type="button" id="blurDoneBtn" class="blur-primary">✓ Hotovo</button>
+    </div>
   </div>
 
   <!-- LOGIN -->
@@ -3332,9 +3368,149 @@
       });
       item.appendChild(removeBtn);
 
+      // Ruční rozmazání obličejů/cizích značek přímo ve fotce — appka
+      // záměrně nedělá automatickou detekci (nespolehlivá, dala by falešný
+      // pocit bezpečí), jen jednoduchý nástroj, kde si to strážník sám
+      // přejetím prstu rozmaže tam, kde potřeba.
+      const blurBtn = document.createElement('button');
+      blurBtn.type = 'button';
+      blurBtn.className = 'pdf-preview-thumb-blur';
+      blurBtn.title = 'Rozmazat obličeje/cizí značky';
+      blurBtn.textContent = '◐';
+      blurBtn.addEventListener('click', (ev)=>{
+        ev.stopPropagation();
+        openBlurEditor(idx);
+      });
+      item.appendChild(blurBtn);
+
       thumbs.appendChild(item);
     });
   }
+
+  // ---------- Ruční rozmazání ve fotce (obličeje, cizí značky) ----------
+  // Vědomě NEjde o automatickou AI detekci — ta by u obličeje z boku,
+  // malého/rozmazaného obličeje nebo natočené značky snadno něco
+  // propásla, a appka by tím strážníkovi dala falešný pocit bezpečí.
+  // Místo toho appka nabízí jednoduchý štětec: strážník přejede prstem
+  // přes to, co se má schovat, appka to na místě "propixeluje" (zmenší
+  // a zase zvětší danou oblast bez vyhlazení) — spolehlivé, protože to
+  // kontroluje člověk, ne algoritmus.
+  let blurEditingIdx = null;
+  let blurUndoStack = [];
+
+  function openBlurEditor(idx){
+    if(!lastGeneratedPdf || !lastGeneratedPdf.photos || !lastGeneratedPdf.photos[idx]) return;
+    blurEditingIdx = idx;
+    blurUndoStack = [];
+    const canvas = document.getElementById('blurCanvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = ()=>{
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+      document.getElementById('blurOverlay').classList.add('open');
+    };
+    img.src = 'data:image/jpeg;base64,' + lastGeneratedPdf.photos[idx];
+  }
+
+  function closeBlurEditor(){
+    document.getElementById('blurOverlay').classList.remove('open');
+    blurEditingIdx = null;
+    blurUndoStack = [];
+  }
+
+  function canvasPointFromEvent(canvas, evt){
+    const rect = canvas.getBoundingClientRect();
+    const point = evt.touches && evt.touches.length ? evt.touches[0] : evt;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (point.clientX - rect.left) * scaleX,
+      y: (point.clientY - rect.top) * scaleY
+    };
+  }
+
+  // Propixeluje kruhovou oblast kolem [cx, cy] — zmenší ji na hrst bloků
+  // a zase zvětší zpátky bez vyhlazování (imageSmoothingEnabled=false),
+  // což dá typický "blokový" efekt rozmazání a nedá se z něj zpětně nic
+  // přečíst.
+  function pixelateAt(ctx, cx, cy, radius){
+    const canvas = ctx.canvas;
+    const x0 = Math.max(0, Math.round(cx - radius));
+    const y0 = Math.max(0, Math.round(cy - radius));
+    const w = Math.min(canvas.width - x0, radius * 2);
+    const h = Math.min(canvas.height - y0, radius * 2);
+    if(w <= 4 || h <= 4) return;
+    const blockCount = 8;
+    const tmp = document.createElement('canvas');
+    tmp.width = blockCount;
+    tmp.height = Math.max(1, Math.round(blockCount * (h / w)));
+    tmp.getContext('2d').drawImage(canvas, x0, y0, w, h, 0, 0, tmp.width, tmp.height);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tmp, 0, 0, tmp.width, tmp.height, x0, y0, w, h);
+    ctx.restore();
+  }
+
+  (function setupBlurCanvasEvents(){
+    const canvas = document.getElementById('blurCanvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    // Poloměr štětce relativně k šířce fotky (ne pevný počet px), ať
+    // sedí na obličej stejně dobře na malém i velkém displeji.
+    const brushRadiusFraction = 0.09;
+
+    function handleStart(evt){
+      evt.preventDefault();
+      drawing = true;
+      blurUndoStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      if(blurUndoStack.length > 15) blurUndoStack.shift();
+      const p = canvasPointFromEvent(canvas, evt);
+      pixelateAt(ctx, p.x, p.y, canvas.width * brushRadiusFraction);
+    }
+    function handleMove(evt){
+      if(!drawing) return;
+      evt.preventDefault();
+      const p = canvasPointFromEvent(canvas, evt);
+      pixelateAt(ctx, p.x, p.y, canvas.width * brushRadiusFraction);
+    }
+    function handleEnd(){ drawing = false; }
+
+    canvas.addEventListener('touchstart', handleStart, { passive: false });
+    canvas.addEventListener('touchmove', handleMove, { passive: false });
+    canvas.addEventListener('touchend', handleEnd);
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+  })();
+
+  document.getElementById('blurUndoBtn').addEventListener('click', ()=>{
+    const canvas = document.getElementById('blurCanvas');
+    const ctx = canvas.getContext('2d');
+    const prev = blurUndoStack.pop();
+    if(prev) ctx.putImageData(prev, 0, 0);
+  });
+
+  document.getElementById('blurResetBtn').addEventListener('click', ()=>{
+    if(blurEditingIdx == null) return;
+    if(!confirm('Vymazat všechny úpravy a začít znovu na původní fotce?')) return;
+    openBlurEditor(blurEditingIdx);
+  });
+
+  document.getElementById('blurCancelBtn').addEventListener('click', closeBlurEditor);
+
+  document.getElementById('blurDoneBtn').addEventListener('click', ()=>{
+    if(blurEditingIdx == null) return;
+    const canvas = document.getElementById('blurCanvas');
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    lastGeneratedPdf.photos[blurEditingIdx] = dataUrl.split(',')[1];
+    refreshPdfPreviewGallery();
+    closeBlurEditor();
+  });
 
   // "Přidej foto" přímo na Kontrole údajů — pro případ, že hlavní fotka
   // chybí nebo je potřeba doplnit další záběr, aniž by se appka musela
