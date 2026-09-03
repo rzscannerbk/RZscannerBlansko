@@ -405,7 +405,7 @@
   }
   .shift-summary-overlay.open{display:flex;}
   .shift-summary-modal{
-    width:100%; max-width:640px; max-height:88vh; display:flex; flex-direction:column;
+    width:100%; max-width:920px; max-height:88vh; display:flex; flex-direction:column;
     background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
     box-shadow:0 30px 90px rgba(0,0,0,.6); overflow:hidden;
   }
@@ -462,9 +462,9 @@
   }
   .shift-list-row:hover{background:var(--asphalt-3);}
   .shift-list-row .plate{font-family:'Roboto Mono',monospace; font-weight:700; flex:0 0 auto;}
-  .shift-list-row .created{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint); flex:0 0 auto; width:98px;}
+  .shift-list-row .created{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint); flex:0 0 auto; width:110px; white-space:nowrap;}
   .shift-list-row .addr{flex:1; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .shift-list-row .resolved{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint); flex:0 0 auto; width:98px;}
+  .shift-list-row .resolved{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint); flex:0 0 auto; width:110px; white-space:nowrap;}
   .shift-list-row .castka{font-family:'Roboto Mono',monospace; font-size:11.5px; color:var(--bad); flex:0 0 auto; width:130px; text-align:right;}
   .shift-list-row .status{flex:0 0 auto; font-size:11px; color:var(--faint); width:120px; text-align:right;}
   .new-record-toast{
@@ -3672,6 +3672,22 @@
 
   // ---- Ruční dialog "Souhrn směny" ----
   let shiftSummaryType = 'denni';
+  // Když appka zobrazuje rozkliknutý seznam (renderShiftSummaryList),
+  // sem si uloží jeho záznamy a titulek, ať export ví, že má exportovat
+  // jen tenhle zúžený výběr, ne celou směnu — viz export handlery níž.
+  let shiftSummaryListRecords = null;
+  let shiftSummaryListTitle = null;
+
+  // Přepíná text obou export tlačítek podle toho, jestli appka zrovna
+  // zobrazuje celý přehled svodky, nebo rozkliknutý zúžený seznam — ať
+  // je hned vidět, co se kliknutím doopravdy stáhne.
+  function updateShiftSummaryExportLabels(){
+    const docxBtn = document.getElementById('shiftSummaryExportBtn');
+    const xlsxBtn = document.getElementById('shiftSummaryExportXlsxBtn');
+    const suffix = shiftSummaryListTitle ? ' (' + shiftSummaryListTitle + ')' : '';
+    if(docxBtn) docxBtn.textContent = 'Exportovat jako .docx' + suffix;
+    if(xlsxBtn) xlsxBtn.textContent = 'Exportovat jako .xlsx' + suffix;
+  }
 
   function currentModalWindow(){
     const dateStr = document.getElementById('shiftSummaryDate').value || todayIso();
@@ -3711,6 +3727,9 @@
   }
 
   function renderShiftSummary(){
+    shiftSummaryListRecords = null;
+    shiftSummaryListTitle = null;
+    updateShiftSummaryExportLabels();
     const win = currentModalWindow();
     const stats = computeStatsForRecords(recordsInWindow(win));
     const content = document.getElementById('shiftSummaryContent');
@@ -3772,6 +3791,9 @@
   // "← Zpět" appku vrátí na přehled. Klik na záznam appku vezme rovnou
   // do detailu (zavře svodku, ať se modály nepřekrývají).
   function renderShiftSummaryList(win, records, title){
+    shiftSummaryListRecords = records;
+    shiftSummaryListTitle = title;
+    updateShiftSummaryExportLabels();
     const content = document.getElementById('shiftSummaryContent');
     let html = '<button type="button" class="shift-list-back" id="shiftSummaryBackBtn">← Zpět na svodku</button>';
     html += '<div class="shift-summary-title">' + escapeHtml(title) + ' (' + records.length + ')</div>';
@@ -3841,11 +3863,11 @@
   // sestavení balíčku (JSZip) jako export Oznámení výše. Používá se jak
   // z ručního dialogu, tak z automaticky vygenerovaných záznamů v levém
   // panelu (viz níže).
-  async function buildShiftSummaryDocxForWindow(win, records){
+  async function buildShiftSummaryDocxForWindow(win, records, label){
     const stats = computeStatsForRecords(records);
     let body = '';
     body += docxPara('Svodka', { bold: true, size: 28, align: 'center', spacingAfter: 100 });
-    body += docxPara('Městská policie Blansko · ' + formatShiftHeading(win), { size: 18, align: 'center', spacingAfter: 300 });
+    body += docxPara('Městská policie Blansko · ' + formatShiftHeading(win) + (label ? ' · ' + label : ''), { size: 18, align: 'center', spacingAfter: 300 });
 
     body += docxPara('Celkem přestupků: ' + stats.total, { size: 22, bold: true, spacingAfter: 100 });
     body += docxPara('Nevyřešeno: ' + stats.statusCounts.pending, { size: 20, spacingAfter: 40 });
@@ -4109,9 +4131,9 @@
   // částky ve sloupci C jako "money" (formát "1 234 Kč"), u tabulek se
   // záhlavím (platby, typ dokumentu, strážníci) jsou popisky sloupců
   // zarovnané na střed.
-  function buildShiftSummaryXlsxRows(win, stats){
+  function buildShiftSummaryXlsxRows(win, stats, label){
     const rows = [];
-    rows.push({ cells: [{ v: 'Svodka', style: 'h1' }], height: 20.1 });
+    rows.push({ cells: [{ v: 'Svodka' + (label ? ' — ' + label : ''), style: 'h1' }], height: 20.1 });
     rows.push({ cells: [{ v: 'Městská policie Blansko', style: 'h2' }], height: 20.1 });
     rows.push({ cells: [{ v: formatShiftHeading(win), style: 'h1' }], height: 20.1 });
     rows.push({ cells: [], height: 20.1 });
@@ -4141,15 +4163,22 @@
     return rows;
   }
 
-  function shiftSummaryFilename(win){
-    return win.dateStr + ' - ' + SHIFT_TYPE_LABEL[win.type] + '.docx';
+  // Appka do názvu souboru přidá filtr (strážník/pole), jen když appka
+  // exportuje zúžený seznam, ne celou svodku — u znaků nevhodných do
+  // názvu souboru (lomítka apod.) appka je nahradí pomlčkou.
+  function shiftSummarySlug(label){
+    return label ? ' - ' + label.replace(/[\\/:*?"<>|]/g, '-') : '';
   }
 
-  function shiftSummaryXlsxFilename(win){
-    return win.dateStr + ' - ' + SHIFT_TYPE_LABEL[win.type] + '.xlsx';
+  function shiftSummaryFilename(win, label){
+    return win.dateStr + ' - ' + SHIFT_TYPE_LABEL[win.type] + shiftSummarySlug(label) + '.docx';
   }
 
-  async function downloadShiftSummaryXlsx(win, records, btn){
+  function shiftSummaryXlsxFilename(win, label){
+    return win.dateStr + ' - ' + SHIFT_TYPE_LABEL[win.type] + shiftSummarySlug(label) + '.xlsx';
+  }
+
+  async function downloadShiftSummaryXlsx(win, records, btn, label){
     const originalText = btn ? btn.textContent : null;
     if(btn){ btn.disabled = true; btn.textContent = 'Připravuji…'; }
     try{
@@ -4158,13 +4187,13 @@
         return;
       }
       const stats = computeStatsForRecords(records);
-      const rows = buildShiftSummaryXlsxRows(win, stats);
+      const rows = buildShiftSummaryXlsxRows(win, stats, label);
       const blob = await buildSimpleXlsx('Svodka', rows, {
         colWidths: [30.7109375, 12.7109375, 12, 12],
         merges: ['A1:D1', 'A2:D2', 'A3:D3', 'A4:D4'],
         totalCols: 4
       });
-      const filename = shiftSummaryXlsxFilename(win);
+      const filename = shiftSummaryXlsxFilename(win, label);
       try{
         const file = new File([blob], filename, { type: blob.type });
         if(navigator.canShare && navigator.canShare({ files: [file] })){
@@ -4183,7 +4212,7 @@
     }
   }
 
-  async function downloadShiftSummaryDocx(win, records, btn){
+  async function downloadShiftSummaryDocx(win, records, btn, label){
     const originalText = btn ? btn.textContent : null;
     if(btn){ btn.disabled = true; btn.textContent = 'Připravuji…'; }
     try{
@@ -4191,8 +4220,8 @@
         alert('Export do Wordu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).');
         return;
       }
-      const blob = await buildShiftSummaryDocxForWindow(win, records);
-      const filename = shiftSummaryFilename(win);
+      const blob = await buildShiftSummaryDocxForWindow(win, records, label);
+      const filename = shiftSummaryFilename(win, label);
       try{
         const file = new File([blob], filename, { type: blob.type });
         if(navigator.canShare && navigator.canShare({ files: [file] })){
@@ -4211,13 +4240,19 @@
     }
   }
 
+  // Když je svodka rozkliknutá na konkrétní pole/strážníka (viz
+  // renderShiftSummaryList), appka exportuje jen ten zúžený seznam — ne
+  // celou směnu. shiftSummaryListRecords/Title appka nastavuje při
+  // vstupu do seznamu a ruší při návratu na přehled (viz níž).
   document.getElementById('shiftSummaryExportBtn').addEventListener('click', function(){
     const win = currentModalWindow();
-    downloadShiftSummaryDocx(win, recordsInWindow(win), this);
+    const records = shiftSummaryListRecords || recordsInWindow(win);
+    downloadShiftSummaryDocx(win, records, this, shiftSummaryListTitle);
   });
   document.getElementById('shiftSummaryExportXlsxBtn').addEventListener('click', function(){
     const win = currentModalWindow();
-    downloadShiftSummaryXlsx(win, recordsInWindow(win), this);
+    const records = shiftSummaryListRecords || recordsInWindow(win);
+    downloadShiftSummaryXlsx(win, records, this, shiftSummaryListTitle);
   });
 
   // ---- Automatické generování po skončení směny + složka "Souhrny směn" ----
