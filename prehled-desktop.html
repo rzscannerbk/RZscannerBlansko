@@ -189,6 +189,11 @@
   .rail-item.active .count{color:var(--amber); background:rgba(255,176,32,.16);}
   .rail-item .dot{width:7px; height:7px; border-radius:50%; margin-right:9px; flex:0 0 auto;}
   .rail-empty{color:var(--faint); font-size:12px; padding:6px 10px;}
+  .rail-toggle{
+    display:block; width:100%; text-align:left; padding:7px 10px; margin-top:2px; border:none; background:none;
+    color:var(--amber); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; border-radius:7px;
+  }
+  .rail-toggle:hover{background:var(--asphalt-3);}
 
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
@@ -404,10 +409,13 @@
     margin-left:auto; font-family:'Roboto Mono',monospace; font-size:10.5px; color:var(--faint);
     background:var(--asphalt-4); border-radius:10px; padding:1px 7px; flex:0 0 auto;
   }
-  .shift-summary-stats{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:24px;}
+  .shift-summary-stats{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:10px;}
+  .shift-summary-stats:last-of-type{margin-bottom:24px;}
+  .shift-summary-stats-total{grid-template-columns:1fr;}
   .shift-stat{background:var(--asphalt); border:1px solid var(--line); border-radius:10px; padding:12px 10px; text-align:center;}
   .shift-stat .num{font-family:'Oswald',sans-serif; font-size:24px; font-weight:700; color:var(--text);}
   .shift-stat .lbl{font-size:10.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;}
+  .shift-stat .amt{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--good); margin-top:4px; font-weight:600;}
   .shift-summary-title{font-size:11px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
   .shift-officer-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
   .shift-officer-row:last-child{border-bottom:none;}
@@ -689,7 +697,7 @@
 
       <button class="icon-btn" id="fullscreenBtn" title="Celá obrazovka">⛶</button>
       <button class="icon-btn" id="themeToggleBtn" title="Světlý/tmavý režim">☾</button>
-      <button class="icon-btn" id="shiftSummaryBtn" title="Souhrn směny" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">Souhrn směny</button>
+      <button class="icon-btn" id="shiftSummaryBtn" title="Svodky" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">Svodky</button>
 
       <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="backlink">Zpět na RZ Scanner</a>
 
@@ -906,8 +914,10 @@
   <div class="shift-summary-overlay" id="shiftSummaryOverlay">
     <div class="shift-summary-modal">
       <div class="panel-head">
-        <div class="detail-head-info"><span class="detail-head-plate mono">SOUHRN SMĚNY</span></div>
-        <button id="shiftSummaryCloseBtn" aria-label="Zavřít">✕</button>
+        <div class="detail-head-info"><span class="detail-head-plate mono">SVODKY</span></div>
+        <div class="panel-head-actions">
+          <button id="shiftSummaryCloseBtn" aria-label="Zavřít">✕</button>
+        </div>
       </div>
       <div class="shift-summary-body">
         <div class="shift-summary-range" id="shiftSummaryRange">
@@ -918,6 +928,7 @@
         <div id="shiftSummaryContent"></div>
       </div>
       <div class="panel-actions">
+        <button class="btn" id="shiftSummaryExportXlsxBtn">Exportovat jako .xlsx</button>
         <button class="btn btn-primary" id="shiftSummaryExportBtn">Exportovat jako .docx</button>
       </div>
     </div>
@@ -2779,6 +2790,30 @@
   let filterType = 'all';     // 'all' | 'vyzva' | 'boticka'
   let filterOfficer = 'all';  // 'all' | jméno strážníka
   let filterRange = 'all';    // 'all' | 'today' | 'week'
+  // Stav rozbalení sekcí "Strážník" a "Svodky" v bočním panelu — appka
+  // v náhledu ukazuje jen první 4 položky, po kliknutí na "Zobrazit vše"
+  // se rozbalí celý seznam. Appka si to pamatuje napříč překreslením
+  // (renderRail/renderShiftSummaryFolder se volají často, kdykoli přijde
+  // nová data z Firestore), ať appka uživateli rozbalený seznam nezavírá
+  // pod rukama.
+  let railOfficerExpanded = false;
+  let railSummariesExpanded = false;
+
+  // Přidá do skupiny bočního panelu jen první 4 položky (`items`), zbytek
+  // schová za tlačítko "Zobrazit vše (N)" — po kliknutí appka zavolá
+  // `onToggle`, které přepne stav a znovu appka danou skupinu překreslí.
+  function appendExpandable(groupEl, items, expanded, onToggle){
+    const visibleCount = expanded ? items.length : Math.min(4, items.length);
+    items.slice(0, visibleCount).forEach(el => groupEl.appendChild(el));
+    if(items.length > 4){
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'rail-toggle';
+      toggle.textContent = expanded ? 'Skrýt' : 'Zobrazit vše (' + items.length + ')';
+      toggle.addEventListener('click', onToggle);
+      groupEl.appendChild(toggle);
+    }
+  }
 
   function recordStatusKey(r){
     if(!r.resolved) return 'pending';
@@ -2876,13 +2911,12 @@
       empty.textContent = 'Zatím žádné záznamy';
       gOfficer.appendChild(empty);
     } else {
-      officers.forEach(name=>{
-        gOfficer.appendChild(item(name, officerCounts[name], filterOfficer === name, ()=>{ filterOfficer = filterOfficer===name ? 'all' : name; refreshView(); }));
-      });
+      const officerItems = officers.map(name=>item(name, officerCounts[name], filterOfficer === name, ()=>{ filterOfficer = filterOfficer===name ? 'all' : name; refreshView(); }));
+      appendExpandable(gOfficer, officerItems, railOfficerExpanded, ()=>{ railOfficerExpanded = !railOfficerExpanded; renderRail(); });
     }
     rail.appendChild(gOfficer);
 
-    const gSummaries = group('Souhrny směn');
+    const gSummaries = group('Svodky');
     const summariesContainer = document.createElement('div');
     summariesContainer.id = 'shiftSummaryFolder';
     gSummaries.appendChild(summariesContainer);
@@ -3388,10 +3422,26 @@
 
   function computeStatsForRecords(records){
     const statusCounts = { pending:0, oznameni:0, vyzva:0, prikaz:0, domluva:0 };
+    // Rozpad příkazů na místě podle způsobu platby (record.platba se
+    // vyplňuje jen u resolvedMethod 'prikaz') + součet vybraných částek —
+    // appka to potřebuje pro rozšířené řádky v "Souhrn směny".
+    const paymentBreakdown = {
+      hotove: { count: 0, sum: 0 },
+      kartou: { count: 0, sum: 0 },
+      bpn: { count: 0, sum: 0 }
+    };
+    const typeCounts = { vyzva: 0, boticka: 0 };
     const officers = {};
     records.forEach(r=>{
       const sKey = recordStatusKey(r);
       statusCounts[sKey] = (statusCounts[sKey] || 0) + 1;
+      typeCounts[(r.docType || 'vyzva') === 'boticka' ? 'boticka' : 'vyzva']++;
+      if(sKey === 'prikaz' && r.platba){
+        const amount = (r.castka != null && !isNaN(Number(r.castka))) ? Number(r.castka) : 0;
+        if(r.platba === 'Hotově'){ paymentBreakdown.hotove.count++; paymentBreakdown.hotove.sum += amount; }
+        else if(r.platba === 'Kartou'){ paymentBreakdown.kartou.count++; paymentBreakdown.kartou.sum += amount; }
+        else if(r.platba === 'BPN'){ paymentBreakdown.bpn.count++; paymentBreakdown.bpn.sum += amount; }
+      }
       const name = r.officerName || 'Neuvedeno';
       if(!officers[name]) officers[name] = { total:0, resolved:0, unresolved:0 };
       officers[name].total++;
@@ -3401,7 +3451,7 @@
     const officerRows = Object.keys(officers)
       .map(name=>({ name, ...officers[name] }))
       .sort((a,b)=> b.total - a.total || a.name.localeCompare(b.name, 'cs'));
-    return { total: records.length, statusCounts, officerRows };
+    return { total: records.length, statusCounts, officerRows, paymentBreakdown, typeCounts };
   }
 
   function formatShiftHeading(win){
@@ -3425,11 +3475,33 @@
       content.innerHTML = '<div class="shift-summary-empty">Žádné přestupky za ' + escapeHtml(formatShiftHeading(win)) + '.</div>';
       return;
     }
+    const formatKc = (n) => Number(n || 0).toLocaleString('cs-CZ') + ' Kč';
+    // Jedno "dlaždicové" pole — číslo + popisek, u plateb appka navíc
+    // ukazuje pod popiskem celkovou vybranou částku za dané období.
+    const statBox = (num, label, amountText) => '<div class="shift-stat"><div class="num">' + num + '</div>' +
+      '<div class="lbl">' + escapeHtml(label) + '</div>' +
+      (amountText ? '<div class="amt">' + escapeHtml(amountText) + '</div>' : '') + '</div>';
+
     let html = '<div class="shift-summary-stats">' +
-      '<div class="shift-stat"><div class="num">' + stats.total + '</div><div class="lbl">Celkem</div></div>' +
-      '<div class="shift-stat"><div class="num">' + stats.statusCounts.pending + '</div><div class="lbl">Nevyřešeno</div></div>' +
-      '<div class="shift-stat"><div class="num">' + (stats.statusCounts.oznameni + stats.statusCounts.prikaz + stats.statusCounts.domluva) + '</div><div class="lbl">Dořešeno</div></div>' +
-      '<div class="shift-stat"><div class="num">' + stats.statusCounts.domluva + '</div><div class="lbl">Domluvou</div></div>' +
+      statBox(stats.total, 'Celkem') +
+      statBox(stats.statusCounts.pending, 'Nevyřešeno') +
+      statBox(stats.statusCounts.oznameni + stats.statusCounts.prikaz + stats.statusCounts.domluva, 'Dořešeno') +
+      statBox(stats.statusCounts.domluva, 'Domluvou') +
+      '</div>';
+    html += '<div class="shift-summary-stats">' +
+      statBox(stats.statusCounts.domluva, 'Domluva') +
+      statBox(stats.paymentBreakdown.hotove.count, 'Příkaz hotově', formatKc(stats.paymentBreakdown.hotove.sum)) +
+      statBox(stats.paymentBreakdown.kartou.count, 'Příkaz kartou', formatKc(stats.paymentBreakdown.kartou.sum)) +
+      statBox(stats.paymentBreakdown.bpn.count, 'BPN', formatKc(stats.paymentBreakdown.bpn.sum)) +
+      '</div>';
+    html += '<div class="shift-summary-stats">' +
+      statBox(stats.statusCounts.vyzva, 'Zaslána výzva') +
+      statBox(stats.statusCounts.oznameni, 'Oznámeno') +
+      statBox(stats.typeCounts.boticka, 'Botička') +
+      statBox(stats.typeCounts.vyzva, 'Parkovačka') +
+      '</div>';
+    html += '<div class="shift-summary-stats shift-summary-stats-total">' +
+      statBox(stats.total, 'Celkem přestupků') +
       '</div>';
     html += '<div class="shift-summary-title">Podle strážníka</div>';
     stats.officerRows.forEach(o=>{
@@ -3473,14 +3545,25 @@
   async function buildShiftSummaryDocxForWindow(win, records){
     const stats = computeStatsForRecords(records);
     let body = '';
-    body += docxPara('Souhrn směny', { bold: true, size: 28, align: 'center', spacingAfter: 100 });
+    body += docxPara('Svodka', { bold: true, size: 28, align: 'center', spacingAfter: 100 });
     body += docxPara('Městská policie Blansko · ' + formatShiftHeading(win), { size: 18, align: 'center', spacingAfter: 300 });
 
     body += docxPara('Celkem přestupků: ' + stats.total, { size: 22, bold: true, spacingAfter: 100 });
     body += docxPara('Nevyřešeno: ' + stats.statusCounts.pending, { size: 20, spacingAfter: 40 });
     body += docxPara('Oznámeno: ' + stats.statusCounts.oznameni, { size: 20, spacingAfter: 40 });
+    body += docxPara('Zaslána výzva: ' + stats.statusCounts.vyzva, { size: 20, spacingAfter: 40 });
     body += docxPara('Dořešeno příkazem: ' + stats.statusCounts.prikaz, { size: 20, spacingAfter: 40 });
     body += docxPara('Dořešeno domluvou: ' + stats.statusCounts.domluva, { size: 20, spacingAfter: 300 });
+
+    const formatKcDocx = (n) => Number(n || 0).toLocaleString('cs-CZ') + ' Kč';
+    body += docxPara('Příkazy podle způsobu platby', { bold: true, size: 22, spacingAfter: 150 });
+    body += docxLabelValuePara('Hotově:', stats.paymentBreakdown.hotove.count + ' ks, ' + formatKcDocx(stats.paymentBreakdown.hotove.sum), { size: 20, spacingAfter: 40, tabPos: 3200 });
+    body += docxLabelValuePara('Kartou:', stats.paymentBreakdown.kartou.count + ' ks, ' + formatKcDocx(stats.paymentBreakdown.kartou.sum), { size: 20, spacingAfter: 40, tabPos: 3200 });
+    body += docxLabelValuePara('BPN:', stats.paymentBreakdown.bpn.count + ' ks, ' + formatKcDocx(stats.paymentBreakdown.bpn.sum), { size: 20, spacingAfter: 300, tabPos: 3200 });
+
+    body += docxPara('Podle typu dokumentu', { bold: true, size: 22, spacingAfter: 150 });
+    body += docxLabelValuePara('Parkovačka:', String(stats.typeCounts.vyzva), { size: 20, spacingAfter: 40, tabPos: 3200 });
+    body += docxLabelValuePara('Botička:', String(stats.typeCounts.boticka), { size: 20, spacingAfter: 300, tabPos: 3200 });
 
     body += docxPara('Podle strážníka', { bold: true, size: 22, spacingAfter: 150 });
     if(stats.officerRows.length === 0){
@@ -3530,8 +3613,150 @@
     });
   }
 
+  // ---------- Export "Svodky" jako .xlsx ----------
+  // Appka nemá knihovnu na tvorbu Excelu (stejný princip jako u docx výš —
+  // OOXML se skládá ručně), balíček je stavěný přes stejný JSZip. Buňky
+  // appka zapisuje jako "inline string" (t="inlineStr"), ať appka nemusí
+  // řešit samostatnou sharedStrings.xml část — pro pár desítek řádků
+  // svodky je to jednodušší a stejně rychlé.
+  function xlsxColLetter(colIndex){
+    let s = '', n = colIndex + 1;
+    while(n > 0){
+      const rem = (n - 1) % 26;
+      s = String.fromCharCode(65 + rem) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+
+  function xlsxSheetDataXml(rows){
+    let xml = '';
+    rows.forEach((row, rIdx)=>{
+      const rowNum = rIdx + 1;
+      let cells = '';
+      row.forEach((val, cIdx)=>{
+        if(val === null || val === undefined || val === '') return;
+        const ref = xlsxColLetter(cIdx) + rowNum;
+        if(typeof val === 'number' && isFinite(val)){
+          cells += '<c r="' + ref + '"><v>' + val + '</v></c>';
+        } else {
+          cells += '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(String(val)) + '</t></is></c>';
+        }
+      });
+      xml += '<row r="' + rowNum + '">' + cells + '</row>';
+    });
+    return xml;
+  }
+
+  async function buildSimpleXlsx(sheetName, rows){
+    const sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<sheetData>' + xlsxSheetDataXml(rows) + '</sheetData>' +
+      '</worksheet>';
+
+    const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '</Types>';
+
+    const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>';
+
+    const workbookXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheets><sheet name="' + xmlEscape(sheetName.slice(0, 31)) + '" sheetId="1" r:id="rId1"/></sheets>' +
+      '</workbook>';
+
+    const workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '</Relationships>';
+
+    const zip = new JSZip();
+    zip.file('[Content_Types].xml', contentTypes);
+    zip.file('_rels/.rels', rootRels);
+    zip.file('xl/workbook.xml', workbookXml);
+    zip.file('xl/_rels/workbook.xml.rels', workbookRels);
+    zip.file('xl/worksheets/sheet1.xml', sheetXml);
+
+    return zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+  }
+
+  // Sestaví řádky svodky pro Excel — stejná data jako v okně/docx, jen
+  // v tabulkové podobě (štítek ve sloupci A, hodnota ve sloupci B).
+  function buildShiftSummaryXlsxRows(win, stats){
+    const rows = [];
+    rows.push(['Svodka']);
+    rows.push(['Městská policie Blansko', formatShiftHeading(win)]);
+    rows.push([]);
+    rows.push(['Celkem přestupků', stats.total]);
+    rows.push(['Nevyřešeno', stats.statusCounts.pending]);
+    rows.push(['Dořešeno', stats.statusCounts.oznameni + stats.statusCounts.prikaz + stats.statusCounts.domluva]);
+    rows.push(['Domluvou', stats.statusCounts.domluva]);
+    rows.push(['Zaslána výzva', stats.statusCounts.vyzva]);
+    rows.push(['Oznámeno', stats.statusCounts.oznameni]);
+    rows.push([]);
+    rows.push(['Příkazy podle způsobu platby', 'Počet', 'Částka (Kč)']);
+    rows.push(['Hotově', stats.paymentBreakdown.hotove.count, stats.paymentBreakdown.hotove.sum]);
+    rows.push(['Kartou', stats.paymentBreakdown.kartou.count, stats.paymentBreakdown.kartou.sum]);
+    rows.push(['BPN', stats.paymentBreakdown.bpn.count, stats.paymentBreakdown.bpn.sum]);
+    rows.push([]);
+    rows.push(['Podle typu dokumentu', 'Počet']);
+    rows.push(['Parkovačka', stats.typeCounts.vyzva]);
+    rows.push(['Botička', stats.typeCounts.boticka]);
+    rows.push([]);
+    rows.push(['Podle strážníka', 'Celkem', 'Dořešeno', 'Nevyřešeno']);
+    stats.officerRows.forEach(o=>{
+      rows.push([o.name, o.total, o.resolved, o.unresolved]);
+    });
+    return rows;
+  }
+
   function shiftSummaryFilename(win){
     return win.dateStr + ' - ' + SHIFT_TYPE_LABEL[win.type] + '.docx';
+  }
+
+  function shiftSummaryXlsxFilename(win){
+    return win.dateStr + ' - ' + SHIFT_TYPE_LABEL[win.type] + '.xlsx';
+  }
+
+  async function downloadShiftSummaryXlsx(win, records, btn){
+    const originalText = btn ? btn.textContent : null;
+    if(btn){ btn.disabled = true; btn.textContent = 'Připravuji…'; }
+    try{
+      if(typeof JSZip === 'undefined'){
+        alert('Export do Excelu se nepodařilo načíst (chybí knihovna JSZip — zkontrolujte připojení k internetu).');
+        return;
+      }
+      const stats = computeStatsForRecords(records);
+      const rows = buildShiftSummaryXlsxRows(win, stats);
+      const blob = await buildSimpleXlsx('Svodka', rows);
+      const filename = shiftSummaryXlsxFilename(win);
+      try{
+        const file = new File([blob], filename, { type: blob.type });
+        if(navigator.canShare && navigator.canShare({ files: [file] })){
+          await navigator.share({ files: [file] });
+          return;
+        }
+      }catch(e){
+        // Sdílení zrušeno/nedostupné — spadneme na otevření v nové kartě.
+      }
+      downloadBlobWithFilename(blob, filename);
+    }catch(e){
+      console.error('Export svodky do Excelu selhal:', e);
+      alert('Vytvoření Excelu se nezdařilo (' + e.message + ').');
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = originalText; }
+    }
   }
 
   async function downloadShiftSummaryDocx(win, records, btn){
@@ -3565,6 +3790,10 @@
   document.getElementById('shiftSummaryExportBtn').addEventListener('click', function(){
     const win = currentModalWindow();
     downloadShiftSummaryDocx(win, recordsInWindow(win), this);
+  });
+  document.getElementById('shiftSummaryExportXlsxBtn').addEventListener('click', function(){
+    const win = currentModalWindow();
+    downloadShiftSummaryXlsx(win, recordsInWindow(win), this);
   });
 
   // ---- Automatické generování po skončení směny + složka "Souhrny směn" ----
@@ -3616,7 +3845,7 @@
       return;
     }
     container.innerHTML = '';
-    docs.forEach(data=>{
+    const items = docs.map(data=>{
       const win = shiftWindowForDate(data.type, data.dateStr);
       const btn = document.createElement('button');
       btn.className = 'rail-summary-item';
@@ -3627,8 +3856,9 @@
       btn.addEventListener('click', ()=>{
         downloadShiftSummaryDocx(win, recordsInWindow(win), null);
       });
-      container.appendChild(btn);
+      return btn;
     });
+    appendExpandable(container, items, railSummariesExpanded, ()=>{ railSummariesExpanded = !railSummariesExpanded; renderShiftSummaryFolder(shiftSummaryDocsCache); });
   }
 
   let shiftSummaryDocsCache = [];
