@@ -380,6 +380,22 @@
   .resolution-history-entry .rh-date{min-width:120px;}
   .resolution-history-entry.rh-edit{color:var(--bad);}
   .resolution-history-entry.rh-edit .rh-method{color:var(--bad);}
+  button.resolution-history-entry{
+    background:none; border:none; font-family:inherit; width:100%; cursor:default; text-align:left;
+  }
+  .resolution-history-entry.rh-edit-clickable{cursor:pointer;}
+  .resolution-history-entry.rh-edit-clickable:hover{background:var(--asphalt-3);}
+  .rh-edit-count{color:var(--faint); font-weight:400;}
+  .rh-edit-detail{
+    display:none; flex-direction:column; gap:4px; padding:6px 0 8px 12px;
+    border-left:2px solid rgba(255,96,88,.3); margin:0 0 4px 4px;
+  }
+  .rh-edit-detail.open{display:flex;}
+  .rh-edit-change{display:flex; align-items:center; gap:8px; font-size:11px; font-family:'Roboto Mono',monospace;}
+  .rh-edit-field{color:var(--muted); font-weight:600; min-width:150px;}
+  .rh-edit-from{color:var(--faint); text-decoration:line-through;}
+  .rh-edit-arrow{color:var(--faint);}
+  .rh-edit-to{color:var(--bad); font-weight:600;}
 
   /* ---------- Souhrn směny ---------- */
   .shift-summary-overlay{
@@ -2705,7 +2721,34 @@
     'aePachatelDatumNarozeni', 'aePachatelDoklad', 'aePachatelMesto',
     'aePachatelCisloDomu', 'aePachatelUlice'
   ];
+  // Čitelné popisky polí pro trvalý záznam změn (viz editHistory níž) —
+  // appka je používá při ukládání changes[] u položky "Upraveno" v logu,
+  // ať si Lukáš i zpětně (po zavření formuláře) může prohlédnout, co se
+  // konkrétně z čeho na co změnilo, ne jen že "něco" bylo upraveno.
+  const AE_FIELD_LABELS = {
+    aeSpz: 'SPZ', aeDocType: 'Typ', aeBrand: 'Značka', aeColor: 'Barva',
+    aeAddress: 'Adresa', aeDate: 'Datum', aeTime: 'Čas',
+    aeOffenseLabel: 'Kvalifikace přestupku', aeOffenseCitation: 'Citace paragrafu',
+    aeOfficerName: 'Strážník (vytvořil)', aeResolvedMethod: 'Způsob řešení',
+    aeCastka: 'Částka', aePlatba: 'Způsob platby',
+    aePachatelJmeno: 'Jméno pachatele', aePachatelPrijmeni: 'Příjmení pachatele',
+    aePachatelDatumNarozeni: 'Datum narození pachatele', aePachatelDoklad: 'Číslo dokladu',
+    aePachatelMesto: 'Obec pachatele', aePachatelCisloDomu: 'Č. p.', aePachatelUlice: 'Ulice pachatele'
+  };
   let aeOriginalValues = {};
+  let aeOriginalDisplayValues = {};
+
+  // Čitelná hodnota pole PRO AKTUÁLNÍ stav (na rozdíl od aeOriginalDisplayValues,
+  // která appka zamrazí při otevření formuláře) — u selectu text vybrané
+  // položky, jinak rovnou hodnota. Používá se při ukládání pro sloupec "na".
+  function aeCurrentDisplayValue(id){
+    const el = document.getElementById(id);
+    if(!el) return '';
+    if(el.tagName === 'SELECT'){
+      return (Array.from(el.options).find(o => o.value === el.value) || {}).textContent || '';
+    }
+    return el.value;
+  }
 
   // Postaví <option> nabídku pro danou datalist appka z hodnot, které se
   // v ostatních záznamech už objevily — appka appka nikam nevolá (žádné
@@ -2755,6 +2798,7 @@
       const originalDisplay = el.tagName === 'SELECT'
         ? (Array.from(el.options).find(o => o.value === aeOriginalValues[id]) || {}).textContent
         : aeOriginalValues[id];
+      aeOriginalDisplayValues[id] = originalDisplay || '';
 
       // Posluchač musí číst hodnotu z KLONU (ten zůstává v DOM a do něj
       // uživatel píše) — čtení ze starého `el` by porovnávalo pořád tu
@@ -2861,16 +2905,25 @@
     }
     // Zjistí, jestli se oproti hodnotám, se kterými se formulář otevřel,
     // opravdu něco změnilo (viz wireAdminEditChangeTracking) — pokud ano,
-    // appka do editHistory přidá záznam "Upraveno", který se v patičce
-    // detailu zobrazí červeně vedle Vytvořeno/Dořešeno (viz
+    // appka do editHistory přidá záznam "Upraveno" i s konkrétním
+    // výčtem změn (pole, "z", "na"), aby šlo i PO uložení a zavření
+    // formuláře zpětně zjistit, co se přesně měnilo — ne jen že se něco
+    // měnilo. Zobrazuje se po rozkliknutí řádku v patičce detailu (viz
     // renderResolutionHistory níž).
-    const wasChanged = AE_TRACKED_FIELDS.some(id=>{
+    const changes = [];
+    AE_TRACKED_FIELDS.forEach(id=>{
       const el = document.getElementById(id);
-      return el && el.value !== aeOriginalValues[id];
+      if(!el || el.value === aeOriginalValues[id]) return;
+      changes.push({
+        field: AE_FIELD_LABELS[id] || id,
+        from: aeOriginalDisplayValues[id] || '(prázdné)',
+        to: aeCurrentDisplayValue(id) || '(prázdné)'
+      });
     });
+    const wasChanged = changes.length > 0;
     let editEntry = null;
     if(wasChanged){
-      editEntry = { resolvedAt: firebase.firestore.Timestamp.now(), officerName: currentOfficerName() || record.officerName || '' };
+      editEntry = { resolvedAt: firebase.firestore.Timestamp.now(), officerName: currentOfficerName() || record.officerName || '', changes };
       updateData.editHistory = firebase.firestore.FieldValue.arrayUnion(editEntry);
     }
     // Object.assign(record, updateData) níž by editHistory přepsal přímo
@@ -4602,8 +4655,8 @@
     (record.resolutionHistory || []).forEach(e=>{
       rows.push({ label: UNDO_METHOD_LABEL[e.method] || 'Dořešeno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt) });
     });
-    (record.editHistory || []).forEach(e=>{
-      rows.push({ label: 'Upraveno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt), edit: true });
+    (record.editHistory || []).forEach((e, idx)=>{
+      rows.push({ label: 'Upraveno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt), edit: true, changes: e.changes || [], editIdx: idx });
     });
     rows.sort((a, b) => {
       if(!a.sortAt && !b.sortAt) return 0;
@@ -4614,12 +4667,33 @@
     container.classList.add('has-entries');
     container.innerHTML = rows.map(r=>{
       const officer = r.officerName ? officerHeadLabel(r.officerName) : '';
-      return '<div class="resolution-history-entry' + (r.edit ? ' rh-edit' : '') + '">' +
-        '<span class="rh-method">' + escapeHtml(r.label) + '</span>' +
+      const hasChanges = r.edit && r.changes && r.changes.length > 0;
+      // Starší záznamy "Upraveno" appka mohla uložit ještě předtím, než
+      // appka uměla ukládat konkrétní changes[] (jen datum + strážník)
+      // — ty appka zobrazí stejně, jen bez rozkliknutí detailu.
+      const rowTag = hasChanges ? 'button type="button"' : 'div';
+      const rowCloseTag = hasChanges ? 'button' : 'div';
+      const detail = hasChanges
+        ? '<div class="rh-edit-detail" id="rhEditDetail' + r.editIdx + '">' +
+          r.changes.map(c => '<div class="rh-edit-change"><span class="rh-edit-field">' + escapeHtml(c.field) + '</span>' +
+            '<span class="rh-edit-from">' + escapeHtml(c.from) + '</span>' +
+            '<span class="rh-edit-arrow">→</span>' +
+            '<span class="rh-edit-to">' + escapeHtml(c.to) + '</span></div>').join('') +
+          '</div>'
+        : '';
+      return '<' + rowTag + ' class="resolution-history-entry' + (r.edit ? ' rh-edit' : '') + (hasChanges ? ' rh-edit-clickable' : '') +
+        '"' + (hasChanges ? ' data-edit-idx="' + r.editIdx + '"' : '') + '>' +
+        '<span class="rh-method">' + escapeHtml(r.label) + (hasChanges ? ' <span class="rh-edit-count">(' + r.changes.length + ')</span>' : '') + '</span>' +
         (r.dateStr ? '<span class="rh-date">' + escapeHtml(r.dateStr) + '</span>' : '') +
         (officer ? '<span class="rh-officer">' + escapeHtml(officer) + '</span>' : '') +
-        '</div>';
+        '</' + rowCloseTag + '>' + detail;
     }).join('');
+    container.querySelectorAll('.rh-edit-clickable').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const detail = document.getElementById('rhEditDetail' + btn.dataset.editIdx);
+        if(detail) detail.classList.toggle('open');
+      });
+    });
 
     // Odkazy na Word dokumenty vedle MPM — appka je ukáže, jen když se
     // Výzva/Oznámení pro tenhle přestupek opravdu někdy vygenerovaly
