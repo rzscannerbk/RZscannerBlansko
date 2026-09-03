@@ -411,17 +411,38 @@
   }
   .shift-summary-stats{display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:10px;}
   .shift-summary-stats:last-of-type{margin-bottom:24px;}
-  .shift-summary-stats-total{grid-template-columns:1fr;}
-  .shift-stat{background:var(--asphalt); border:1px solid var(--line); border-radius:10px; padding:12px 10px; text-align:center;}
+  .shift-summary-stats-total{grid-template-columns:1fr 1fr;}
+  .shift-stat{
+    background:var(--asphalt); border:1px solid var(--line); border-radius:10px; padding:12px 10px; text-align:center;
+    font-family:inherit; cursor:pointer; transition:border-color .15s ease, background .15s ease;
+  }
+  .shift-stat:hover{border-color:var(--amber-dim); background:var(--asphalt-3);}
   .shift-stat .num{font-family:'Oswald',sans-serif; font-size:24px; font-weight:700; color:var(--text);}
   .shift-stat .lbl{font-size:10.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;}
   .shift-stat .amt{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--good); margin-top:4px; font-weight:600;}
   .shift-summary-title{font-size:11px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
-  .shift-officer-row{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
+  .shift-officer-row{
+    display:flex; width:100%; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);
+    font-size:13px; background:none; border-left:none; border-right:none; border-top:none; font-family:inherit; cursor:pointer; text-align:left;
+  }
+  .shift-officer-row:hover .name{color:var(--amber);}
   .shift-officer-row:last-child{border-bottom:none;}
   .shift-officer-row .name{color:var(--text); font-weight:600;}
   .shift-officer-row .nums{color:var(--faint); font-family:'Roboto Mono',monospace; font-size:12px;}
   .shift-summary-empty{color:var(--faint); font-size:13px; text-align:center; padding:20px 0;}
+  .shift-list-back{
+    display:block; background:none; border:none; color:var(--amber); font-family:inherit; font-size:13px; font-weight:600;
+    cursor:pointer; padding:0 0 16px; text-align:left;
+  }
+  .shift-list-back:hover{text-decoration:underline;}
+  .shift-list-row{
+    display:flex; width:100%; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; margin-bottom:2px;
+    background:none; border:none; color:var(--text); font-family:inherit; font-size:13px; cursor:pointer; text-align:left;
+  }
+  .shift-list-row:hover{background:var(--asphalt-3);}
+  .shift-list-row .plate{font-family:'Roboto Mono',monospace; font-weight:700; flex:0 0 auto;}
+  .shift-list-row .addr{flex:1; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .shift-list-row .status{flex:0 0 auto; font-size:11px; color:var(--faint);}
   .new-record-toast{
     position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--asphalt-3); border:1px solid var(--amber-dim); color:var(--text);
@@ -3467,6 +3488,38 @@
     return shiftWindowForDate(shiftSummaryType, dateStr);
   }
 
+  // Filtry pro jednotlivá klikací pole svodky — appka na klik znovu
+  // vyfiltruje záznamy dané směny (recordsInWindow(win)) podle stejné
+  // podmínky, jakou počítadlo v poli zobrazuje, a ukáže je jako seznam.
+  const STAT_FILTERS = {
+    celkem: () => true,
+    nevyresene: r => !r.resolved,
+    domluva: r => recordStatusKey(r) === 'domluva',
+    prikaz_hotove: r => recordStatusKey(r) === 'prikaz' && r.platba === 'Hotově',
+    prikaz_kartou: r => recordStatusKey(r) === 'prikaz' && r.platba === 'Kartou',
+    bpn: r => recordStatusKey(r) === 'prikaz' && r.platba === 'BPN',
+    vyzva: r => recordStatusKey(r) === 'vyzva',
+    oznameno: r => recordStatusKey(r) === 'oznameni',
+    boticka: r => (r.docType || 'vyzva') === 'boticka',
+    parkovacka: r => (r.docType || 'vyzva') !== 'boticka'
+  };
+  const STAT_LABELS = {
+    celkem: 'Celkem přestupků',
+    nevyresene: 'Nevyřešeno',
+    domluva: 'Domluva',
+    prikaz_hotove: 'Příkaz hotově',
+    prikaz_kartou: 'Příkaz kartou',
+    bpn: 'BPN',
+    vyzva: 'Zaslána výzva',
+    oznameno: 'Oznámeno',
+    boticka: 'Botička',
+    parkovacka: 'Parkovačka'
+  };
+  function statusLabelForRecord(r){
+    if(!r.resolved) return 'Nevyřešeno';
+    return UNDO_METHOD_LABEL[recordStatusKey(r)] || 'Dořešeno';
+  }
+
   function renderShiftSummary(){
     const win = currentModalWindow();
     const stats = computeStatsForRecords(recordsInWindow(win));
@@ -3476,34 +3529,88 @@
       return;
     }
     const formatKc = (n) => Number(n || 0).toLocaleString('cs-CZ') + ' Kč';
-    // Jedno "dlaždicové" pole — číslo + popisek, u plateb appka navíc
-    // ukazuje pod popiskem celkovou vybranou částku za dané období.
-    const statBox = (num, label, amountText) => '<div class="shift-stat"><div class="num">' + num + '</div>' +
+    // Jedno "dlaždicové" pole — číslo + popisek, klikací (appka na klik
+    // otevře seznam záznamů, které do daného počtu spadají — viz
+    // STAT_FILTERS výš). U plateb appka navíc ukazuje pod popiskem
+    // celkovou vybranou částku za dané období.
+    const statBox = (num, label, amountText, key) => '<button type="button" class="shift-stat" data-stat-key="' + key + '"><div class="num">' + num + '</div>' +
       '<div class="lbl">' + escapeHtml(label) + '</div>' +
-      (amountText ? '<div class="amt">' + escapeHtml(amountText) + '</div>' : '') + '</div>';
+      (amountText ? '<div class="amt">' + escapeHtml(amountText) + '</div>' : '') + '</button>';
 
     let html = '<div class="shift-summary-stats">' +
-      statBox(stats.statusCounts.domluva, 'Domluva') +
-      statBox(stats.paymentBreakdown.hotove.count, 'Příkaz hotově', formatKc(stats.paymentBreakdown.hotove.sum)) +
-      statBox(stats.paymentBreakdown.kartou.count, 'Příkaz kartou', formatKc(stats.paymentBreakdown.kartou.sum)) +
-      statBox(stats.paymentBreakdown.bpn.count, 'BPN', formatKc(stats.paymentBreakdown.bpn.sum)) +
+      statBox(stats.statusCounts.domluva, 'Domluva', null, 'domluva') +
+      statBox(stats.paymentBreakdown.hotove.count, 'Příkaz hotově', formatKc(stats.paymentBreakdown.hotove.sum), 'prikaz_hotove') +
+      statBox(stats.paymentBreakdown.kartou.count, 'Příkaz kartou', formatKc(stats.paymentBreakdown.kartou.sum), 'prikaz_kartou') +
+      statBox(stats.paymentBreakdown.bpn.count, 'BPN', formatKc(stats.paymentBreakdown.bpn.sum), 'bpn') +
       '</div>';
     html += '<div class="shift-summary-stats">' +
-      statBox(stats.statusCounts.vyzva, 'Zaslána výzva') +
-      statBox(stats.statusCounts.oznameni, 'Oznámeno') +
-      statBox(stats.typeCounts.boticka, 'Botička') +
-      statBox(stats.typeCounts.vyzva, 'Parkovačka') +
+      statBox(stats.statusCounts.vyzva, 'Zaslána výzva', null, 'vyzva') +
+      statBox(stats.statusCounts.oznameni, 'Oznámeno', null, 'oznameno') +
+      statBox(stats.typeCounts.boticka, 'Botička', null, 'boticka') +
+      statBox(stats.typeCounts.vyzva, 'Parkovačka', null, 'parkovacka') +
       '</div>';
     html += '<div class="shift-summary-stats shift-summary-stats-total">' +
-      statBox(stats.total, 'Celkem přestupků') +
+      statBox(stats.statusCounts.pending, 'Nevyřešeno', null, 'nevyresene') +
+      statBox(stats.total, 'Celkem přestupků', null, 'celkem') +
       '</div>';
     html += '<div class="shift-summary-title">Podle strážníka</div>';
     stats.officerRows.forEach(o=>{
-      html += '<div class="shift-officer-row"><span class="name">' + escapeHtml(o.name) + '</span>' +
-        '<span class="nums">' + o.total + ' celkem · ' + o.resolved + ' dořešeno · ' + o.unresolved + ' nevyřešeno</span></div>';
+      html += '<button type="button" class="shift-officer-row" data-officer-name="' + escapeAttr(o.name) + '"><span class="name">' + escapeHtml(o.name) + '</span>' +
+        '<span class="nums">' + o.total + ' celkem · ' + o.resolved + ' dořešeno · ' + o.unresolved + ' nevyřešeno</span></button>';
     });
     content.innerHTML = html;
+
+    const win2 = win; // zachyceno pro listenery níž
+    content.querySelectorAll('[data-stat-key]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const key = btn.dataset.statKey;
+        const filtered = recordsInWindow(win2).filter(STAT_FILTERS[key]);
+        renderShiftSummaryList(win2, filtered, STAT_LABELS[key]);
+      });
+    });
+    content.querySelectorAll('[data-officer-name]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const name = btn.dataset.officerName;
+        const filtered = recordsInWindow(win2).filter(r => r.officerName === name);
+        renderShiftSummaryList(win2, filtered, name);
+      });
+    });
   }
+
+  // Seznam konkrétních přestupků za dané pole/strážníka v rámci svodky —
+  // appka nahradí obsah #shiftSummaryContent seznamem místo dlaždic,
+  // "← Zpět" appku vrátí na přehled. Klik na záznam appku vezme rovnou
+  // do detailu (zavře svodku, ať se modály nepřekrývají).
+  function renderShiftSummaryList(win, records, title){
+    const content = document.getElementById('shiftSummaryContent');
+    let html = '<button type="button" class="shift-list-back" id="shiftSummaryBackBtn">← Zpět na svodku</button>';
+    html += '<div class="shift-summary-title">' + escapeHtml(title) + ' (' + records.length + ')</div>';
+    if(records.length === 0){
+      html += '<div class="shift-summary-empty">Žádné záznamy.</div>';
+    } else {
+      records.forEach(r=>{
+        const isBoticka = (r.docType || 'vyzva') === 'boticka';
+        html += '<button type="button" class="shift-list-row" data-record-id="' + escapeAttr(r.id || '') + '">' +
+          '<span class="plate">' + escapeHtml(r.plate || '—') + '</span>' +
+          '<span class="addr">' + escapeHtml(r.address || (isBoticka ? 'Botička' : '')) + '</span>' +
+          '<span class="status">' + escapeHtml(statusLabelForRecord(r)) + '</span>' +
+          '</button>';
+      });
+    }
+    content.innerHTML = html;
+    document.getElementById('shiftSummaryBackBtn').addEventListener('click', ()=>{ renderShiftSummary(); });
+    content.querySelectorAll('.shift-list-row').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.dataset.recordId;
+        const record = records.find(r => r.id === id);
+        if(record){
+          document.getElementById('shiftSummaryOverlay').classList.remove('open');
+          openDetail(record);
+        }
+      });
+    });
+  }
+
 
   // Výchozí datum v dialogu = datum směny, ve které je aktuální okamžik
   // (u noční směny je to den, kdy začala, i po půlnoci).
@@ -3623,30 +3730,82 @@
     return s;
   }
 
+  // Styly buněk podle vzorového souboru, který Lukáš poslal (ručně
+  // naformátovaná svodka): "h1" — tučné, zarovnané na střed (nadpis
+  // "Svodka" a řádek se směnou), "h2" — tučné a velké (Městská policie
+  // Blansko), "center" — jen zarovnání na střed, normální řez (záhlaví
+  // sloupců typu "Počet"/"Celkem"). Index v poli = index v cellXfs níž,
+  // pořadí se NESMÍ měnit, jinak buňky ukážou na jiný styl.
+  const XLSX_STYLE_INDEX = { default: 0, h1: 1, h2: 2, center: 3 };
+
   function xlsxSheetDataXml(rows){
     let xml = '';
-    rows.forEach((row, rIdx)=>{
+    rows.forEach((rowDef, rIdx)=>{
       const rowNum = rIdx + 1;
+      const cellsArr = rowDef.cells || [];
       let cells = '';
-      row.forEach((val, cIdx)=>{
-        if(val === null || val === undefined || val === '') return;
+      cellsArr.forEach((cell, cIdx)=>{
+        const isObj = cell !== null && typeof cell === 'object' && !(cell instanceof Array);
+        const val = isObj ? cell.v : cell;
+        const styleName = isObj ? cell.style : null;
+        if(val === null || val === undefined || val === ''){
+          if(!styleName) return; // prázdná buňka bez stylu se vůbec nezapisuje
+        }
         const ref = xlsxColLetter(cIdx) + rowNum;
+        const sAttr = styleName ? ' s="' + XLSX_STYLE_INDEX[styleName] + '"' : '';
         if(typeof val === 'number' && isFinite(val)){
-          cells += '<c r="' + ref + '"><v>' + val + '</v></c>';
+          cells += '<c r="' + ref + '"' + sAttr + '><v>' + val + '</v></c>';
+        } else if(val === null || val === undefined || val === ''){
+          cells += '<c r="' + ref + '"' + sAttr + '/>';
         } else {
-          cells += '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(String(val)) + '</t></is></c>';
+          cells += '<c r="' + ref + '" t="inlineStr"' + sAttr + '><is><t xml:space="preserve">' + xmlEscape(String(val)) + '</t></is></c>';
         }
       });
-      xml += '<row r="' + rowNum + '">' + cells + '</row>';
+      const htAttr = rowDef.height ? ' ht="' + rowDef.height + '" customHeight="1"' : '';
+      xml += '<row r="' + rowNum + '"' + htAttr + '>' + cells + '</row>';
     });
     return xml;
   }
 
-  async function buildSimpleXlsx(sheetName, rows){
+  async function buildSimpleXlsx(sheetName, rows, opts){
+    opts = opts || {};
+    const colWidths = opts.colWidths || null; // pole šířek podle sloupce, index 0 = A
+    const merges = opts.merges || []; // pole '{ref}' typu 'A1:D1'
+
+    const colsXml = colWidths
+      ? '<cols>' + colWidths.map((w, i) => w ? ('<col min="' + (i+1) + '" max="' + (i+1) + '" width="' + w + '" customWidth="1"/>') : '').join('') + '</cols>'
+      : '';
+    const mergeXml = merges.length
+      ? '<mergeCells count="' + merges.length + '">' + merges.map(ref => '<mergeCell ref="' + ref + '"/>').join('') + '</mergeCells>'
+      : '';
+
     const sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      colsXml +
       '<sheetData>' + xlsxSheetDataXml(rows) + '</sheetData>' +
+      mergeXml +
       '</worksheet>';
+
+    // Styly: fonty [0]=normální, [1]=tučné 11, [2]=tučné 16 — a čtyři
+    // cellXfs záznamy podle XLSX_STYLE_INDEX výš (pořadí musí sedět).
+    const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<fonts count="3">' +
+        '<font><sz val="11"/><name val="Calibri"/></font>' +
+        '<font><b/><sz val="11"/><name val="Calibri"/></font>' +
+        '<font><b/><sz val="16"/><name val="Calibri"/></font>' +
+      '</fonts>' +
+      '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="4">' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>' +
+        '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf>' +
+      '</cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+      '</styleSheet>';
 
     const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
@@ -3654,6 +3813,7 @@
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
       '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
       '</Types>';
 
     const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
@@ -3670,6 +3830,7 @@
     const workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
       '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
       '</Relationships>';
 
     const zip = new JSZip();
@@ -3677,6 +3838,7 @@
     zip.file('_rels/.rels', rootRels);
     zip.file('xl/workbook.xml', workbookXml);
     zip.file('xl/_rels/workbook.xml.rels', workbookRels);
+    zip.file('xl/styles.xml', stylesXml);
     zip.file('xl/worksheets/sheet1.xml', sheetXml);
 
     return zip.generateAsync({
@@ -3685,32 +3847,40 @@
     });
   }
 
-  // Sestaví řádky svodky pro Excel — stejná data jako v okně/docx, jen
-  // v tabulkové podobě (štítek ve sloupci A, hodnota ve sloupci B).
+  // Sestaví řádky svodky pro Excel přesně podle vzorového formátu, který
+  // Lukáš poslal (ručně naformátovaná svodka 02.09.2026): nadpis "Svodka"
+  // + "Městská policie Blansko" + datum/směna jako tři sloučené řádky
+  // přes sloupce A–D, pak štítek/hodnota ve sloupcích A/B, u tabulek se
+  // záhlavím (platby, typ dokumentu, strážníci) mají popisky sloupců
+  // zarovnání na střed.
   function buildShiftSummaryXlsxRows(win, stats){
     const rows = [];
-    rows.push(['Svodka']);
-    rows.push(['Městská policie Blansko', formatShiftHeading(win)]);
-    rows.push([]);
-    rows.push(['Celkem přestupků', stats.total]);
-    rows.push(['Nevyřešeno', stats.statusCounts.pending]);
-    rows.push(['Dořešeno', stats.statusCounts.oznameni + stats.statusCounts.prikaz + stats.statusCounts.domluva]);
-    rows.push(['Domluvou', stats.statusCounts.domluva]);
-    rows.push(['Zaslána výzva', stats.statusCounts.vyzva]);
-    rows.push(['Oznámeno', stats.statusCounts.oznameni]);
-    rows.push([]);
-    rows.push(['Příkazy podle způsobu platby', 'Počet', 'Částka (Kč)']);
-    rows.push(['Hotově', stats.paymentBreakdown.hotove.count, stats.paymentBreakdown.hotove.sum]);
-    rows.push(['Kartou', stats.paymentBreakdown.kartou.count, stats.paymentBreakdown.kartou.sum]);
-    rows.push(['BPN', stats.paymentBreakdown.bpn.count, stats.paymentBreakdown.bpn.sum]);
-    rows.push([]);
-    rows.push(['Podle typu dokumentu', 'Počet']);
-    rows.push(['Parkovačka', stats.typeCounts.vyzva]);
-    rows.push(['Botička', stats.typeCounts.boticka]);
-    rows.push([]);
-    rows.push(['Podle strážníka', 'Celkem', 'Dořešeno', 'Nevyřešeno']);
+    rows.push({ cells: [{ v: 'Svodka', style: 'h1' }], height: 20.1 });
+    rows.push({ cells: [{ v: 'Městská policie Blansko', style: 'h2' }], height: 20.1 });
+    rows.push({ cells: [{ v: formatShiftHeading(win), style: 'h1' }], height: 20.1 });
+    rows.push({ cells: [], height: 20.1 });
+    rows.push({ cells: ['Celkem přestupků', stats.total] });
+    rows.push({ cells: ['Nevyřešeno', stats.statusCounts.pending] });
+    rows.push({ cells: ['Dořešeno', stats.statusCounts.oznameni + stats.statusCounts.prikaz + stats.statusCounts.domluva] });
+    rows.push({ cells: ['Domluvou', stats.statusCounts.domluva] });
+    rows.push({ cells: ['Zaslána výzva', stats.statusCounts.vyzva] });
+    rows.push({ cells: ['Oznámeno', stats.statusCounts.oznameni] });
+    rows.push({ cells: [] });
+    rows.push({ cells: ['Příkazy podle způsobu platby', { v: 'Počet', style: 'center' }, { v: 'Částka (Kč)', style: 'center' }] });
+    rows.push({ cells: [] });
+    rows.push({ cells: ['Hotově', stats.paymentBreakdown.hotove.count, stats.paymentBreakdown.hotove.sum] });
+    rows.push({ cells: ['Kartou', stats.paymentBreakdown.kartou.count, stats.paymentBreakdown.kartou.sum] });
+    rows.push({ cells: ['BPN', stats.paymentBreakdown.bpn.count, stats.paymentBreakdown.bpn.sum] });
+    rows.push({ cells: [] });
+    rows.push({ cells: ['Podle typu dokumentu', { v: 'Počet', style: 'center' }] });
+    rows.push({ cells: [] });
+    rows.push({ cells: ['Parkovačka', stats.typeCounts.vyzva] });
+    rows.push({ cells: ['Botička', stats.typeCounts.boticka] });
+    rows.push({ cells: [] });
+    rows.push({ cells: ['Podle strážníka', { v: 'Celkem', style: 'center' }, { v: 'Dořešeno', style: 'center' }, { v: 'Nevyřešeno', style: 'center' }] });
+    rows.push({ cells: [] });
     stats.officerRows.forEach(o=>{
-      rows.push([o.name, o.total, o.resolved, o.unresolved]);
+      rows.push({ cells: [o.name, o.total, o.resolved, o.unresolved] });
     });
     return rows;
   }
@@ -3733,7 +3903,10 @@
       }
       const stats = computeStatsForRecords(records);
       const rows = buildShiftSummaryXlsxRows(win, stats);
-      const blob = await buildSimpleXlsx('Svodka', rows);
+      const blob = await buildSimpleXlsx('Svodka', rows, {
+        colWidths: [30.7109375, 12.7109375],
+        merges: ['A1:D1', 'A2:D2', 'A3:D3']
+      });
       const filename = shiftSummaryXlsxFilename(win);
       try{
         const file = new File([blob], filename, { type: blob.type });
