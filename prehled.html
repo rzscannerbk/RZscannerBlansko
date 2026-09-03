@@ -1048,6 +1048,12 @@
   }
 
   async function buildVyzvaDopisDocx(record, pachatel, dostaveniTermin){
+    // Do hlavičky/podpisu dokumentu appka dává strážníka, který přestupek
+    // PRÁVĚ dořešuje (přihlášený na tomhle zařízení), ne toho, kdo ho
+    // kdysi založil (record.officerName) — dořešuje často jiný strážník,
+    // než ten, co na místě udělal zápis. resolvedByOfficer je pojistka
+    // pro případ, že by appka currentOfficerName() nepoznala.
+    const officerForDoc = currentOfficerName() || record.resolvedByOfficer || record.officerName || '';
     const offenseLabel = record.offenseLabel || '';
     const offenseCitation = record.offenseCitation || '';
     // Stejné rozdělení "základní/sankční" citace jako u Oznámení (viz
@@ -1114,7 +1120,7 @@
       headerLeft,
       [
         'Naše  č. j.: MP ' + new Date().getFullYear() + '/',
-        'Vyřizuje: str. ' + (record.officerName || ''),
+        'Vyřizuje: str. ' + officerForDoc,
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
         '',
@@ -1197,6 +1203,9 @@
   }
 
   async function buildOznameniDocx(record, photosB64, pachatel){
+    // Viz stejný komentář u buildVyzvaDopisDocx — appka do hlavičky i
+    // podpisu dává dořešujícího strážníka, ne zakladatele záznamu.
+    const officerForDoc = currentOfficerName() || record.resolvedByOfficer || record.officerName || '';
     const offenseCitation = record.offenseCitation || '';
     const offenseLabel = record.offenseLabel || '';
     // Přesunuto sem (dřív se deklarovalo až u fotek) — appka teď relEntries
@@ -1211,7 +1220,7 @@
       ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'Nám. Republiky 1', '678 01 BLANSKO'],
       [
         'Naše  č. j.: MP ' + new Date().getFullYear() + '/',
-        'Vyřizuje: str. ' + (record.officerName || ''),
+        'Vyřizuje: str. ' + officerForDoc,
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
         '',
@@ -1393,8 +1402,8 @@
       );
     }
 
-    if(record.officerName){
-      inner += docxPara('str. ' + record.officerName, { bold: true, size: 14, align: 'center' });
+    if(officerForDoc){
+      inner += docxPara('str. ' + officerForDoc, { bold: true, size: 14, align: 'center' });
     }
     inner += docxPara('Městská policie Blansko', { bold: true, size: 14, align: 'center' });
     inner += docxPara('Sadová 149/2, 678 01 Blansko', { size: 13, align: 'center' });

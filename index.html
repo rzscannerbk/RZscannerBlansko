@@ -2147,7 +2147,18 @@
     const streetEntry = chain.find(s => s.type === 'regional.street');
     const muniPartEntry = chain.find(s => s.type === 'regional.municipality_part');
     const muniEntry = chain.find(s => s.type === 'regional.municipality');
-    const city = (muniPartEntry && muniPartEntry.name) || (muniEntry && muniEntry.name) || '';
+    let city = (muniPartEntry && muniPartEntry.name) || (muniEntry && muniEntry.name) || '';
+    // U spojených obcí se dvěma jmény přes pomlčku (typicky "Rájec-Jestřebí",
+    // vzniklé sloučením dvou historických obcí) appka nechce vracet jen
+    // polovinu jména — Mapy.com totiž tu polovinu ("Rájec") vrací jako
+    // "regional.municipality_part", což appka jinak upřednostňuje (kvůli
+    // místním částem Blanska typu Klepačov, kde je to naopak žádoucí).
+    // Pozná se to tak, že jméno místní části je obsažené v pomlčkovém
+    // jménu celé obce — pak appka radši použije celý úřední název.
+    if(muniPartEntry && muniEntry && muniEntry.name && muniEntry.name.includes('-') &&
+       muniEntry.name.toLowerCase().includes(muniPartEntry.name.toLowerCase())){
+      city = muniEntry.name;
+    }
     return { street: (streetEntry && streetEntry.name) || '', city };
   }
 
