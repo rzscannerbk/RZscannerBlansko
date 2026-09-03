@@ -1985,11 +1985,19 @@
   // od oka. Vzor dodal Lukáš 28.8.2026 (Výzva_vzor.rtf).
   function addressForLetter(address){
     if(!address) return { city: 'Blansko', locationPhrase: '' };
-    const first = address.split(',')[0].trim();
+    const parts = address.split(',').map(s => s.trim()).filter(Boolean);
+    const first = parts[0] || '';
+    // Appka dřív město do dopisu dávala natvrdo "Blansko" bez ohledu na
+    // to, co je v record.address uložené — u přestupků mimo Blansko
+    // (Doubravice nad Svitavou, Rájec-Jestřebí…) to bylo špatně. Když
+    // appka v adrese má i druhou část za čárkou (obec), použije ji;
+    // jinak jde o místní část Blanska uloženou bez obce (jen "Těchov"
+    // apod.), kde zůstává dosavadní výchozí "Blansko".
+    const city = parts[1] || 'Blansko';
     if(MPM_LOCAL_PARTS.includes(first)){
-      return { city: 'Blansko', locationPhrase: 'v místní části ' + first };
+      return { city, locationPhrase: 'v místní části ' + first };
     }
-    return { city: 'Blansko', locationPhrase: 'na ulici ' + first };
+    return { city, locationPhrase: 'na ulici ' + first };
   }
 
   async function buildVyzvaDopisDocx(record, pachatel, dostaveniTermin){
@@ -4999,7 +5007,7 @@
   // dořešený záznam možné jedním klikem vrátit zpět na nevyřešený.
   let undoTimer = null;
   let undoRecord = null;
-  const UNDO_METHOD_LABEL = { oznameni: 'Oznámeno', vyzva: 'Odeslána výzva', prikaz: 'Dořešeno příkazem', domluva: 'Dořešeno domluvou' };
+  const UNDO_METHOD_LABEL = { oznameni: 'Oznámeno', vyzva: 'Zaslána výzva', prikaz: 'Dořešeno příkazem', domluva: 'Dořešeno domluvou' };
   function showUndoToast(record, method){
     undoRecord = record;
     clearTimeout(undoTimer);
