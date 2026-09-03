@@ -3483,12 +3483,6 @@
       (amountText ? '<div class="amt">' + escapeHtml(amountText) + '</div>' : '') + '</div>';
 
     let html = '<div class="shift-summary-stats">' +
-      statBox(stats.total, 'Celkem') +
-      statBox(stats.statusCounts.pending, 'Nevyřešeno') +
-      statBox(stats.statusCounts.oznameni + stats.statusCounts.prikaz + stats.statusCounts.domluva, 'Dořešeno') +
-      statBox(stats.statusCounts.domluva, 'Domluvou') +
-      '</div>';
-    html += '<div class="shift-summary-stats">' +
       statBox(stats.statusCounts.domluva, 'Domluva') +
       statBox(stats.paymentBreakdown.hotove.count, 'Příkaz hotově', formatKc(stats.paymentBreakdown.hotove.sum)) +
       statBox(stats.paymentBreakdown.kartou.count, 'Příkaz kartou', formatKc(stats.paymentBreakdown.kartou.sum)) +
