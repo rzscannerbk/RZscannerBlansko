@@ -939,13 +939,40 @@
     return [obecName, pachatel.cisloDomu].filter(Boolean).join(' ');
   }
 
+  // Klikací "vyplňovací pole" v docx (Word content control / structured
+  // document tag) — vypadá jako žlutě zvýrazněný text "doplň Č.j.:", ale
+  // ve Wordu funguje jako placeholder: strážník do něj klikne, začne psát
+  // číslo jednací a placeholder text se sám smaže (chování jako u
+  // vestavěných formulářových polí Wordu, ne obyčejný zvýrazněný text).
+  // w:id musí být v rámci dokumentu unikátní — appka generuje náhodně,
+  // v jednom dokumentu se pole vyskytuje jen jednou, takže kolize nehrozí.
+  function docxPlaceholderFieldPara(prefixText, placeholderText, opts){
+    opts = opts || {};
+    const size = opts.size || 19;
+    const pPr = '<w:spacing w:before="0" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 20) + '"/>';
+    const prefixRun = docxRun(prefixText, { size, bold: !!opts.bold });
+    const sdtId = Math.floor(Math.random() * 2000000000) + 1;
+    const sdt = '<w:sdt><w:sdtPr>' +
+      '<w:alias w:val="Číslo jednací"/>' +
+      '<w:tag w:val="cisloJednaci"/>' +
+      '<w:id w:val="' + sdtId + '"/>' +
+      '<w:placeholder><w:docPart w:val="DefaultPlaceholder_-1854013438"/></w:placeholder>' +
+      '<w:showingPlcHdr/>' +
+      '<w:text/>' +
+      '</w:sdtPr><w:sdtEndPr/><w:sdtContent>' +
+      '<w:r><w:rPr><w:sz w:val="' + size + '"/><w:b/><w:highlight w:val="yellow"/></w:rPr>' +
+      '<w:t xml:space="preserve">' + xmlEscape(placeholderText) + '</w:t></w:r>' +
+      '</w:sdtContent></w:sdt>';
+    return '<w:p><w:pPr>' + pPr + '</w:pPr>' + prefixRun + sdt + '</w:p>';
+  }
+
   function docxHeaderTable(leftLines, rightLines, leftBold){
     // Mezisloupec (gutter) mezi adresou úřadu a blokem s č.j. — bez něj by
     // sloupce splývaly těsně vedle sebe. Pravý blok tak začíná výrazně
     // víc vpravo, blíž k pravému okraji stránky.
     const leftW = 3600, gutterW = 2200, rightW = 3226;
     const cell = (lines, w, bold) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' +
-      lines.map(t => docxPara(t, { size: 19, spacingAfter: 20, bold: !!bold })).join('') + '</w:tc>';
+      lines.map(t => (t && typeof t === 'object' && t.raw) ? t.raw : docxPara(t, { size: 19, spacingAfter: 20, bold: !!bold })).join('') + '</w:tc>';
     const emptyCell = (w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' + docxPara('', { size: 19 }) + '</w:tc>';
     return '<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblBorders>' +
       '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>' +
@@ -1040,11 +1067,19 @@
 
   function addressForLetter(address){
     if(!address) return { city: 'Blansko', locationPhrase: '' };
-    const first = address.split(',')[0].trim();
+    const parts = address.split(',').map(s => s.trim()).filter(Boolean);
+    const first = parts[0] || '';
+    // Appka dřív město do dopisu dávala natvrdo "Blansko" bez ohledu na
+    // to, co je v record.address uložené — u přestupků mimo Blansko
+    // (Doubravice nad Svitavou, Rájec-Jestřebí…) to bylo špatně. Když
+    // appka v adrese má i druhou část za čárkou (obec), použije ji;
+    // jinak jde o místní část Blanska uloženou bez obce (jen "Těchov"
+    // apod.), kde zůstává dosavadní výchozí "Blansko".
+    const city = parts[1] || 'Blansko';
     if(VYZVA_LOCAL_PARTS.includes(first)){
-      return { city: 'Blansko', locationPhrase: 'v místní části ' + first };
+      return { city, locationPhrase: 'v místní části ' + first };
     }
-    return { city: 'Blansko', locationPhrase: 'na ulici ' + first };
+    return { city, locationPhrase: 'na ulici ' + first };
   }
 
   async function buildVyzvaDopisDocx(record, pachatel, dostaveniTermin){
@@ -1119,7 +1154,7 @@
     body += docxHeaderTable(
       headerLeft,
       [
-        'Naše  č. j.: MP ' + new Date().getFullYear() + '/',
+        { raw: docxPlaceholderFieldPara('Naše  č. j.: MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 }) },
         'Vyřizuje: str. ' + officerForDoc,
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
@@ -1219,7 +1254,7 @@
     body += docxHeaderTable(
       ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'Nám. Republiky 1', '678 01 BLANSKO'],
       [
-        'Naše  č. j.: MP ' + new Date().getFullYear() + '/',
+        { raw: docxPlaceholderFieldPara('Naše  č. j.: MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 }) },
         'Vyřizuje: str. ' + officerForDoc,
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
@@ -1887,6 +1922,7 @@
         const badge = document.createElement('div');
         badge.className = 'record-resolved-badge';
         badge.textContent = r.resolvedMethod === 'oznameni' ? 'Oznámeno'
+          : r.resolvedMethod === 'vyzva' ? 'Zaslána výzva'
           : r.resolvedMethod === 'prikaz' ? 'Dořešeno příkazem'
           : r.resolvedMethod === 'domluva' ? 'Dořešeno domluvou'
           : 'Dořešeno';
