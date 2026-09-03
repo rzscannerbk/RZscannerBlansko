@@ -2756,9 +2756,16 @@
         ? (Array.from(el.options).find(o => o.value === aeOriginalValues[id]) || {}).textContent
         : aeOriginalValues[id];
 
+      // Posluchač musí číst hodnotu z KLONU (ten zůstává v DOM a do něj
+      // uživatel píše) — čtení ze starého `el` by porovnávalo pořád tu
+      // samou (od DOM odpojenou, nikdy se neměnící) hodnotu se sebou
+      // samou, takže appka změnu nikdy nezaznamenala.
+      const clone = el.cloneNode(true);
+      el.parentNode.replaceChild(clone, el);
+      clone.value = aeOriginalValues[id];
       const handler = () => {
-        const changed = el.value !== aeOriginalValues[id];
-        el.classList.toggle('ae-changed', changed);
+        const changed = clone.value !== aeOriginalValues[id];
+        clone.classList.toggle('ae-changed', changed);
         if(changed && originalDisplay){
           hint.textContent = 'bylo: ' + originalDisplay;
           hint.style.display = 'block';
@@ -2766,12 +2773,6 @@
           hint.style.display = 'none';
         }
       };
-      // Odstranění případného předchozího posluchače z minulého otevření
-      // (appka pole při každém openAdminEditModal přepisuje hodnotou
-      // nového záznamu, staré posluchače by jinak zbytečně přibývaly).
-      const clone = el.cloneNode(true);
-      el.parentNode.replaceChild(clone, el);
-      clone.value = aeOriginalValues[id];
       clone.addEventListener('input', handler);
       clone.addEventListener('change', handler);
     });
