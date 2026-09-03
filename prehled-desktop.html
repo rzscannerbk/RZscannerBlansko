@@ -294,10 +294,10 @@
   .lightbox-img{max-width:88vw; max-height:88vh; border-radius:6px; box-shadow:0 20px 60px rgba(0,0,0,.6);}
   .lightbox-close{
     position:absolute; top:22px; right:26px; width:38px; height:38px; border-radius:50%;
-    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); color:#fff;
+    background:rgba(255,96,88,.12); border:1px solid rgba(255,96,88,.4); color:var(--bad);
     font-size:16px; cursor:pointer;
   }
-  .lightbox-close:hover{background:rgba(255,255,255,.16);}
+  .lightbox-close:hover{background:rgba(255,96,88,.22);}
   .lightbox-nav{
     position:absolute; top:50%; transform:translateY(-50%); width:52px; height:52px; border-radius:50%;
     background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); color:#fff;
@@ -340,6 +340,8 @@
   .panel-head-actions{position:absolute; right:22px; top:50%; transform:translateY(-50%); display:flex; gap:8px;}
   .panel-head-actions button{background:none; border:1px solid var(--line); color:var(--muted); width:28px; height:28px; border-radius:7px; cursor:pointer; font-size:13px;}
   .panel-head-actions button:hover{color:var(--text); border-color:var(--faint);}
+  .panel-head-actions button[aria-label="Zavřít"]{color:var(--bad); border-color:rgba(255,96,88,.35);}
+  .panel-head-actions button[aria-label="Zavřít"]:hover{color:var(--bad); border-color:var(--bad); background:rgba(255,96,88,.1);}
   .panel-head-actions #detailFullscreenBtn{font-size:15px;}
   #detailPreviewWrap{
     flex:1; overflow-y:auto; padding:28px 26px; background:transparent;
@@ -419,7 +421,7 @@
   .shift-stat:hover{border-color:var(--amber-dim); background:var(--asphalt-3);}
   .shift-stat .num{font-family:'Oswald',sans-serif; font-size:24px; font-weight:700; color:var(--text);}
   .shift-stat .lbl{font-size:10.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.04em; margin-top:2px;}
-  .shift-stat .amt{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--good); margin-top:4px; font-weight:600;}
+  .shift-stat .amt{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--bad); margin-top:4px; font-weight:600;}
   .shift-summary-title{font-size:11px; font-weight:700; color:var(--faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
   .shift-officer-row{
     display:flex; width:100%; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);
@@ -441,8 +443,11 @@
   }
   .shift-list-row:hover{background:var(--asphalt-3);}
   .shift-list-row .plate{font-family:'Roboto Mono',monospace; font-weight:700; flex:0 0 auto;}
+  .shift-list-row .created{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint); flex:0 0 auto; width:98px;}
   .shift-list-row .addr{flex:1; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .shift-list-row .status{flex:0 0 auto; font-size:11px; color:var(--faint);}
+  .shift-list-row .resolved{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--faint); flex:0 0 auto; width:98px;}
+  .shift-list-row .castka{font-family:'Roboto Mono',monospace; font-size:11.5px; color:var(--bad); flex:0 0 auto; width:130px; text-align:right;}
+  .shift-list-row .status{flex:0 0 auto; font-size:11px; color:var(--faint); width:120px; text-align:right;}
   .new-record-toast{
     position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
     background:var(--asphalt-3); border:1px solid var(--amber-dim); color:var(--text);
@@ -3590,9 +3595,17 @@
     } else {
       records.forEach(r=>{
         const isBoticka = (r.docType || 'vyzva') === 'boticka';
+        const createdStr = [r.date ? formatDateCz(r.date) : null, r.time || null].filter(Boolean).join(' ');
+        const resolvedStr = r.resolved ? formatResolvedDateTime(r.resolvedAt) : '';
+        const castkaStr = (r.castka != null && r.castka !== '')
+          ? (Number(r.castka).toLocaleString('cs-CZ') + ' Kč' + (r.platba ? ' (' + r.platba + ')' : ''))
+          : '';
         html += '<button type="button" class="shift-list-row" data-record-id="' + escapeAttr(r.id || '') + '">' +
+          '<span class="created">' + escapeHtml(createdStr || '—') + '</span>' +
           '<span class="plate">' + escapeHtml(r.plate || '—') + '</span>' +
           '<span class="addr">' + escapeHtml(r.address || (isBoticka ? 'Botička' : '')) + '</span>' +
+          '<span class="resolved">' + escapeHtml(resolvedStr) + '</span>' +
+          '<span class="castka">' + escapeHtml(castkaStr) + '</span>' +
           '<span class="status">' + escapeHtml(statusLabelForRecord(r)) + '</span>' +
           '</button>';
       });
