@@ -426,8 +426,8 @@
   }
   .blur-overlay.open{display:flex;}
   .blur-hint{color:#ccc; font-size:12.5px; text-align:center; margin-bottom:8px; padding:0 12px;}
-  .blur-canvas-wrap{flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; touch-action:none;}
-  .blur-canvas-wrap canvas{max-width:100%; max-height:100%; border-radius:8px; touch-action:none;}
+  .blur-canvas-wrap{flex:1; min-height:0; display:flex; align-items:center; justify-content:center; overflow:hidden; touch-action:none;}
+  .blur-canvas-wrap canvas{display:block; border-radius:8px; touch-action:none;}
   .blur-toolbar{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; justify-content:center;}
   .blur-toolbar button{
     flex:1 1 auto; min-width:80px; padding:12px 10px; border-radius:10px; border:1px solid #444;
@@ -3430,9 +3430,27 @@
       canvas.height = img.naturalHeight;
       ctx.drawImage(img, 0, 0);
       document.getElementById('blurOverlay').classList.add('open');
+      // Zobrazenou velikost appka počítá a nastavuje sama v JS (ne přes
+      // CSS max-width/max-height) — na některých mobilních prohlížečích
+      // (iOS Safari) se canvas uvnitř flexboxu bez explicitní velikosti
+      // uměl vykreslit s nulovou viditelnou velikostí, i když obsah byl
+      // ve skutečnosti správně nakreslený.
+      resizeBlurCanvasDisplay();
     };
     img.src = 'data:image/jpeg;base64,' + lastGeneratedPdf.photos[idx];
   }
+
+  function resizeBlurCanvasDisplay(){
+    const canvas = document.getElementById('blurCanvas');
+    const wrap = document.querySelector('.blur-canvas-wrap');
+    if(!canvas.width || !canvas.height || !wrap.clientWidth || !wrap.clientHeight) return;
+    const scale = Math.min(wrap.clientWidth / canvas.width, wrap.clientHeight / canvas.height, 1);
+    canvas.style.width = Math.round(canvas.width * scale) + 'px';
+    canvas.style.height = Math.round(canvas.height * scale) + 'px';
+  }
+  window.addEventListener('resize', ()=>{
+    if(document.getElementById('blurOverlay').classList.contains('open')) resizeBlurCanvasDisplay();
+  });
 
   function closeBlurEditor(){
     document.getElementById('blurOverlay').classList.remove('open');
