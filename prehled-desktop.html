@@ -2571,17 +2571,24 @@
   });
 
   // ---------- Admin editace přestupku (tužka úplně vpravo v seznamu) ----------
-  // Heslo appka kontroluje čistě jako pojistku proti omylem kliknutí — je to
-  // klientský JS kód, takže to NENÍ opravdové zabezpečení (kdokoliv se
-  // zdrojovým kódem appky ho uvidí). Nikam se neukládá, jen se porovná.
-  const ADMIN_EDIT_PASSWORD = 'Admin1048';
+  // Skutečné vynucení běží na Firestore (Security Rules, viz firestore.rules
+  // v repu) — kontrola appka tady dělá jen pro pohodlí (rovnou hezky
+  // upozornit, ne nechat strážníka vyplňovat formulář, který mu pak server
+  // stejně odmítne). I kdyby tuhle kontrolu někdo v appce obešel, Firestore
+  // zápis/smazání od neschváleného e-mailu stejně odmítne.
+  const ADMIN_EMAILS = [
+    'juracka.1048@rzscanner.cz'
+    // Dalšího strážníka appka pustí k editaci/mazání přidáním jeho
+    // e-mailu sem NA TENTO SEZNAM I do firestore.rules (isAdmin()) —
+    // obě místa musí mít stejný seznam, jinak appka tlačítko ukáže, ale
+    // Firestore uložení stejně odmítne.
+  ];
   let adminEditRecord = null;
 
   function openAdminEditGate(record){
-    const input = prompt('Heslo pro úpravu/smazání přestupku:');
-    if(input === null) return;
-    if(input !== ADMIN_EDIT_PASSWORD){
-      alert('Nesprávné heslo.');
+    const email = auth.currentUser && auth.currentUser.email;
+    if(!email || !ADMIN_EMAILS.includes(email)){
+      alert('K úpravě nebo smazání přestupků nemáš oprávnění.');
       return;
     }
     openAdminEditModal(record);
@@ -3114,18 +3121,22 @@
       }
       item.appendChild(thumb);
 
-      // Editační tužka — jen pro admina (heslo), otevře okno se všemi
-      // poli přestupku + smazání. Klik nemá otevírat detail, proto
-      // stopPropagation stejně jako u náhledu fotky.
-      const editBtn = document.createElement('button');
-      editBtn.className = 'record-edit-btn';
-      editBtn.innerHTML = '✎';
-      editBtn.title = 'Upravit/smazat přestupek (admin)';
-      editBtn.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        openAdminEditGate(r);
-      });
-      item.appendChild(editBtn);
+      // Editační tužka appka ukazuje jen strážníkům na ADMIN_EMAILS seznamu
+      // (viz openAdminEditGate výš) — u ostatních appka tlačítko rovnou
+      // nezobrazí, ať nenabízí něco, co server (Firestore Security Rules)
+      // stejně odmítne. Klik nemá otevírat detail, proto stopPropagation
+      // stejně jako u náhledu fotky.
+      if(auth.currentUser && ADMIN_EMAILS.includes(auth.currentUser.email)){
+        const editBtn = document.createElement('button');
+        editBtn.className = 'record-edit-btn';
+        editBtn.innerHTML = '✎';
+        editBtn.title = 'Upravit/smazat přestupek (admin)';
+        editBtn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          openAdminEditGate(r);
+        });
+        item.appendChild(editBtn);
+      }
 
       item.addEventListener('click', ()=>{
         document.querySelectorAll('.record-item.selected').forEach(el=>el.classList.remove('selected'));
