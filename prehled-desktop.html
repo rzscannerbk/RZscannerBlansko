@@ -378,6 +378,8 @@
   .resolution-history-entry{display:flex; gap:12px; font-size:11px; color:var(--muted); padding:3px 0; font-family:'Roboto Mono',monospace;}
   .resolution-history-entry .rh-method{color:var(--text); font-weight:600; min-width:150px;}
   .resolution-history-entry .rh-date{min-width:120px;}
+  .resolution-history-entry.rh-edit{color:var(--bad);}
+  .resolution-history-entry.rh-edit .rh-method{color:var(--bad);}
 
   /* ---------- Souhrn směny ---------- */
   .shift-summary-overlay{
@@ -568,6 +570,13 @@
   .admin-edit-row{display:flex; gap:12px;}
   .admin-edit-row .field{flex:1; min-width:0;}
   .admin-edit-note{font-size:12.5px; color:var(--bad); min-height:1.2em; margin-top:4px;}
+  .ae-original-line{
+    display:none; font-family:'Roboto Mono',monospace; font-size:11px; color:var(--text);
+    background:var(--asphalt-4); border-radius:5px; padding:2px 7px; margin-bottom:3px; width:fit-content;
+  }
+  .admin-edit-box input.ae-changed, .admin-edit-box select.ae-changed{
+    color:var(--bad); border-color:var(--bad); font-weight:600;
+  }
   .admin-edit-actions{display:flex; gap:10px;}
   .admin-edit-actions #adminEditDeleteBtn{color:var(--bad); border-color:var(--bad); flex:0 0 auto;}
   .admin-edit-actions #adminEditDeleteBtn:hover{background:var(--bad); color:#fff;}
@@ -972,21 +981,21 @@
           </div>
         </div>
         <div class="admin-edit-row">
-          <div class="field"><label for="aeBrand">Značka</label><input type="text" id="aeBrand"></div>
-          <div class="field"><label for="aeColor">Barva</label><input type="text" id="aeColor"></div>
+          <div class="field"><label for="aeBrand">Značka</label><input type="text" id="aeBrand" list="aeBrandList"></div>
+          <div class="field"><label for="aeColor">Barva</label><input type="text" id="aeColor" list="aeColorList"></div>
         </div>
 
         <div class="admin-edit-section">Místo a čas</div>
-        <div class="field"><label for="aeAddress">Adresa</label><input type="text" id="aeAddress"></div>
+        <div class="field"><label for="aeAddress">Adresa</label><input type="text" id="aeAddress" list="aeAddressList"></div>
         <div class="admin-edit-row">
-          <div class="field"><label for="aeDate">Datum (RRRR-MM-DD)</label><input type="text" id="aeDate" placeholder="2026-09-02"></div>
-          <div class="field"><label for="aeTime">Čas (HH:MM)</label><input type="text" id="aeTime" placeholder="12:34"></div>
+          <div class="field"><label for="aeDate">Datum</label><input type="date" id="aeDate"></div>
+          <div class="field"><label for="aeTime">Čas</label><input type="time" id="aeTime"></div>
         </div>
 
         <div class="admin-edit-section">Přestupek a strážník</div>
-        <div class="field"><label for="aeOffenseLabel">Kvalifikace přestupku</label><input type="text" id="aeOffenseLabel"></div>
-        <div class="field"><label for="aeOffenseCitation">Citace paragrafu</label><input type="text" id="aeOffenseCitation"></div>
-        <div class="field"><label for="aeOfficerName">Strážník (vytvořil)</label><input type="text" id="aeOfficerName" placeholder="Příjmení Jméno"></div>
+        <div class="field"><label for="aeOffenseLabel">Kvalifikace přestupku</label><input type="text" id="aeOffenseLabel" list="aeOffenseLabelList"></div>
+        <div class="field"><label for="aeOffenseCitation">Citace paragrafu</label><input type="text" id="aeOffenseCitation" list="aeOffenseCitationList"></div>
+        <div class="field"><label for="aeOfficerName">Strážník (vytvořil)</label><input type="text" id="aeOfficerName" placeholder="Příjmení Jméno" list="aeOfficerNameList"></div>
 
         <div class="admin-edit-section">Řešení</div>
         <div class="admin-edit-row">
@@ -1007,18 +1016,29 @@
 
         <div class="admin-edit-section">Pachatel</div>
         <div class="admin-edit-row">
-          <div class="field"><label for="aePachatelJmeno">Jméno</label><input type="text" id="aePachatelJmeno"></div>
-          <div class="field"><label for="aePachatelPrijmeni">Příjmení</label><input type="text" id="aePachatelPrijmeni"></div>
+          <div class="field"><label for="aePachatelJmeno">Jméno</label><input type="text" id="aePachatelJmeno" list="aePachatelJmenoList"></div>
+          <div class="field"><label for="aePachatelPrijmeni">Příjmení</label><input type="text" id="aePachatelPrijmeni" list="aePachatelPrijmeniList"></div>
         </div>
         <div class="admin-edit-row">
           <div class="field"><label for="aePachatelDatumNarozeni">Datum narození (DD.MM.RRRR)</label><input type="text" id="aePachatelDatumNarozeni"></div>
           <div class="field"><label for="aePachatelDoklad">Číslo dokladu</label><input type="text" id="aePachatelDoklad"></div>
         </div>
         <div class="admin-edit-row">
-          <div class="field"><label for="aePachatelMesto">Obec (příp. "PSČ, Obec")</label><input type="text" id="aePachatelMesto"></div>
+          <div class="field"><label for="aePachatelMesto">Obec (příp. "PSČ, Obec")</label><input type="text" id="aePachatelMesto" list="aePachatelMestoList"></div>
           <div class="field"><label for="aePachatelCisloDomu">Č. p.</label><input type="text" id="aePachatelCisloDomu"></div>
         </div>
-        <div class="field"><label for="aePachatelUlice">Ulice</label><input type="text" id="aePachatelUlice"></div>
+        <div class="field"><label for="aePachatelUlice">Ulice</label><input type="text" id="aePachatelUlice" list="aePachatelUliceList"></div>
+
+        <datalist id="aeBrandList"></datalist>
+        <datalist id="aeColorList"></datalist>
+        <datalist id="aeAddressList"></datalist>
+        <datalist id="aeOffenseLabelList"></datalist>
+        <datalist id="aeOffenseCitationList"></datalist>
+        <datalist id="aeOfficerNameList"></datalist>
+        <datalist id="aePachatelJmenoList"></datalist>
+        <datalist id="aePachatelPrijmeniList"></datalist>
+        <datalist id="aePachatelMestoList"></datalist>
+        <datalist id="aePachatelUliceList"></datalist>
 
         <div class="admin-edit-note" id="adminEditNote"></div>
       </div>
@@ -2675,10 +2695,93 @@
     openAdminEditModal(record);
   }
 
+  // Seznam polí formuláře, u kterých appka sleduje změnu oproti hodnotě
+  // načtené při otevření — id inputu, a pro select i funkce vracející
+  // čitelný text aktuálně vybrané položky (pro nápovědu "bylo: ...").
+  const AE_TRACKED_FIELDS = [
+    'aeSpz', 'aeDocType', 'aeBrand', 'aeColor', 'aeAddress', 'aeDate', 'aeTime',
+    'aeOffenseLabel', 'aeOffenseCitation', 'aeOfficerName', 'aeResolvedMethod',
+    'aeCastka', 'aePlatba', 'aePachatelJmeno', 'aePachatelPrijmeni',
+    'aePachatelDatumNarozeni', 'aePachatelDoklad', 'aePachatelMesto',
+    'aePachatelCisloDomu', 'aePachatelUlice'
+  ];
+  let aeOriginalValues = {};
+
+  // Postaví <option> nabídku pro danou datalist appka z hodnot, které se
+  // v ostatních záznamech už objevily — appka appka nikam nevolá (žádné
+  // externí API), jen sbírá to, co má v paměti z Firestore.
+  function populateAdminEditDatalists(){
+    const collect = (getter) => {
+      const set = new Set();
+      allRecords.forEach(r=>{ const v = getter(r); if(v) set.add(v); });
+      return Array.from(set).sort((a,b)=> a.localeCompare(b, 'cs'));
+    };
+    const fill = (listId, values) => {
+      const el = document.getElementById(listId);
+      if(el) el.innerHTML = values.map(v => '<option value="' + escapeAttr(v) + '"></option>').join('');
+    };
+    fill('aeBrandList', collect(r => r.brand));
+    fill('aeColorList', collect(r => r.color));
+    fill('aeAddressList', collect(r => r.address));
+    fill('aeOffenseLabelList', collect(r => r.offenseLabel));
+    fill('aeOffenseCitationList', collect(r => r.offenseCitation));
+    fill('aeOfficerNameList', collect(r => r.officerName));
+    fill('aePachatelJmenoList', collect(r => r.pachatel && r.pachatel.jmeno));
+    fill('aePachatelPrijmeniList', collect(r => r.pachatel && r.pachatel.prijmeni));
+    fill('aePachatelMestoList', collect(r => r.pachatel && r.pachatel.mesto));
+    fill('aePachatelUliceList', collect(r => r.pachatel && r.pachatel.ulice));
+  }
+
+  // Pro každé sledované pole appka porovná aktuální hodnotu s tou, se
+  // kterou se formulář otevřel — při rozdílu zbarví pole červeně a nad
+  // něj appka vloží (jednou, znovupoužije při dalších změnách) řádek
+  // "bylo: ..." s původní hodnotou bíle/šedě. U selectu appka jako
+  // "bylo" ukazuje popisek dřív vybrané položky, ne technickou value.
+  function wireAdminEditChangeTracking(){
+    AE_TRACKED_FIELDS.forEach(id=>{
+      const el = document.getElementById(id);
+      if(!el) return;
+      aeOriginalValues[id] = el.value;
+      let hint = document.getElementById(id + '_orig');
+      if(!hint){
+        hint = document.createElement('div');
+        hint.id = id + '_orig';
+        hint.className = 'ae-original-line';
+        el.parentNode.insertBefore(hint, el);
+      }
+      hint.style.display = 'none';
+      el.classList.remove('ae-changed');
+
+      const originalDisplay = el.tagName === 'SELECT'
+        ? (Array.from(el.options).find(o => o.value === aeOriginalValues[id]) || {}).textContent
+        : aeOriginalValues[id];
+
+      const handler = () => {
+        const changed = el.value !== aeOriginalValues[id];
+        el.classList.toggle('ae-changed', changed);
+        if(changed && originalDisplay){
+          hint.textContent = 'bylo: ' + originalDisplay;
+          hint.style.display = 'block';
+        } else {
+          hint.style.display = 'none';
+        }
+      };
+      // Odstranění případného předchozího posluchače z minulého otevření
+      // (appka pole při každém openAdminEditModal přepisuje hodnotou
+      // nového záznamu, staré posluchače by jinak zbytečně přibývaly).
+      const clone = el.cloneNode(true);
+      el.parentNode.replaceChild(clone, el);
+      clone.value = aeOriginalValues[id];
+      clone.addEventListener('input', handler);
+      clone.addEventListener('change', handler);
+    });
+  }
+
   function openAdminEditModal(record){
     adminEditRecord = record;
     const note = document.getElementById('adminEditNote');
     note.textContent = '';
+    populateAdminEditDatalists();
     document.getElementById('aeSpz').value = record.plate || '';
     document.getElementById('aeDocType').value = record.docType === 'boticka' ? 'boticka' : 'vyzva';
     document.getElementById('aeBrand').value = record.brand || '';
@@ -2700,6 +2803,7 @@
     document.getElementById('aePachatelMesto').value = p.mesto || '';
     document.getElementById('aePachatelUlice').value = p.ulice || '';
     document.getElementById('aePachatelCisloDomu').value = p.cisloDomu || '';
+    wireAdminEditChangeTracking();
     document.getElementById('adminEditOverlay').classList.add('open');
   }
 
@@ -2754,12 +2858,27 @@
       updateData.resolvedAt = firebase.firestore.FieldValue.delete();
       updateData.resolvedByOfficer = firebase.firestore.FieldValue.delete();
     }
+    // Zjistí, jestli se oproti hodnotám, se kterými se formulář otevřel,
+    // opravdu něco změnilo (viz wireAdminEditChangeTracking) — pokud ano,
+    // appka do editHistory přidá záznam "Upraveno", který se v patičce
+    // detailu zobrazí červeně vedle Vytvořeno/Dořešeno (viz
+    // renderResolutionHistory níž).
+    const wasChanged = AE_TRACKED_FIELDS.some(id=>{
+      const el = document.getElementById(id);
+      return el && el.value !== aeOriginalValues[id];
+    });
+    let editEntry = null;
+    if(wasChanged){
+      editEntry = { resolvedAt: firebase.firestore.Timestamp.now(), officerName: currentOfficerName() || record.officerName || '' };
+      updateData.editHistory = firebase.firestore.FieldValue.arrayUnion(editEntry);
+    }
     const saveBtn = document.getElementById('adminEditSaveBtn');
     saveBtn.disabled = true;
     saveBtn.textContent = 'Ukládám…';
     try{
       await db.collection('prestupky').doc(record.id).update(updateData);
       Object.assign(record, updateData);
+      if(editEntry){ record.editHistory = (record.editHistory || []).concat([editEntry]); }
       if(!hasPachatel) delete record.pachatel;
       if(castkaRaw === '' || isNaN(Number(castkaRaw))) delete record.castka;
       if(!document.getElementById('aePlatba').value) delete record.platba;
@@ -3743,37 +3862,43 @@
     return s;
   }
 
-  // Styly buněk podle vzorového souboru, který Lukáš poslal (ručně
-  // naformátovaná svodka): "h1" — tučné, zarovnané na střed (nadpis
-  // "Svodka" a řádek se směnou), "h2" — tučné a velké (Městská policie
-  // Blansko), "center" — jen zarovnání na střed, normální řez (záhlaví
-  // sloupců typu "Počet"/"Celkem"). Index v poli = index v cellXfs níž,
-  // pořadí se NESMÍ měnit, jinak buňky ukážou na jiný styl.
-  const XLSX_STYLE_INDEX = { default: 0, h1: 1, h2: 2, center: 3 };
-
-  function xlsxSheetDataXml(rows){
+  // Styly buněk podle vzorového souboru, který Lukáš doladil ručně ve
+  // Wordu/Excelu (font Arial, tučné nadpisy, ohraničení dokola celé
+  // tabulky, částky formátované jako "1 234 Kč"): "h1" — tučné Arial 11,
+  // na střed (nadpis "Svodka" a řádek se směnou), "h2" — tučné Arial 16,
+  // na střed (Městská policie Blansko), "center" — Arial 11 normální řez,
+  // jen zarovnané na střed (záhlaví sloupců typu "Počet"), "money" —
+  // Arial 11 s číselným formátem "# ##0 Kč".
+  //
+  // Styly appka negeneruje jako pevný seznam (na rozdíl od dřívější
+  // verze) — každá buňka může ležet na okraji tabulky (potřebuje
+  // ohraničení) i uprostřed (bez ohraničení), takže se kombinace
+  // písmo+zarovnání+formát+ohraničení skládá za běhu a stejné kombinace
+  // se v cellXfs sdílí (viz getXfIndex níž), ať styleSheet zbytečně
+  // nebobtná.
+  function xlsxSheetDataXml(rows, styleResolver, totalCols){
     let xml = '';
     rows.forEach((rowDef, rIdx)=>{
       const rowNum = rIdx + 1;
       const cellsArr = rowDef.cells || [];
       let cells = '';
-      cellsArr.forEach((cell, cIdx)=>{
-        const isObj = cell !== null && typeof cell === 'object' && !(cell instanceof Array);
+      for(let cIdx = 0; cIdx < totalCols; cIdx++){
+        const cell = cellsArr[cIdx];
+        const isObj = cell !== null && cell !== undefined && typeof cell === 'object' && !(cell instanceof Array);
         const val = isObj ? cell.v : cell;
         const styleName = isObj ? cell.style : null;
-        if(val === null || val === undefined || val === ''){
-          if(!styleName) return; // prázdná buňka bez stylu se vůbec nezapisuje
-        }
+        const sIdx = styleResolver(rIdx, cIdx, styleName);
         const ref = xlsxColLetter(cIdx) + rowNum;
-        const sAttr = styleName ? ' s="' + XLSX_STYLE_INDEX[styleName] + '"' : '';
-        if(typeof val === 'number' && isFinite(val)){
-          cells += '<c r="' + ref + '"' + sAttr + '><v>' + val + '</v></c>';
-        } else if(val === null || val === undefined || val === ''){
+        const sAttr = sIdx ? ' s="' + sIdx + '"' : '';
+        if(val === null || val === undefined || val === ''){
+          if(!sAttr) continue; // prázdná buňka bez stylu (bez ohraničení) appka vůbec nezapisuje
           cells += '<c r="' + ref + '"' + sAttr + '/>';
+        } else if(typeof val === 'number' && isFinite(val)){
+          cells += '<c r="' + ref + '"' + sAttr + '><v>' + val + '</v></c>';
         } else {
           cells += '<c r="' + ref + '" t="inlineStr"' + sAttr + '><is><t xml:space="preserve">' + xmlEscape(String(val)) + '</t></is></c>';
         }
-      });
+      }
       const htAttr = rowDef.height ? ' ht="' + rowDef.height + '" customHeight="1"' : '';
       xml += '<row r="' + rowNum + '"' + htAttr + '>' + cells + '</row>';
     });
@@ -3784,6 +3909,65 @@
     opts = opts || {};
     const colWidths = opts.colWidths || null; // pole šířek podle sloupce, index 0 = A
     const merges = opts.merges || []; // pole '{ref}' typu 'A1:D1'
+    const totalCols = opts.totalCols || Math.max(1, ...rows.map(r => (r.cells || []).length));
+    const totalRows = rows.length;
+    const outerBorder = opts.outerBorder !== false; // ohraničení dokola celé tabulky (výchozí zapnuto)
+
+    // ---- Style registry (fonty, ohraničení, číselné formáty, cellXfs) ----
+    const fonts = ['<font><sz val="11"/><name val="Calibri"/></font>']; // font 0 = nepoužitý default
+    const fontIdx = {
+      normal: fonts.push('<font><sz val="11"/><name val="Arial"/></font>') - 1,
+      h1: fonts.push('<font><b/><sz val="11"/><name val="Arial"/></font>') - 1,
+      h2: fonts.push('<font><b/><sz val="16"/><name val="Arial"/></font>') - 1
+    };
+    const STYLE_FONT = { h1: 'h1', h2: 'h2', center: 'normal', money: 'normal', default: 'normal' };
+    const STYLE_ALIGN = { h1: 'center', h2: 'center', center: 'center', money: null, default: null };
+    const STYLE_NUMFMT = { money: 164 };
+
+    const borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>']; // border 0 = žádné
+    const borderIdxCache = {};
+    function getBorderIdx(l, r, t, b){
+      if(!l && !r && !t && !b) return 0;
+      const key = (l?1:0) + '' + (r?1:0) + '' + (t?1:0) + '' + (b?1:0);
+      if(borderIdxCache[key] !== undefined) return borderIdxCache[key];
+      const seg = (tag, on) => on ? ('<' + tag + ' style="thin"><color auto="1"/></' + tag + '>') : ('<' + tag + '/>');
+      borders.push('<border>' + seg('left', l) + seg('right', r) + seg('top', t) + seg('bottom', b) + '<diagonal/></border>');
+      borderIdxCache[key] = borders.length - 1;
+      return borderIdxCache[key];
+    }
+
+    const cellXfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>']; // xf 0 = default
+    const xfIdxCache = {};
+    function getXfIndex(styleName, borderIdx){
+      const key = (styleName || 'default') + '|' + borderIdx;
+      if(xfIdxCache[key] !== undefined) return xfIdxCache[key];
+      const fKey = STYLE_FONT[styleName] || 'normal';
+      const align = STYLE_ALIGN[styleName] || null;
+      const numFmtId = STYLE_NUMFMT[styleName] || 0;
+      let attrs = 'numFmtId="' + numFmtId + '" fontId="' + fontIdx[fKey] + '" fillId="0" borderId="' + borderIdx + '" xfId="0"' +
+        ' applyFont="1" applyBorder="1"' + (numFmtId ? ' applyNumberFormat="1"' : '') + (align ? ' applyAlignment="1"' : '');
+      const inner = align ? '<alignment horizontal="' + align + '"/>' : '';
+      cellXfs.push(inner ? ('<xf ' + attrs + '>' + inner + '</xf>') : ('<xf ' + attrs + '/>'));
+      xfIdxCache[key] = cellXfs.length - 1;
+      return xfIdxCache[key];
+    }
+
+    // Pro každou buňku appka spočítá, jestli leží na okraji tabulky (viz
+    // outerBorder) — první/poslední sloupec a první/poslední řádek — a
+    // podle toho jí přidá levé/pravé/horní/dolní ohraničení, ať kolem
+    // celé svodky vznikne jeden souvislý "box" přesně jako ve vzoru.
+    function styleResolver(rIdx, cIdx, styleName){
+      let l = false, r = false, t = false, b = false;
+      if(outerBorder){
+        l = cIdx === 0;
+        r = cIdx === totalCols - 1;
+        t = rIdx === 0;
+        b = rIdx === totalRows - 1;
+      }
+      const borderIdx = getBorderIdx(l, r, t, b);
+      if(!styleName && borderIdx === 0) return 0;
+      return getXfIndex(styleName, borderIdx);
+    }
 
     const colsXml = colWidths
       ? '<cols>' + colWidths.map((w, i) => w ? ('<col min="' + (i+1) + '" max="' + (i+1) + '" width="' + w + '" customWidth="1"/>') : '').join('') + '</cols>'
@@ -3792,31 +3976,23 @@
       ? '<mergeCells count="' + merges.length + '">' + merges.map(ref => '<mergeCell ref="' + ref + '"/>').join('') + '</mergeCells>'
       : '';
 
+    const sheetDataXml = xlsxSheetDataXml(rows, styleResolver, totalCols);
+
     const sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
       colsXml +
-      '<sheetData>' + xlsxSheetDataXml(rows) + '</sheetData>' +
+      '<sheetData>' + sheetDataXml + '</sheetData>' +
       mergeXml +
       '</worksheet>';
 
-    // Styly: fonty [0]=normální, [1]=tučné 11, [2]=tučné 16 — a čtyři
-    // cellXfs záznamy podle XLSX_STYLE_INDEX výš (pořadí musí sedět).
     const stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      '<fonts count="3">' +
-        '<font><sz val="11"/><name val="Calibri"/></font>' +
-        '<font><b/><sz val="11"/><name val="Calibri"/></font>' +
-        '<font><b/><sz val="16"/><name val="Calibri"/></font>' +
-      '</fonts>' +
+      '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0\\ &quot;Kč&quot;"/></numFmts>' +
+      '<fonts count="' + fonts.length + '">' + fonts.join('') + '</fonts>' +
       '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>' +
-      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+      '<borders count="' + borders.length + '">' + borders.join('') + '</borders>' +
       '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-      '<cellXfs count="4">' +
-        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
-        '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>' +
-        '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>' +
-        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf>' +
-      '</cellXfs>' +
+      '<cellXfs count="' + cellXfs.length + '">' + cellXfs.join('') + '</cellXfs>' +
       '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
       '</styleSheet>';
 
@@ -3862,10 +4038,11 @@
 
   // Sestaví řádky svodky pro Excel přesně podle vzorového formátu, který
   // Lukáš poslal (ručně naformátovaná svodka 02.09.2026): nadpis "Svodka"
-  // + "Městská policie Blansko" + datum/směna jako tři sloučené řádky
-  // přes sloupce A–D, pak štítek/hodnota ve sloupcích A/B, u tabulek se
-  // záhlavím (platby, typ dokumentu, strážníci) mají popisky sloupců
-  // zarovnání na střed.
+  // + "Městská policie Blansko" + datum/směna + prázdný řádek jako čtyři
+  // sloučené řádky přes sloupce A–D, pak štítek/hodnota ve sloupcích A/B,
+  // částky ve sloupci C jako "money" (formát "1 234 Kč"), u tabulek se
+  // záhlavím (platby, typ dokumentu, strážníci) jsou popisky sloupců
+  // zarovnané na střed.
   function buildShiftSummaryXlsxRows(win, stats){
     const rows = [];
     rows.push({ cells: [{ v: 'Svodka', style: 'h1' }], height: 20.1 });
@@ -3881,9 +4058,9 @@
     rows.push({ cells: [] });
     rows.push({ cells: ['Příkazy podle způsobu platby', { v: 'Počet', style: 'center' }, { v: 'Částka (Kč)', style: 'center' }] });
     rows.push({ cells: [] });
-    rows.push({ cells: ['Hotově', stats.paymentBreakdown.hotove.count, stats.paymentBreakdown.hotove.sum] });
-    rows.push({ cells: ['Kartou', stats.paymentBreakdown.kartou.count, stats.paymentBreakdown.kartou.sum] });
-    rows.push({ cells: ['BPN', stats.paymentBreakdown.bpn.count, stats.paymentBreakdown.bpn.sum] });
+    rows.push({ cells: ['Hotově', stats.paymentBreakdown.hotove.count, { v: stats.paymentBreakdown.hotove.sum, style: 'money' }] });
+    rows.push({ cells: ['Kartou', stats.paymentBreakdown.kartou.count, { v: stats.paymentBreakdown.kartou.sum, style: 'money' }] });
+    rows.push({ cells: ['BPN', stats.paymentBreakdown.bpn.count, { v: stats.paymentBreakdown.bpn.sum, style: 'money' }] });
     rows.push({ cells: [] });
     rows.push({ cells: ['Podle typu dokumentu', { v: 'Počet', style: 'center' }] });
     rows.push({ cells: [] });
@@ -3918,7 +4095,8 @@
       const rows = buildShiftSummaryXlsxRows(win, stats);
       const blob = await buildSimpleXlsx('Svodka', rows, {
         colWidths: [30.7109375, 12.7109375],
-        merges: ['A1:D1', 'A2:D2', 'A3:D3']
+        merges: ['A1:D1', 'A2:D2', 'A3:D3', 'A4:D4'],
+        totalCols: 4
       });
       const filename = shiftSummaryXlsxFilename(win);
       try{
@@ -4393,23 +4571,43 @@
     if(!currentDetailRecord.resolved) await markResolved(currentDetailRecord, 'oznameni');
   });
 
+  // Pomocná funkce na získání srovnatelného Date z Firestore Timestamp
+  // i obyčejného JS Date — appka historii (Vytvořeno/Dořešeno/Upraveno)
+  // řadí chronologicky podle skutečného času, ne podle pořadí přidání.
+  function tsToSortableDate(ts){
+    if(!ts) return null;
+    const d = typeof ts.toDate === 'function' ? ts.toDate() : ts;
+    return (d instanceof Date && !isNaN(d)) ? d : null;
+  }
+
   // Historie řešení v patičce detailu — úplně první řádek je "Vytvořeno"
   // (kdy a kým appka přestupek vůbec založila, viz index.html), pak
   // následuje první doopravdy uložené řešení a případné další změny
   // způsobu řešení (viz markResolved), všechno ve stejném formátu
-  // "štítek · datum · str. číslo jméno".
+  // "štítek · datum · str. číslo jméno". Admin editace (editHistory,
+  // viz saveAdminEdit) appka do stejné časové osy zamíchá jako řádky
+  // "Upraveno", barevně (rh-edit) odlišené červeně.
   function renderResolutionHistory(record){
     const container = document.getElementById('resolutionHistory');
     if(!container) return;
     const rows = [];
-    rows.push({ label: 'Vytvořeno', dateStr: formatResolvedDateTime(record.createdAt), officerName: record.officerName });
+    rows.push({ label: 'Vytvořeno', dateStr: formatResolvedDateTime(record.createdAt), officerName: record.officerName, sortAt: tsToSortableDate(record.createdAt) });
     (record.resolutionHistory || []).forEach(e=>{
-      rows.push({ label: UNDO_METHOD_LABEL[e.method] || 'Dořešeno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName });
+      rows.push({ label: UNDO_METHOD_LABEL[e.method] || 'Dořešeno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt) });
+    });
+    (record.editHistory || []).forEach(e=>{
+      rows.push({ label: 'Upraveno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt), edit: true });
+    });
+    rows.sort((a, b) => {
+      if(!a.sortAt && !b.sortAt) return 0;
+      if(!a.sortAt) return -1;
+      if(!b.sortAt) return 1;
+      return a.sortAt - b.sortAt;
     });
     container.classList.add('has-entries');
     container.innerHTML = rows.map(r=>{
       const officer = r.officerName ? officerHeadLabel(r.officerName) : '';
-      return '<div class="resolution-history-entry">' +
+      return '<div class="resolution-history-entry' + (r.edit ? ' rh-edit' : '') + '">' +
         '<span class="rh-method">' + escapeHtml(r.label) + '</span>' +
         (r.dateStr ? '<span class="rh-date">' + escapeHtml(r.dateStr) + '</span>' : '') +
         (officer ? '<span class="rh-officer">' + escapeHtml(officer) + '</span>' : '') +
