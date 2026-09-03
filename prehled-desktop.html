@@ -1657,7 +1657,7 @@
       '<w:placeholder><w:docPart w:val="DefaultPlaceholder_-1854013438"/></w:placeholder>' +
       '<w:showingPlcHdr/>' +
       '<w:text/>' +
-      '</w:sdtPr><w:sdtEndPr/><w:sdtContent>' +
+      '</w:sdtPr><w:sdtEndPr><w:rPr><w:sz w:val="' + size + '"/></w:rPr></w:sdtEndPr><w:sdtContent>' +
       '<w:r><w:rPr><w:sz w:val="' + size + '"/><w:b/><w:highlight w:val="yellow"/></w:rPr>' +
       '<w:t xml:space="preserve">' + xmlEscape(placeholderText) + '</w:t></w:r>' +
       '</w:sdtContent></w:sdt>';
@@ -2872,13 +2872,19 @@
       editEntry = { resolvedAt: firebase.firestore.Timestamp.now(), officerName: currentOfficerName() || record.officerName || '' };
       updateData.editHistory = firebase.firestore.FieldValue.arrayUnion(editEntry);
     }
+    // Object.assign(record, updateData) níž by editHistory přepsal přímo
+    // na FieldValue.arrayUnion "sentinel" objekt (appka ho appce posílá
+    // do Firestore, ne jako skutečné pole) — appka si proto skutečné
+    // dosavadní pole uloží zvlášť předem a po Object.assign ho ručně
+    // opraví na správné JS pole s novým záznamem přidaným na konec.
+    const prevEditHistory = Array.isArray(record.editHistory) ? record.editHistory : [];
     const saveBtn = document.getElementById('adminEditSaveBtn');
     saveBtn.disabled = true;
     saveBtn.textContent = 'Ukládám…';
     try{
       await db.collection('prestupky').doc(record.id).update(updateData);
       Object.assign(record, updateData);
-      if(editEntry){ record.editHistory = (record.editHistory || []).concat([editEntry]); }
+      if(editEntry){ record.editHistory = prevEditHistory.concat([editEntry]); }
       if(!hasPachatel) delete record.pachatel;
       if(castkaRaw === '' || isNaN(Number(castkaRaw))) delete record.castka;
       if(!document.getElementById('aePlatba').value) delete record.platba;
