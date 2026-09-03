@@ -375,13 +375,14 @@
   .doc-link-label{font-size:8.5px; font-family:'Roboto Mono',monospace; letter-spacing:.02em;}
   .resolution-history{padding:8px 22px 0; border-top:1px solid var(--line); flex:0 0 auto; display:none;}
   .resolution-history.has-entries{display:block;}
+  .resolution-history-list{max-height:88px; overflow-y:auto;}
   .resolution-history-entry{display:flex; gap:12px; font-size:11px; color:var(--muted); padding:3px 0; font-family:'Roboto Mono',monospace;}
   .resolution-history-entry .rh-method{color:var(--text); font-weight:600; min-width:150px;}
   .resolution-history-entry .rh-date{min-width:120px;}
   .resolution-history-entry.rh-edit{color:var(--bad);}
   .resolution-history-entry.rh-edit .rh-method{color:var(--bad);}
   button.resolution-history-entry{
-    background:none; border:none; font-family:inherit; width:100%; cursor:default; text-align:left;
+    background:none; border:none; width:100%; cursor:default; text-align:left;
   }
   .resolution-history-entry.rh-edit-clickable{cursor:pointer;}
   .resolution-history-entry.rh-edit-clickable:hover{background:var(--asphalt-3);}
@@ -1663,7 +1664,12 @@
   function docxPlaceholderFieldPara(prefixText, placeholderText, opts){
     opts = opts || {};
     const size = opts.size || 19;
-    const pPr = '<w:spacing w:before="0" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 20) + '"/>';
+    // Kromě sdtEndPr appka nastavuje velikost i na "rPr" konce odstavce
+    // (pPr/rPr) — sdtEndPr Word na nově napsaný text v praxi nepoužívá
+    // spolehlivě (běžná nekonzistence content controlů), zatímco
+    // formátování konce odstavce Word skutečně dědí, když nahrazuje
+    // placeholder text napsaným.
+    const pPr = '<w:spacing w:before="0" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 20) + '"/><w:rPr><w:sz w:val="' + size + '"/></w:rPr>';
     const prefixRun = docxRun(prefixText, { size, bold: !!opts.bold });
     const sdtId = Math.floor(Math.random() * 2000000000) + 1;
     const sdt = '<w:sdt><w:sdtPr>' +
@@ -4154,7 +4160,7 @@
       const stats = computeStatsForRecords(records);
       const rows = buildShiftSummaryXlsxRows(win, stats);
       const blob = await buildSimpleXlsx('Svodka', rows, {
-        colWidths: [30.7109375, 12.7109375],
+        colWidths: [30.7109375, 12.7109375, 12, 12],
         merges: ['A1:D1', 'A2:D2', 'A3:D3', 'A4:D4'],
         totalCols: 4
       });
@@ -4660,12 +4666,12 @@
     });
     rows.sort((a, b) => {
       if(!a.sortAt && !b.sortAt) return 0;
-      if(!a.sortAt) return -1;
-      if(!b.sortAt) return 1;
-      return a.sortAt - b.sortAt;
+      if(!a.sortAt) return 1;
+      if(!b.sortAt) return -1;
+      return b.sortAt - a.sortAt;
     });
     container.classList.add('has-entries');
-    container.innerHTML = rows.map(r=>{
+    container.innerHTML = '<div class="resolution-history-list">' + rows.map(r=>{
       const officer = r.officerName ? officerHeadLabel(r.officerName) : '';
       const hasChanges = r.edit && r.changes && r.changes.length > 0;
       // Starší záznamy "Upraveno" appka mohla uložit ještě předtím, než
@@ -4687,7 +4693,7 @@
         (r.dateStr ? '<span class="rh-date">' + escapeHtml(r.dateStr) + '</span>' : '') +
         (officer ? '<span class="rh-officer">' + escapeHtml(officer) + '</span>' : '') +
         '</' + rowCloseTag + '>' + detail;
-    }).join('');
+    }).join('') + '</div>';
     container.querySelectorAll('.rh-edit-clickable').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const detail = document.getElementById('rhEditDetail' + btn.dataset.editIdx);

@@ -949,7 +949,12 @@
   function docxPlaceholderFieldPara(prefixText, placeholderText, opts){
     opts = opts || {};
     const size = opts.size || 19;
-    const pPr = '<w:spacing w:before="0" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 20) + '"/>';
+    // Kromě sdtEndPr appka nastavuje velikost i na "rPr" konce odstavce
+    // (pPr/rPr) — sdtEndPr Word na nově napsaný text v praxi nepoužívá
+    // spolehlivě (běžná nekonzistence content controlů), zatímco
+    // formátování konce odstavce Word skutečně dědí, když nahrazuje
+    // placeholder text napsaným.
+    const pPr = '<w:spacing w:before="0" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 20) + '"/><w:rPr><w:sz w:val="' + size + '"/></w:rPr>';
     const prefixRun = docxRun(prefixText, { size, bold: !!opts.bold });
     const sdtId = Math.floor(Math.random() * 2000000000) + 1;
     const sdt = '<w:sdt><w:sdtPr>' +
