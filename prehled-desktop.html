@@ -750,6 +750,7 @@
       <button class="icon-btn" id="fullscreenBtn" title="Celá obrazovka">⛶</button>
       <button class="icon-btn" id="themeToggleBtn" title="Světlý/tmavý režim">☾</button>
       <button class="icon-btn" id="shiftSummaryBtn" title="Svodky" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">Svodky</button>
+      <button class="icon-btn" id="addEventBtn" title="Přidat událost" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">+ Přidat událost</button>
 
       <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="backlink">Zpět na RZ Scanner</a>
 
@@ -7007,6 +7008,17 @@
     resetShiftSummaryModalDefaults();
     document.getElementById('shiftSummaryOverlay').classList.add('open');
     renderShiftSummary();
+  });
+
+  // Tlačítko "Přidat událost" — zatím jen zástupný stav (placeholder).
+  // Bude sloužit k ručnímu ex-post zadání přestupků řešených radarem
+  // (§ 125c odst. 1 písm. f) body 2-4 — překročení rychlosti), které se
+  // na rozdíl od ostatních přestupků neřeší v terénu appkou index.html,
+  // ale až zpětně na služebně s exportem do MPM. Konkrétní podoba
+  // formuláře (pole, výpočet bodu podle naměřené rychlosti, nahrání
+  // fotky z radaru) bude doplněna v další iteraci.
+  document.getElementById('addEventBtn').addEventListener('click', ()=>{
+    alert('Přidat událost — formulář zatím není hotový, připravuje se.');
   });
   document.getElementById('shiftSummaryCloseBtn').addEventListener('click', ()=>{
     document.getElementById('shiftSummaryOverlay').classList.remove('open');
