@@ -291,6 +291,8 @@
   .dot{width:7px; height:7px; border-radius:50%;}
 
   .btn-row{display:flex; justify-content:center; gap:130px;}
+  #loginScreen .btn-row{justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
+  #loginScreen .btn-row .btn{flex:1 1 auto; min-width:0;}
   .btn-row #makePdfBtn{flex:0 0 auto; min-width:98px; padding-left:10px; padding-right:10px;}
   .btn{
     flex:1; border-radius:14px; padding:15px 12px; font-family:'Inter',sans-serif; font-weight:700;
@@ -935,6 +937,7 @@
       <div class="field"><label>Heslo</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
       <div class="btn-row">
         <button class="btn btn-ghost" id="loginCancelBtn">Zpět</button>
+        <button class="btn btn-ghost" id="loginLogoutBtn" style="border-color:#555; color:#ff6b6b; display:none;">Odhlásit</button>
         <button class="btn btn-primary" id="loginSubmitBtn">Přihlásit se</button>
       </div>
       <div id="loginError"></div>
@@ -1412,6 +1415,20 @@
     pendingAutoPrintAfterLogin = false;
     show(loginCancelDestination);
     loginCancelDestination = 'result';
+  });
+
+  // Explicitní odhlášení přímo z přihlašovací obrazovky (mezi "Zpět" a
+  // "Přihlásit se") — na rozdíl od kliku na officerStatusBox appka tady
+  // odhlásí HNED, bez čekání na nové přihlášení (viz komentář u
+  // officerStatusBox níž, proč se tam odhlášení dřív dělalo předčasně).
+  // Appka pak zůstane na loginu, ať se rovnou může přihlásit další
+  // strážník — box "Přihlášený strážník" na startu by jinak chvíli ukázal
+  // "Nepřihlášen", než by si appka tuhle obrazovku stihla zavřít.
+  document.getElementById('loginLogoutBtn').addEventListener('click', async ()=>{
+    await auth.signOut();
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').style.display = 'none';
   });
 
   document.getElementById('loginSubmitBtn').addEventListener('click', async ()=>{
@@ -2593,6 +2610,10 @@
       loginOverlay.style.display = 'block';
     }
     updateOfficerStatusBox();
+    // Tlačítko "Odhlásit" na přihlašovací obrazovce má smysl jen tehdy,
+    // když je momentálně někdo přihlášený (jinak by nebylo co odhlašovat).
+    const logoutBtn = document.getElementById('loginLogoutBtn');
+    if(logoutBtn) logoutBtn.style.display = auth.currentUser ? '' : 'none';
   }
 
   // Box "Přihlášený strážník" na úvodní obrazovce (nad logem RZ Scanner).
