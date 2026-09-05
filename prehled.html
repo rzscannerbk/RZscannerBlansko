@@ -372,7 +372,7 @@
 <div id="app">
 
   <!-- LOGIN -->
-  <div id="loginScreen" class="screen active">
+  <div id="loginScreen" class="screen">
     <div class="login-box">
       <h1>RZ Scanner</h1>
       <p class="hint">Přehled odeslaných přestupků. Přihlaste se svým účtem.</p>
@@ -630,6 +630,12 @@
     if(q) document.getElementById('searchInput').value = q;
   }catch(e){}
 
+  // Dokud appka nezjistí, jestli je uživatel přihlášený (Firebase to čte
+  // asynchronně z IndexedDB, chvilku to trvá), nemá žádná obrazovka třídu
+  // "active" (viz HTML výš — loginScreen ji dřív měl napevno, což
+  // způsobovalo krátké probliknutí loginu i lidem, co jsou už přihlášení
+  // přes appku index.html na stejné doméně/projektu). Appka radši chvilku
+  // ukáže jen prázdné pozadí, než by blikala špatnou obrazovkou.
   auth.onAuthStateChanged(user=>{
     if(user){
       show('list');
@@ -1257,7 +1263,7 @@
 
     let body = '';
     body += docxHeaderTable(
-      ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'Nám. Republiky 1', '678 01 BLANSKO'],
+      ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'nám. Republiky 1316/1', '678 01 BLANSKO'],
       [
         { raw: docxPlaceholderFieldPara('Naše  č. j.: MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 }) },
         'Vyřizuje: str. ' + officerForDoc,

@@ -1112,7 +1112,10 @@
   auth.onAuthStateChanged((user)=>{
     if(!initialAuthCheckDone){
       initialAuthCheckDone = true;
-      if(!user) show('login');
+      if(!user){
+        loginCancelDestination = 'start';
+        show('login');
+      }
     }
     if(typeof applyOfficerLock === 'function') applyOfficerLock();
   });
@@ -1131,6 +1134,14 @@
   // přihlášení (appka nebyla přihlášená), potřebuje appka po úspěšném
   // přihlášení vědět, že má rovnou i vytisknout, ne jen odeslat.
   let pendingAutoPrintAfterLogin = false;
+  // Kam appka skočí po kliknutí na "Zpět" na přihlašovací obrazovce —
+  // výchozí 'result' zachovává původní chování (přihlášení vyžádané
+  // uprostřed rozpracovaného záznamu se zruší zpátky na náhled záznamu).
+  // Box "Přihlášený strážník" na úvodní obrazovce (a vynucené přihlášení
+  // hned po startu appky) si před zobrazením loginu přepne tohle na
+  // 'start', ať "Zpět" vrátí na úvodní obrazovku, ne doprostřed
+  // rozpracovaného/neexistujícího záznamu.
+  let loginCancelDestination = 'result';
 
   function setSubmitNote(text, kind){
     const note = document.getElementById('submitNote');
@@ -1399,7 +1410,8 @@
   document.getElementById('loginCancelBtn').addEventListener('click', ()=>{
     pendingSubmitAfterLogin = false;
     pendingAutoPrintAfterLogin = false;
-    show('result');
+    show(loginCancelDestination);
+    loginCancelDestination = 'result';
   });
 
   document.getElementById('loginSubmitBtn').addEventListener('click', async ()=>{
@@ -2601,17 +2613,15 @@
     }
   }
 
-  // Klik na box = appka umožní přihlásit se jako jiný strážník. Pokud je
-  // někdo už přihlášený, appka ho nejdřív odhlásí (jinak by
-  // signInWithEmailAndPassword jen přepsal aktuální relaci — funkčně by to
-  // vyšlo nastejno, ale explicitní odhlášení je jednoznačnější UX signál,
-  // že appka opravdu přepíná uživatele) a rovnou zobrazí přihlašovací
-  // obrazovku.
-  document.getElementById('officerStatusBox').addEventListener('click', async ()=>{
-    if(auth.currentUser){
-      await auth.signOut();
-    }
+  // Klik na box = appka umožní přihlásit se jako jiný strážník. Appka
+  // NEODHLAŠUJE hned teď — signInWithEmailAndPassword aktuální relaci
+  // sama přepíše, jakmile se někdo nový úspěšně přihlásí. Díky tomu, když
+  // uživatel na přihlašovací obrazovce dá "Zpět" (bez přihlášení), zůstane
+  // appka přihlášená jako předtím, místo aby skončila bez přihlášeného
+  // strážníka (viz loginCancelDestination výš).
+  document.getElementById('officerStatusBox').addEventListener('click', ()=>{
     document.getElementById('loginError').style.display = 'none';
+    loginCancelDestination = 'start';
     show('login');
   });
 
