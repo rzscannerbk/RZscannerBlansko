@@ -5469,8 +5469,12 @@
 
     // Stejná stavba věty jako u Oznámení (viz skutekRuns v
     // buildOznameniDocx) — datum+čas dostavení, popis skutku (slovesný
-    // tvar) a vozidlo appka dává tučně, zbytek běžným řezem.
-    const vehicleBoldPart = (record.brand ? (record.brand + ', ') : '') + 'RZ ' + (record.plate || '');
+    // tvar) a vozidlo appka dává tučně, zbytek běžným řezem. Značka
+    // a barva appka spojuje čárkou (stejný formát, jaký appka používá
+    // i jinde — viz "Tovární značka, barva" v Oznámení) — obě jsou
+    // nepovinné, appka je do věty přidá, jen když jsou vyplněné.
+    const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
+    const vehicleBoldPart = (vehicleBits ? (vehicleBits + ', ') : '') + 'RZ ' + (record.plate || '');
     let vyzvaRuns = docxRun('Žádáme Vás, abyste se dostavil(a) dne ', { size: 20 }) +
       docxRun(dostaveniDatumCasText, { size: 20, bold: true }) +
       docxRun(' na Městskou policii Blansko, Sadová č. 2, k podání vysvětlení podle § 11 odst. 1 zákona č. 553/1991 Sb., ' +
