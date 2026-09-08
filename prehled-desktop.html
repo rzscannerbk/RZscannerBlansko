@@ -8817,14 +8817,18 @@
     // a uložit (viz updatePrikazEventActionBtn níž).
     document.getElementById('prikazConfirmBtn').style.display = prikazIsNewEvent ? 'none' : '';
     document.getElementById('prikazEventActionBtn').style.display = prikazIsNewEvent ? '' : 'none';
-    // "Vlož provozovatele" appka u "Přidat událost" schová — tuhle roli
-    // teď plní tlačítko "Vložit" (viz prikazEventActionBtn), které navíc
-    // čte rovnou ze schránky bez nutnosti ručně vkládat do pole. U
-    // běžných záznamů appka pole nechává, je tam pořád jediná cesta.
+    // "Vlož provozovatele" appka schovává u "Přidat událost" (tuhle roli
+    // tam plní tlačítko "Vložit", viz prikazEventActionBtn), a teď nově
+    // i u Příkazu na místě a Domluvy na běžném terénním záznamu — tam
+    // strážník řeší přímo přítomného přestupce (doklad má v ruce), takže
+    // appka žádné kopírování z lustrace nepotřebuje. U Výzvy a Oznámení
+    // pole appka nechává — tam appka typicky řeší dosud neustanoveného
+    // řidiče/provozovatele zjištěného přes lustraci vozidla.
     // Popisek appka mění na "PROVOZOVATEL" jen u nové události — u
     // běžného Příkazu/Oznámení appka řeší přímo přítomného pachatele, ne
     // (nutně) provozovatele vozidla.
-    document.getElementById('prikazPasteField').style.display = prikazIsNewEvent ? 'none' : '';
+    const showPasteField = !prikazIsNewEvent && (prikazMode === 'vyzva' || prikazMode === 'oznameni');
+    document.getElementById('prikazPasteField').style.display = showPasteField ? '' : 'none';
     document.getElementById('prikazPachatelLabel').textContent = prikazIsNewEvent ? 'PROVOZOVATEL' : 'PACHATEL';
     // U "Přidat událost" appka celý blok PROVOZOVATEL (jméno/firma,
     // adresa, dostavit se dne) schová, dokud se strážník nevrátí z MP
