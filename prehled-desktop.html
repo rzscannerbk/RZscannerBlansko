@@ -8651,6 +8651,26 @@
   let prikazMpmCisloJednaci = null;
   // 'osoba' nebo 'firma' — viz setPrikazProvozovatelMode.
   let prikazProvozovatelMode = 'osoba';
+  // Appka na true nastaví v okamžiku, kdy strážník aspoň jednou klikne
+  // na "Vyhledat DS" (ať už appka najde ID automaticky, nebo appka jen
+  // otevře veřejný seznam k ručnímu dohledání) — appka to bere jako
+  // důkaz, že se o dohledání datové schránky u firmy vůbec pokusil.
+  // Bez toho appka firemní záznam (kde appka DS ještě nemá) neuloží,
+  // viz prikazFirmaDsMissing níž.
+  let prikazDsLookupRan = false;
+
+  // Appka blokuje uložení firemního provozovatele, dokud u něj appka
+  // nemá vyplněnou datovou schránku NEBO aspoň jednou neproběhlo
+  // tlačítko "Vyhledat DS" (viz prikazDsLookupRan výš) — ať appka
+  // strážníkovi nedovolí na tenhle krok jednoduše zapomenout. Editace
+  // záznamu, který appka DS už dřív uložila (pole appka předvyplnila
+  // při otevření dialogu), appka samozřejmě nijak neblokuje.
+  function prikazFirmaDsMissing(){
+    if(prikazProvozovatelMode !== 'firma') return false;
+    if(!document.getElementById('prikazIco').value.trim()) return false;
+    if(document.getElementById('prikazDatovaSchranka').value.trim()) return false;
+    return !prikazDsLookupRan;
+  }
 
   // U "Přidat událost" appka nedovolí uložit, dokud nejsou vyplněné RZ,
   // datum spáchání a čas spáchání — vrací seznam id chybějících polí
@@ -8819,6 +8839,12 @@
     prikazEventBtnState = 'mpm';
     prikazEventPasted = false;
     prikazMpmCisloJednaci = null;
+    // Appka požadavek na "aspoň jednou Vyhledat DS" resetuje při každém
+    // otevření dialogu — pokud ale appka pole Datová schránka rovnou
+    // předvyplnila z uloženého záznamu (viz p.datovaSchranka výš),
+    // prikazFirmaDsMissing appku stejně nezablokuje, takže tenhle reset
+    // nic nerozbije.
+    prikazDsLookupRan = false;
     // setPrikazProvozovatelMode appka už zavolala výš (podle
     // currentDetailRecord.pachatel.firma) — tady by to jen zbytečně
     // přepsalo správně obnovený režim zpátky na 'osoba'.
@@ -9646,6 +9672,15 @@
       // mezikroku) rovnou vygeneruje Výzvu a označí záznam jako
       // dořešený, stejně jako běžný tok u existujících záznamů.
       //
+      // U firmy appka nedovolí pokračovat, dokud aspoň jednou
+      // neproběhlo "Vyhledat DS" (viz prikazFirmaDsMissing) — appka
+      // pole i tlačítko zvýrazní a na tlačítko appka rovnou skočí.
+      if(prikazFirmaDsMissing()){
+        document.getElementById('prikazDatovaSchranka').closest('.field').classList.add('prikaz-field-missing');
+        document.getElementById('prikazDsLookupBtn').focus();
+        return;
+      }
+      //
       // Kdyby appka právě dočítala nějaký přiložený soubor (viz
       // prikazFileReadBusy), počká na to — jinak by se mohlo stát, že
       // appka uloží záznam dřív, než čtení souboru vůbec doběhne, a
@@ -9802,6 +9837,16 @@
         focusField(document.getElementById(missing[0]));
         return;
       }
+    }
+
+    // U firmy appka nedovolí uložit, dokud aspoň jednou neproběhlo
+    // "Vyhledat DS" (viz prikazFirmaDsMissing) — platí i tady, ne jen
+    // u vícestavového tlačítka "Přidat událost" (viz stejná kontrola
+    // v jeho click handleru výš).
+    if(prikazFirmaDsMissing()){
+      document.getElementById('prikazDatovaSchranka').closest('.field').classList.add('prikaz-field-missing');
+      document.getElementById('prikazDsLookupBtn').focus();
+      return;
     }
 
     const jmeno = document.getElementById('prikazJmeno').value.trim();
@@ -10238,6 +10283,11 @@
       document.getElementById('prikazIco').focus();
       return;
     }
+    // Appka počítá pokus za "proběhlý" už tímhle kliknutím — ať appka
+    // skončí u automatického nálezu, nebo appka spadne na ruční cestu
+    // přes otevřenou záložku (viz prikazFirmaDsMissing výš).
+    prikazDsLookupRan = true;
+    document.getElementById('prikazDatovaSchranka').closest('.field').classList.remove('prikaz-field-missing');
     const originalHtml = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="cam-icon">🔍</span> Hledám…';
@@ -10260,6 +10310,15 @@
       window.open('https://www.datovka.gov.cz/sds/', '_blank');
       btn.disabled = false;
       btn.innerHTML = originalHtml;
+    }
+  });
+
+  // Ruční přepsání/vyplnění pole appce taky stačí jako splnění
+  // požadavku "aspoň jednou Vyhledat DS" (viz prikazFirmaDsMissing) —
+  // appka proto zvýraznění smaže i bez kliknutí na tlačítko.
+  document.getElementById('prikazDatovaSchranka').addEventListener('input', ()=>{
+    if(document.getElementById('prikazDatovaSchranka').value.trim()){
+      document.getElementById('prikazDatovaSchranka').closest('.field').classList.remove('prikaz-field-missing');
     }
   });
 
