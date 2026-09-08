@@ -973,33 +973,52 @@
         <label for="prikazPaste">Vlož provozovatele</label>
         <input type="text" id="prikazPaste" autocomplete="off" placeholder="vlož zkopírovaný text z lustrace (příjmení jméno, datum narození, adresa)">
       </div>
-      <div class="prikaz-row2">
-        <div class="field prikaz-suggest-wrap">
-          <label for="prikazJmeno">Jméno</label>
-          <input type="text" id="prikazJmeno" autocomplete="off">
-          <div class="prikaz-suggest-list" id="prikazJmenoSuggest"></div>
+      <div id="prikazOsobaFields">
+        <div class="prikaz-row2">
+          <div class="field prikaz-suggest-wrap">
+            <label for="prikazJmeno">Jméno</label>
+            <input type="text" id="prikazJmeno" autocomplete="off">
+            <div class="prikaz-suggest-list" id="prikazJmenoSuggest"></div>
+          </div>
+          <div class="field prikaz-suggest-wrap">
+            <label for="prikazPrijmeni">Příjmení</label>
+            <input type="text" id="prikazPrijmeni" autocomplete="off">
+            <div class="prikaz-suggest-list" id="prikazPrijmeniSuggest"></div>
+          </div>
         </div>
-        <div class="field prikaz-suggest-wrap">
-          <label for="prikazPrijmeni">Příjmení</label>
-          <input type="text" id="prikazPrijmeni" autocomplete="off">
-          <div class="prikaz-suggest-list" id="prikazPrijmeniSuggest"></div>
+        <div class="prikaz-row2">
+          <div class="field prikaz-datepicker-wrap">
+            <label for="prikazNarozeni">Datum narození</label>
+            <input type="text" id="prikazNarozeni" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
+            <div class="prikaz-datepicker-panel" id="prikazNarozeniPanel"></div>
+          </div>
+          <div class="field prikaz-suggest-wrap">
+            <label for="prikazDoklad">Číslo dokladu</label>
+            <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
+            <div class="prikaz-suggest-list" id="prikazDokladSuggest"></div>
+          </div>
         </div>
       </div>
-      <div class="prikaz-row2">
-        <div class="field prikaz-datepicker-wrap">
-          <label for="prikazNarozeni">Datum narození</label>
-          <input type="text" id="prikazNarozeni" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
-          <div class="prikaz-datepicker-panel" id="prikazNarozeniPanel"></div>
-        </div>
-        <div class="field prikaz-suggest-wrap">
-          <label for="prikazDoklad">Číslo dokladu</label>
-          <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
-          <div class="prikaz-suggest-list" id="prikazDokladSuggest"></div>
+      <!-- Appka do tohohle režimu přepne sama, když z "Vlož provozovatele"
+           pozná firmu (IČO + název subjektu) místo osoby — viz
+           setPrikazProvozovatelMode/applyProvozovatelText. Firma logicky
+           nemá jméno/příjmení/datum narození/číslo dokladu, proto appka
+           tenhle blok schovává celý ten výš, ne jen jednotlivá pole. -->
+      <div id="prikazFirmaFields" style="display:none;">
+        <div class="prikaz-row2">
+          <div class="field">
+            <label for="prikazFirma">Název firmy</label>
+            <input type="text" id="prikazFirma" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="prikazIco">IČO</label>
+            <input type="text" id="prikazIco" inputmode="numeric" autocomplete="off">
+          </div>
         </div>
       </div>
       <div class="prikaz-row-address">
         <div class="field prikaz-suggest-wrap prikaz-street-field">
-          <label for="prikazMesto">Adresa trvalého pobytu</label>
+          <label for="prikazMesto" id="prikazMestoLabel">Adresa trvalého pobytu</label>
           <input type="text" id="prikazMesto" autocomplete="off" placeholder="obec">
           <div class="prikaz-suggest-list" id="prikazMestoSuggest"></div>
         </div>
@@ -4958,6 +4977,19 @@
     return '<w:p><w:pPr>' + pPr + '</w:pPr>' + prefixRun + sdt + '</w:p>';
   }
 
+  // Když appka má číslo jednací z MPM (viz "Vlož provozovatele" / nové
+  // tlačítko "Vložit" u "Přidat událost" — bookmarklet z MPM ho appce
+  // pošle spolu s údaji o provozovateli), vloží ho rovnou jako hotový
+  // text. Jinak appka spadne na starší žlutý placeholder "doplň Č.j.:"
+  // k ručnímu dopsání ve Wordu, stejně jako dřív.
+  function cisloJednaciPara(record){
+    const prefix = 'Naše  č. j.: MP ';
+    if(record && record.mpmCisloJednaci){
+      return docxPara(prefix + record.mpmCisloJednaci, { size: 19, spacingAfter: 20 });
+    }
+    return docxPlaceholderFieldPara(prefix + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 });
+  }
+
   function docxHeaderTable(leftLines, rightLines, leftBold){
     // Mezisloupec (gutter) mezi adresou úřadu a blokem s č.j. — bez něj by
     // sloupce splývaly těsně vedle sebe. Pravý blok tak začíná výrazně
@@ -5063,7 +5095,7 @@
     body += docxHeaderTable(
       ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'nám. Republiky 1316/1', '678 01 BLANSKO'],
       [
-        { raw: docxPlaceholderFieldPara('Naše  č. j.: MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 }) },
+        { raw: cisloJednaciPara(record) },
         'Vyřizuje: str. ' + officerForDoc,
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
@@ -5455,7 +5487,7 @@
     body += docxHeaderTable(
       headerLeft,
       [
-        { raw: docxPlaceholderFieldPara('Naše  č. j.: MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 }) },
+        { raw: cisloJednaciPara(record) },
         'Vyřizuje: str. ' + officerForDoc,
         'Tel.: ' + OZNAMENI_TEL,
         'E-mail: ' + OZNAMENI_EMAIL,
@@ -8524,6 +8556,14 @@
   // to řetězovému auto-přeskoku Ulice -> Č.P., který by appce ukradl
   // fokus zpátky z kalendáře.
   let prikazSuppressAutoAdvance = false;
+  // Číslo jednací z MP Manageru (viz "Vlož provozovatele"/tlačítko
+  // "Vložit" u "Přidat událost" — nový bookmarklet ho posílá spolu
+  // s údaji o provozovateli, viz parseProvozovatelText) — appka ho
+  // použije jen tiše při generování dokumentu (viz cisloJednaciPara),
+  // žádné viditelné pole pro něj appka nemá.
+  let prikazMpmCisloJednaci = null;
+  // 'osoba' nebo 'firma' — viz setPrikazProvozovatelMode.
+  let prikazProvozovatelMode = 'osoba';
 
   // U "Přidat událost" appka nedovolí uložit, dokud nejsou vyplněné RZ,
   // datum spáchání a čas spáchání — vrací seznam id chybějících polí
@@ -8622,6 +8662,9 @@
     // dialog otevírá, record.pachatel ještě neexistuje, takže pole
     // zůstanou prázdná stejně jako dřív.
     const p = currentDetailRecord && currentDetailRecord.pachatel;
+    setPrikazProvozovatelMode(p && p.firma ? 'firma' : 'osoba');
+    document.getElementById('prikazFirma').value = (p && p.firma) || '';
+    document.getElementById('prikazIco').value = (p && p.ico) || '';
     document.getElementById('prikazJmeno').value = (p && p.jmeno) || '';
     document.getElementById('prikazPrijmeni').value = (p && p.prijmeni) || '';
     document.getElementById('prikazNarozeni')._setDatePickerIso(p && p.datumNarozeni ? dottedToIso(p.datumNarozeni) : '');
@@ -8672,6 +8715,10 @@
     document.getElementById('prikazPachatelLabel').textContent = prikazIsNewEvent ? 'PROVOZOVATEL' : 'PACHATEL';
     prikazEventBtnState = 'mpm';
     prikazEventPasted = false;
+    prikazMpmCisloJednaci = null;
+    // setPrikazProvozovatelMode appka už zavolala výš (podle
+    // currentDetailRecord.pachatel.firma) — tady by to jen zbytečně
+    // přepsalo správně obnovený režim zpátky na 'osoba'.
     // Automatické zaostření prvního pole appka dělá jen napoprvé (kdy
     // appka o pachateli ještě nic neví) — při editaci, kdy se pole
     // rovnou předvyplnila z předchozího řešení, appka radši nezaostřuje
@@ -9382,23 +9429,28 @@
         date: spachaniDatumIsoNow || record.date,
         time: spachaniCasNow || record.time,
         brand: brandNow || null,
-        color: colorNow || null
+        color: colorNow || null,
+        mpmCisloJednaci: prikazMpmCisloJednaci || null
       });
 
       const jmeno = document.getElementById('prikazJmeno').value.trim();
       const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
       const narozeni = document.getElementById('prikazNarozeni').value.trim();
       const doklad = document.getElementById('prikazDoklad').value.trim();
+      const firma = document.getElementById('prikazFirma').value.trim();
+      const ico = document.getElementById('prikazIco').value.trim();
       const mestoObec = document.getElementById('prikazMesto').value.trim();
       const psc = document.getElementById('prikazPsc').value.trim();
       const mesto = [psc, mestoObec].filter(Boolean).join(', ');
       const ulice = document.getElementById('prikazUlice').value.trim();
       const cisloDomu = document.getElementById('prikazCisloDomu').value.trim();
-      const pachatel = (jmeno || prijmeni || narozeni || doklad || mesto) ? {
+      const pachatel = (jmeno || prijmeni || narozeni || doklad || firma || ico || mesto) ? {
         jmeno: jmeno || null,
         prijmeni: prijmeni || null,
         datumNarozeni: narozeni || null,
         cisloDokladu: doklad || null,
+        firma: firma || null,
+        ico: ico || null,
         mesto: mesto || null,
         ulice: ulice || null,
         cisloDomu: cisloDomu || null
@@ -9408,7 +9460,7 @@
       btn.textContent = 'Ukládám…';
       try{
         await db.collection('prestupky').doc(record.id).update({
-          plate: record.plate, date: record.date, time: record.time, brand: record.brand, color: record.color
+          plate: record.plate, date: record.date, time: record.time, brand: record.brand, color: record.color, mpmCisloJednaci: record.mpmCisloJednaci
         });
         if(pachatel){
           await db.collection('prestupky').doc(record.id).update({ pachatel });
@@ -9501,16 +9553,20 @@
     // (DD.MM.RRRR) — appka ho tak i ukládá/tiskne, žádný převod netřeba.
     const narozeni = document.getElementById('prikazNarozeni').value.trim();
     const doklad = document.getElementById('prikazDoklad').value.trim();
+    const firma = document.getElementById('prikazFirma').value.trim();
+    const ico = document.getElementById('prikazIco').value.trim();
     const mestoObec = document.getElementById('prikazMesto').value.trim();
     const psc = document.getElementById('prikazPsc').value.trim();
     const mesto = [psc, mestoObec].filter(Boolean).join(', ');
     const ulice = document.getElementById('prikazUlice').value.trim();
     const cisloDomu = document.getElementById('prikazCisloDomu').value.trim();
-    const pachatel = (jmeno || prijmeni || narozeni || doklad || mesto) ? {
+    const pachatel = (jmeno || prijmeni || narozeni || doklad || firma || ico || mesto) ? {
       jmeno: jmeno || null,
       prijmeni: prijmeni || null,
       datumNarozeni: narozeni || null,
       cisloDokladu: doklad || null,
+      firma: firma || null,
+      ico: ico || null,
       mesto: mesto || null,
       ulice: ulice || null,
       cisloDomu: cisloDomu || null
@@ -9750,7 +9806,58 @@
   // chybové hlášky — strážník si zbytek dopíše ručně, appka ho nezdržuje.
   function parseProvozovatelText(raw){
     const result = {};
-    const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+    // Číslo jednací appka hledá jako první a odstraní ho z textu ještě
+    // před zbytkem parsování — jinak by se řádek "Událost: 2026/02395"
+    // (appka to takhle dostává z bookmarkletu, co čte z MP Manageru)
+    // spletl s prvním dílem (příjmení+jméno). Formát YYYY/číslo appka
+    // bere přímo tak, jak je v MP Manageru — do dokumentu se skládá jako
+    // "MP " + tahle hodnota (viz cisloJednaciPara).
+    const cjMatch = raw.match(/Ud[aá]lost:?\s*(\d{4}\/\d+)/i);
+    if(cjMatch) result.cisloJednaci = cjMatch[1];
+    const rawWithoutCj = cjMatch ? raw.replace(cjMatch[0], '') : raw;
+
+    // Adresu (ulice+číslo, PSČ+obec) appka umí vytáhnout stejně pro
+    // osobu i firmu — sdílená pomocná funkce nad libovolným seznamem
+    // čárkou oddělených dílů, ať appka tu logiku nemá dvakrát.
+    function extractAddress(parts, into){
+      const streetPart = parts.find(p => /^\D.*\s\d+(?:\/\d+)?$/.test(p) && !/datum narozen/i.test(p));
+      if(streetPart){
+        const sm = streetPart.match(/^(.+?)\s+(\d+(?:\/\d+)?)$/);
+        if(sm){
+          into.ulice = sm[1].trim();
+          into.cisloDomu = sm[2].trim();
+        }
+      }
+      const pscPart = parts.find(p => /^\d{5}\s+\S/.test(p));
+      if(pscPart){
+        const pm = pscPart.match(/^(\d{5})\s+(.+)$/);
+        if(pm){
+          into.psc = pm[1];
+          // MP Manager za obec někdy přidává " [FO] (Bez recidivy)" (z
+          // lustrace) nebo " (okr. Blansko)" (z detailu vozidla/subjektu)
+          // — appka obojí odsekne, ať appce nezůstane v poli Obec smetí.
+          into.obec = pm[2].replace(/\s*[[(].*$/, '').trim();
+        }
+      }
+    }
+
+    // Firma (právnická osoba) — appka to pozná podle prefixu, který
+    // takhle posílá bookmarklet z MP Manageru (viz "Název subjektu:" /
+    // "IČO:" v detailu vozidla). Appka na tenhle případ větví úplně
+    // zvlášť — jméno/příjmení/datum narození/číslo dokladu appka firmě
+    // nepřiřazuje (nedávají smysl), jen název, IČO a adresu sídla.
+    const firmaMatch = rawWithoutCj.match(/PR[AÁ]VNICK[AÁ]\s+OSOBA:\s*(.+?),\s*I[ČC]O\s*(\d+)/i);
+    if(firmaMatch){
+      result.firma = firmaMatch[1].trim();
+      result.ico = firmaMatch[2].trim();
+      const sidloText = rawWithoutCj.slice(rawWithoutCj.indexOf(firmaMatch[0]) + firmaMatch[0].length)
+        .replace(/^,?\s*s[ií]dlo:\s*/i, '');
+      const sidloParts = sidloText.split(',').map(s => s.trim()).filter(Boolean);
+      extractAddress(sidloParts, result);
+      return result;
+    }
+
+    const parts = rawWithoutCj.split(',').map(s => s.trim()).filter(Boolean);
     if(parts.length === 0) return result;
 
     // Příjmení a jméno — appka čeká "PŘÍJMENÍ JMÉNO" (příjmení první,
@@ -9765,37 +9872,42 @@
 
     // Datum narození — appka ho hledá kdekoliv v textu (ne v konkrétním
     // dílu za čárkou), ať appka nezávisí na přesném pořadí zbytku.
-    const dateMatch = raw.match(/datum narozen[íi]:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
+    const dateMatch = rawWithoutCj.match(/datum narozen[íi]:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
     if(dateMatch){
       const [, d, m, y] = dateMatch;
       result.narozeniIso = y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
-    }
-
-    // Ulice + číslo popisné/orientační — díl, co končí číslem (případně
-    // číslo/číslo), a zjevně to není datum narození.
-    const streetPart = parts.find(p => /^\D.*\s\d+(?:\/\d+)?$/.test(p) && !/datum narozen/i.test(p));
-    if(streetPart){
-      const sm = streetPart.match(/^(.+?)\s+(\d+(?:\/\d+)?)$/);
-      if(sm){
-        result.ulice = sm[1].trim();
-        result.cisloDomu = sm[2].trim();
+    } else {
+      // MP Manager v lustraci nemá popisek "datum narození:", jen datum
+      // hned za jménem (viz "SEDLÁČKOVÁ MARKÉTA, 06.06.1992, ..."). Appka
+      // proto zkusí i holé datum jako druhý díl, když ho nenašla s popiskem.
+      const bareDateMatch = (parts[1] || '').match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if(bareDateMatch){
+        const [, d, m, y] = bareDateMatch;
+        result.narozeniIso = y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
       }
     }
 
-    // PSČ + obec — díl začínající pěti číslicemi.
-    const pscPart = parts.find(p => /^\d{5}\s+\S/.test(p));
-    if(pscPart){
-      const pm = pscPart.match(/^(\d{5})\s+(.+)$/);
-      if(pm){
-        result.psc = pm[1];
-        result.obec = pm[2].trim();
-      }
-    }
+    extractAddress(parts, result);
     return result;
+  }
+
+  // Přepne dialog mezi režimem "osoba" (Jméno/Příjmení/Datum narození/
+  // Číslo dokladu) a "firma" (Název firmy/IČO) — adresa zůstává
+  // společná pro oba režimy, jen popisek u ní appka přizpůsobí. Appka
+  // se přepíná sama podle toho, co pozná ve "Vlož provozovatele" (viz
+  // applyProvozovatelText) — ruční přepínač appka nemá.
+  function setPrikazProvozovatelMode(mode){
+    prikazProvozovatelMode = mode;
+    document.getElementById('prikazOsobaFields').style.display = (mode === 'firma') ? 'none' : '';
+    document.getElementById('prikazFirmaFields').style.display = (mode === 'firma') ? '' : 'none';
+    document.getElementById('prikazMestoLabel').textContent = (mode === 'firma') ? 'Sídlo firmy' : 'Adresa trvalého pobytu';
   }
 
   function applyProvozovatelText(raw){
     const p = parseProvozovatelText(raw);
+    setPrikazProvozovatelMode(p.firma ? 'firma' : 'osoba');
+    if(p.firma) document.getElementById('prikazFirma').value = p.firma;
+    if(p.ico) document.getElementById('prikazIco').value = p.ico;
     if(p.prijmeni) prikazPrijmeniInput.value = p.prijmeni;
     if(p.jmeno) prikazJmenoInput.value = p.jmeno;
     if(p.narozeniIso){
@@ -9816,6 +9928,10 @@
     if(p.psc) prikazPscInput.value = p.psc;
     if(p.ulice) prikazUliceInput.value = p.ulice;
     if(p.cisloDomu) prikazCisloDomuInput.value = p.cisloDomu;
+    // Appka číslo jednací nemá kam vyplnit do viditelného pole (žádné
+    // v dialogu není — použije se jen tiše při generování dokumentu, viz
+    // cisloJednaciPara) — appka si ho jen zapamatuje do proměnné.
+    if(p.cisloJednaci) prikazMpmCisloJednaci = p.cisloJednaci;
     // checkStreetsAndAdvance() výš mezitím přesouvá fokus (na Ulici) a
     // to umí některé z těchhle bublin (viz attachConfirmChip) nechat
     // otevřené — appka je tady po hromadném vyplnění všechny natvrdo
