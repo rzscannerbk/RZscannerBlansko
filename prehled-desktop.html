@@ -668,6 +668,23 @@
   .prikaz-datepicker-foot{display:flex; justify-content:space-between; margin-top:8px;}
   .prikaz-datepicker-foot button{background:transparent; border:none; color:var(--muted); font-size:12px; font-family:'Roboto Mono',monospace; cursor:pointer; padding:4px 6px;}
   .prikaz-datepicker-foot button:active{color:var(--text);}
+  /* "Dostavit se dne" appka umí vyklikat víc dní najednou (viz
+     initMultiDatePicker) — širší panel se dvěma měsíci vedle sebe,
+     šipky mezi nimi appce nechají posunout oba měsíce zároveň dál/zpět. */
+  .prikaz-datepicker-panel.multi{width:auto; max-width:calc(100vw - 40px);}
+  .prikaz-multi-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;}
+  .prikaz-multi-nav button{
+    background:var(--asphalt-2); border:1px solid var(--line); border-radius:8px; color:var(--text);
+    font-size:14px; padding:4px 10px; cursor:pointer;
+  }
+  .prikaz-multi-nav button:active{background:var(--line);}
+  .prikaz-multi-months{display:flex; gap:16px;}
+  .prikaz-multi-month{width:216px;}
+  .prikaz-multi-month-label{
+    font-size:12.5px; font-weight:600; color:var(--text); text-align:center; margin-bottom:6px;
+    font-family:'Roboto Mono',monospace;
+  }
+  .prikaz-datepicker-day.is-selected-multi{background:var(--amber); color:var(--ink); font-weight:700;}
   .prikaz-box input:disabled{opacity:.4;}
 
   /* ---------- Dialog "kde se tahle hodnota ještě objevuje" (klik na SPZ,
@@ -1452,6 +1469,31 @@
     const [y, m, d] = parts.map(Number);
     if(!y || !m || !d) return iso;
     return d + '. ' + m + '. ' + y;
+  }
+
+  // Vrátí seřazený seznam ISO dat vybraných v kalendáři "Dostavit se
+  // dne" (viz initMultiDatePicker) — appka čte dataset.isoList (JSON
+  // pole), se zpětnou kompatibilitou na starší dataset.iso (jediné
+  // datum), kdyby appka pole nikdy multi-pickerem neprošla.
+  function getVyzvaDatumyIso(){
+    const input = document.getElementById('prikazVyzvaDatum');
+    if(!input) return [];
+    try{
+      if(input.dataset.isoList){
+        const list = JSON.parse(input.dataset.isoList);
+        if(Array.isArray(list) && list.length) return list.slice().sort();
+      }
+    }catch(e){ /* poškozený JSON appka ignoruje, spadne na dataset.iso */ }
+    return input.dataset.iso ? [input.dataset.iso] : [];
+  }
+
+  // Appka víc dat spojí česky přirozeně — čárkami mezi prvními,
+  // "nebo" před posledním (typicky appka nabízí víc termínů na
+  // výběr, ne že by se měl dostavit na všechny najednou).
+  function joinDatesCz(datumy){
+    if(!datumy || !datumy.length) return '';
+    if(datumy.length === 1) return datumy[0];
+    return datumy.slice(0, -1).join(', ') + ' nebo ' + datumy[datumy.length - 1];
   }
 
   // Firestore Timestamp (má .toDate()) i obyčejný JS Date appka umí
@@ -4983,11 +5025,18 @@
   // text. Jinak appka spadne na starší žlutý placeholder "doplň Č.j.:"
   // k ručnímu dopsání ve Wordu, stejně jako dřív.
   function cisloJednaciPara(record){
-    const prefix = 'Naše  č. j.: MP ';
+    const prefix = 'Naše  č. j.: ';
     if(record && record.mpmCisloJednaci){
-      return docxPara(prefix + record.mpmCisloJednaci, { size: 19, spacingAfter: 20 });
+      // Appka číslo jednací zobrazuje/vyplňuje s prefixem "MP " už
+      // rovnou v poli (viz applyProvozovatelText) — appka to tady jen
+      // pojistí pro případ ručního zápisu bez "MP" (appka ho doplní),
+      // ať appka nikdy nezdvojí "MP MP 2026/..." u appkou vyplněné
+      // hodnoty.
+      const hasMp = /^MP\s/i.test(record.mpmCisloJednaci.trim());
+      const value = hasMp ? record.mpmCisloJednaci.trim() : 'MP ' + record.mpmCisloJednaci.trim();
+      return docxPara(prefix + value, { size: 19, spacingAfter: 20 });
     }
-    return docxPlaceholderFieldPara(prefix + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 });
+    return docxPlaceholderFieldPara(prefix + 'MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 });
   }
 
   function docxHeaderTable(leftLines, rightLines, leftBold){
@@ -5445,11 +5494,13 @@
     const loc = addressForLetter(record.address);
 
     // Termín dostavení se (datum + časové rozmezí) — appka ho teď bere
-    // z pole v modálu "Výzva" (kalendář + čas od/do). Když by přesto
-    // chybělo (starší volání funkce, chyba v UI), zůstává placeholder
-    // k ručnímu dopsání, stejně jako dřív.
-    const dostaveniDatumCasText = (dostaveniTermin && dostaveniTermin.datum)
-      ? (dostaveniTermin.datum + (dostaveniTermin.casOd ? (' v čase ' + dostaveniTermin.casOd + (dostaveniTermin.casDo ? ' - ' + dostaveniTermin.casDo : '') + ' hod') : ''))
+    // z pole v modálu "Výzva" (kalendář + čas od/do). Kalendář appka
+    // umí vyklikat i víc dní najednou (viz initMultiDatePicker) — appka
+    // je do věty spojí česky přirozeně (joinDatesCz: čárky mezi prvními,
+    // "nebo" před posledním). Když by termín přesto chyběl (starší
+    // volání funkce, chyba v UI), zůstává placeholder k ručnímu dopsání.
+    const dostaveniDatumCasText = (dostaveniTermin && dostaveniTermin.datumy && dostaveniTermin.datumy.length)
+      ? (joinDatesCz(dostaveniTermin.datumy) + (dostaveniTermin.casOd ? (' v čase ' + dostaveniTermin.casOd + (dostaveniTermin.casDo ? ' - ' + dostaveniTermin.casDo : '') + ' hod') : ''))
       : '[DOPLNIT DATUM A ČAS]';
 
     // Jméno/příjmení, datum narození a adresa se vyplní, pokud je appka
@@ -8984,6 +9035,151 @@
     return { open, close, setValue };
   }
 
+  // Kalendář pro "Dostavit se dne" appka umí vyklikat víc dní najednou
+  // (na rozdíl od initDatePicker výš, který je pro jediné datum — Datum
+  // narození, Datum spáchání). Appka ukazuje dva měsíce vedle sebe
+  // (aktuální + následující, s šipkami na posun dál/zpět), kliknutí na
+  // den appka jen přidá/odebere ze seznamu a panel NEZAVÍRÁ, ať jde
+  // vybrat víc dní za sebou. Appka drží seznam vybraných dní jako JSON
+  // pole v input.dataset.isoList (na rozdíl od jediného dataset.iso
+  // u initDatePicker) — appce se to hodí ke konzultaci datumů, kdy
+  // appka strážníkovi nabízí víc možných termínů dostavení v jedné
+  // Výzvě, a appka je pak i takhle uloží do generovaného dokumentu.
+  function initMultiDatePicker(input, panel, opts){
+    opts = opts || {};
+    const today = new Date();
+    let baseYear = today.getFullYear();
+    let baseMonth = today.getMonth();
+    let selected = new Set();
+
+    function pad2(n){ return String(n).padStart(2, '0'); }
+    function isoOf(y, m, d){ return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+    function todayIso(){ return isoOf(today.getFullYear(), today.getMonth(), today.getDate()); }
+
+    function loadSelected(){
+      selected = new Set();
+      try{
+        const raw = input.dataset.isoList ? JSON.parse(input.dataset.isoList) : [];
+        raw.forEach(iso => selected.add(iso));
+      }catch(e){ /* appka poškozený JSON prostě ignoruje, začne s prázdným výběrem */ }
+    }
+
+    function saveSelected(){
+      const list = Array.from(selected).sort();
+      input.dataset.isoList = JSON.stringify(list);
+      // Appka do zpětně kompatibilního dataset.iso (čtou ho jiná místa
+      // appky, co o víceudenním výběru nevědí) dá první vybrané datum.
+      input.dataset.iso = list[0] || '';
+      input.value = list.map(isoToDotted).join(', ');
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function renderMonth(y, m){
+      let html = '<div class="prikaz-multi-month-label">' + DP_MONTHS_CS[m] + ' ' + y + '</div>';
+      html += '<div class="prikaz-datepicker-grid">';
+      DP_DOW_CS.forEach(d => { html += '<div class="prikaz-datepicker-dow">' + d + '</div>'; });
+      const leadingEmpty = (new Date(y, m, 1).getDay() + 6) % 7;
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+      for(let i = 0; i < leadingEmpty; i++){ html += '<div class="prikaz-datepicker-day is-empty"></div>'; }
+      for(let d = 1; d <= daysInMonth; d++){
+        const iso = isoOf(y, m, d);
+        let cls = 'prikaz-datepicker-day';
+        if(iso === todayIso()) cls += ' is-today';
+        if(selected.has(iso)) cls += ' is-selected-multi';
+        html += '<div class="' + cls + '" data-iso="' + iso + '">' + d + '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function render(){
+      let nextY = baseYear, nextM = baseMonth + 1;
+      if(nextM > 11){ nextM = 0; nextY++; }
+      let html = '<div class="prikaz-multi-nav">' +
+        '<button type="button" class="dp-prev">‹ Dřív</button>' +
+        '<button type="button" class="dp-today">Dnes</button>' +
+        '<button type="button" class="dp-next">Později ›</button>' +
+        '</div>';
+      html += '<div class="prikaz-multi-months">';
+      html += '<div class="prikaz-multi-month">' + renderMonth(baseYear, baseMonth) + '</div>';
+      html += '<div class="prikaz-multi-month">' + renderMonth(nextY, nextM) + '</div>';
+      html += '</div>';
+      html += '<div class="prikaz-datepicker-foot"><button type="button" class="dp-clear">Vymazat vše</button><button type="button" class="dp-done">Hotovo</button></div>';
+      panel.innerHTML = html;
+
+      panel.querySelectorAll('.prikaz-datepicker-day[data-iso]').forEach(el => {
+        el.addEventListener('click', () => {
+          const iso = el.getAttribute('data-iso');
+          if(selected.has(iso)) selected.delete(iso); else selected.add(iso);
+          saveSelected();
+          render();
+        });
+      });
+      panel.querySelector('.dp-prev').addEventListener('click', () => {
+        baseMonth--; if(baseMonth < 0){ baseMonth = 11; baseYear--; }
+        render();
+      });
+      panel.querySelector('.dp-next').addEventListener('click', () => {
+        baseMonth++; if(baseMonth > 11){ baseMonth = 0; baseYear++; }
+        render();
+      });
+      panel.querySelector('.dp-today').addEventListener('click', () => {
+        baseYear = today.getFullYear();
+        baseMonth = today.getMonth();
+        render();
+      });
+      panel.querySelector('.dp-clear').addEventListener('click', () => {
+        selected.clear();
+        saveSelected();
+        render();
+      });
+      panel.querySelector('.dp-done').addEventListener('click', close);
+    }
+
+    function onOutside(e){ if(!panel.contains(e.target) && e.target !== input) close(); }
+    function open(){
+      loadSelected();
+      // Appka dva zobrazené měsíce vychází buď z prvního už vybraného
+      // dne (ať appka rovnou vidí, co má zatím vyklikané), nebo (bez
+      // výběru) z aktuálního měsíce — přesně "aktuální a následující",
+      // jak appka chtěla.
+      const firstSelected = Array.from(selected).sort()[0];
+      if(firstSelected){
+        const [y, m] = firstSelected.split('-').map(Number);
+        baseYear = y; baseMonth = m - 1;
+      } else {
+        baseYear = today.getFullYear();
+        baseMonth = today.getMonth();
+      }
+      render();
+      panel.classList.add('multi');
+      const spaceBelow = window.innerHeight - input.getBoundingClientRect().bottom;
+      panel.classList.toggle('upward', spaceBelow < 420);
+      panel.classList.add('open');
+      setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
+    }
+    function close(){
+      panel.classList.remove('open');
+      document.removeEventListener('mousedown', onOutside);
+    }
+    input.addEventListener('click', () => {
+      if(panel.classList.contains('open')) close(); else open();
+    });
+    // Appka si tu drží i stejné jméno metod jako initDatePicker
+    // (_openDatePicker/_setDatePickerIso), ať appka jinde (focusField,
+    // reset formuláře) nemusí rozlišovat, jaký typ pickeru je pod
+    // kterým polem — API appka nechává shodné, jen chování uvnitř je jiné.
+    // _setDatePickerIso appka bere jako "nastav výběr na přesně tohle
+    // jedno datum" (prázdný řetězec = appka vše smaže) — používá se při
+    // resetu formuláře appky, ne při běžném klikání v kalendáři.
+    input._openDatePicker = open;
+    input._setDatePickerIso = function(iso){
+      selected = iso ? new Set([iso]) : new Set();
+      saveSelected();
+    };
+    return { open, close };
+  }
+
   const prikazNarozeniInput = document.getElementById('prikazNarozeni');
   const prikazDokladInput = document.getElementById('prikazDoklad');
   const prikazDokladList = document.getElementById('prikazDokladSuggest');
@@ -8997,9 +9193,7 @@
   const prikazPscList = document.getElementById('prikazPscSuggest');
   const prikazVyzvaDatumInput = document.getElementById('prikazVyzvaDatum');
   initDatePicker(prikazNarozeniInput, document.getElementById('prikazNarozeniPanel'), { defaultYear: 1990 });
-  initDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'), {
-    minYear: new Date().getFullYear(), maxYear: new Date().getFullYear() + 1
-  });
+  initMultiDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'));
   const prikazSpachaniDatumInput = document.getElementById('prikazSpachaniDatum');
   initDatePicker(prikazSpachaniDatumInput, document.getElementById('prikazSpachaniDatumPanel'), {
     minYear: new Date().getFullYear() - 1, maxYear: new Date().getFullYear() + 1
@@ -9507,9 +9701,9 @@
           record._resolvedMime = newMimes[0] || 'image/jpeg';
           prikazNewEventFiles = [];
         }
-        const vyzvaDatumRaw = document.getElementById('prikazVyzvaDatum').dataset.iso || '';
-        const dostaveniTermin = vyzvaDatumRaw ? {
-          datum: formatDateCz(vyzvaDatumRaw),
+        const vyzvaDatumyIso = getVyzvaDatumyIso();
+        const dostaveniTermin = vyzvaDatumyIso.length ? {
+          datumy: vyzvaDatumyIso.map(formatDateCz),
           casOd: document.getElementById('prikazVyzvaCasOd').value || null,
           casDo: document.getElementById('prikazVyzvaCasDo').value || null
         } : null;
@@ -9669,9 +9863,9 @@
         openDetail(record);
       } else if(prikazMode === 'vyzva'){
         document.getElementById('prikazOverlay').classList.remove('open');
-        const vyzvaDatumRaw = document.getElementById('prikazVyzvaDatum').dataset.iso || '';
-        const dostaveniTermin = vyzvaDatumRaw ? {
-          datum: formatDateCz(vyzvaDatumRaw),
+        const vyzvaDatumyIso = getVyzvaDatumyIso();
+        const dostaveniTermin = vyzvaDatumyIso.length ? {
+          datumy: vyzvaDatumyIso.map(formatDateCz),
           casOd: document.getElementById('prikazVyzvaCasOd').value || null,
           casDo: document.getElementById('prikazVyzvaCasDo').value || null
         } : null;
@@ -9954,7 +10148,7 @@
       // navíc rovnou vyplní přemapované pole "Číslo jednací", ať ho
       // strážník vidí a může i ručně opravit (viz cisloJednaciPara).
       prikazMpmCisloJednaci = p.cisloJednaci;
-      if(prikazIsNewEvent) document.getElementById('prikazDoklad').value = p.cisloJednaci;
+      if(prikazIsNewEvent) document.getElementById('prikazDoklad').value = 'MP ' + p.cisloJednaci;
     }
     // checkStreetsAndAdvance() výš mezitím přesouvá fokus (na Ulici) a
     // to umí některé z těchhle bublin (viz attachConfirmChip) nechat
