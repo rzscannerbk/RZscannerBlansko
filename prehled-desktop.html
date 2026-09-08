@@ -102,6 +102,10 @@
   #prikazCastkaField label{text-align:center;}
   #prikazCastkaField input{text-align:center;}
   #prikazCastkaField.prikaz-castka-missing{border-color:var(--bad);}
+  /* Obecná verze téhož pro RZ/datum/čas spáchání u "Přidat událost"
+     (viz prikazValidateEventFields v JS) — na rozdíl od Částky, kde je
+     appka zvýrazňuje jen jedno pole, tady jich může svítit víc najednou. */
+  .field.prikaz-field-missing{border-color:var(--bad);}
   .field label{display:block; font-size:10.5px; color:var(--muted); font-family:'Roboto Mono',monospace; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px;}
   .field input{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
   .field select{width:100%; background:transparent; border:none; color:var(--text); font-size:15px; font-family:'Inter',sans-serif; padding:2px 0; outline:none;}
@@ -913,7 +917,7 @@
            událostí drží pevně podle volby v menu, needituje se tady. -->
       <div id="prikazEventFieldsWrap" style="display:none;">
         <div class="prikaz-row2">
-          <div class="field">
+          <div class="field" id="prikazSpzField">
             <label for="prikazSpz">RZ (SPZ)</label>
             <input type="text" id="prikazSpz" autocomplete="off" placeholder="např. 1AB 2345" style="text-transform:uppercase;">
           </div>
@@ -927,12 +931,12 @@
           </div>
         </div>
         <div class="prikaz-row2">
-          <div class="field prikaz-datepicker-wrap">
+          <div class="field prikaz-datepicker-wrap" id="prikazSpachaniDatumField">
             <label for="prikazSpachaniDatum">Datum spáchání</label>
             <input type="text" id="prikazSpachaniDatum" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
             <div class="prikaz-datepicker-panel" id="prikazSpachaniDatumPanel"></div>
           </div>
-          <div class="field">
+          <div class="field" id="prikazSpachaniCasField">
             <label for="prikazSpachaniCas">Čas spáchání</label>
             <input type="time" id="prikazSpachaniCas">
           </div>
@@ -7350,6 +7354,7 @@
               note.textContent = '✓ Datum a čas přestupku vyplněny z PDF (' + file.name + ')';
               note.style.color = '';
               note.style.display = 'block';
+              updatePrikazEventFieldValidation();
             }
           }catch(err){
             console.error('Čtení data/času z PDF selhalo:', file.name, err);
@@ -7360,6 +7365,13 @@
     updatePrikazAddDocsLabel();
     e.target.value = '';
   });
+
+  // Živá validace RZ/datum/čas u "Přidat událost" — zvýraznění appka
+  // aktualizuje průběžně, ne až při pokusu o uložení (viz
+  // updatePrikazEventFieldValidation výš).
+  document.getElementById('prikazSpz').addEventListener('input', updatePrikazEventFieldValidation);
+  document.getElementById('prikazSpachaniCas').addEventListener('input', updatePrikazEventFieldValidation);
+  document.getElementById('prikazSpachaniDatum').addEventListener('change', updatePrikazEventFieldValidation);
 
   document.getElementById('addEventBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.add('open');
@@ -8423,6 +8435,27 @@
   // bez SPZ/data/času z terénu) — viz openPrikazModal a pickAddEventChoice.
   let prikazIsNewEvent = false;
 
+  // U "Přidat událost" appka nedovolí uložit, dokud nejsou vyplněné RZ,
+  // datum spáchání a čas spáchání — vrací seznam id chybějících polí
+  // (v pořadí, v jakém appka na ně skáče kurzorem).
+  function prikazEventMissingFields(){
+    const missing = [];
+    if(!document.getElementById('prikazSpz').value.trim()) missing.push('prikazSpz');
+    if(!prikazSpachaniDatumInput.dataset.iso) missing.push('prikazSpachaniDatum');
+    if(!document.getElementById('prikazSpachaniCas').value) missing.push('prikazSpachaniCas');
+    return missing;
+  }
+  // Zvýrazní červeně chybějící pole (viz .prikaz-field-missing) a vrátí,
+  // jestli je appka může uložit (true = všechna tři pole appka má).
+  function updatePrikazEventFieldValidation(){
+    if(!prikazIsNewEvent) return true;
+    const missing = prikazEventMissingFields();
+    document.getElementById('prikazSpzField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpz'));
+    document.getElementById('prikazSpachaniDatumField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpachaniDatum'));
+    document.getElementById('prikazSpachaniCasField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpachaniCas'));
+    return missing.length === 0;
+  }
+
   function openPrikazModal(mode, isNewEvent){
     prikazMode = mode || 'prikaz';
     prikazIsNewEvent = !!isNewEvent;
@@ -8505,10 +8538,14 @@
     // appka o pachateli ještě nic neví) — při editaci, kdy se pole
     // rovnou předvyplnila z předchozího řešení, appka radši nezaostřuje
     // nic (jinak se na předvyplněném poli objevila zbytečná potvrzovací
-    // nabídka, viz attachConfirmChip).
-    if(!p){
+    // nabídka, viz attachConfirmChip). U nové události appka vždycky
+    // zaostří RZ — to pole appka chce vyplněné jako první.
+    if(prikazIsNewEvent){
+      document.getElementById('prikazSpz').focus();
+    } else if(!p){
       (prikazMode === 'prikaz' ? document.getElementById('prikazCastka') : document.getElementById('prikazJmeno')).focus();
     }
+    updatePrikazEventFieldValidation();
   }
 
   document.getElementById('prikazCancelBtn').addEventListener('click', ()=>{
@@ -9055,6 +9092,20 @@
       const castkaInput = document.getElementById('prikazCastka');
       castkaInput.focus();
       return;
+    }
+
+    // U "Přidat událost" appka nedovolí uložit, dokud nejsou vyplněné
+    // RZ, datum spáchání a čas spáchání — zvýrazní chybějící pole
+    // červeně (viz updatePrikazEventFieldValidation) a kurzor pošle na
+    // první z nich, stejným způsobem jako appka jinde skáče mezi poli
+    // (viz focusField).
+    if(prikazIsNewEvent){
+      const complete = updatePrikazEventFieldValidation();
+      if(!complete){
+        const missing = prikazEventMissingFields();
+        focusField(document.getElementById(missing[0]));
+        return;
+      }
     }
 
     const jmeno = document.getElementById('prikazJmeno').value.trim();
