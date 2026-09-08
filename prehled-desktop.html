@@ -923,6 +923,7 @@
               <span class="cam-icon">📎</span> <span id="prikazAddDocsLabel">Přidej fotodokumentaci</span>
             </button>
             <input type="file" id="prikazAddDocsInput" accept="image/*,application/pdf" multiple style="display:none;">
+            <div id="prikazAddDocsNote" style="display:none; font-size:11.5px; color:var(--muted); margin-top:4px;"></div>
           </div>
         </div>
         <div class="prikaz-row2">
@@ -7277,17 +7278,83 @@
       : 'Přidej fotodokumentaci';
   }
 
+  // Lazy-load pdf.js (stejný vzor jako loadTesseract níž pro OCR OP) —
+  // appka ho stahuje, jen když poprvé přiložíš PDF, ne při startu appky.
+  let pdfJsLoadPromise = null;
+  function loadPdfJs(){
+    if(window.pdfjsLib) return Promise.resolve();
+    if(pdfJsLoadPromise) return pdfJsLoadPromise;
+    pdfJsLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = () => {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve();
+      };
+      s.onerror = () => reject(new Error('Nepodařilo se načíst PDF knihovnu — zkontroluj připojení k internetu.'));
+      document.head.appendChild(s);
+    });
+    return pdfJsLoadPromise;
+  }
+
+  // Zkusí z textové vrstvy PDF (exporty z MKDS appka umí rovnou číst
+  // text, nejsou to naskenované obrázky) najít řádek "Datum a čas:
+  // D.M.RRRR H:MM:SS" a vrátit datum/čas přestupku. Vrací null, když
+  // appka vzor nenajde (jiný formát PDF) — appka to bere jako
+  // informativní doplněk, ne jako povinnost, žádná chyba se nehlásí.
+  async function extractDatumCasFromPdf(file){
+    await loadPdfJs();
+    const buf = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    let fullText = '';
+    for(let i = 1; i <= pdf.numPages; i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      fullText += content.items.map(it => it.str).join(' ') + '\n';
+    }
+    const m = fullText.match(/Datum a (?:č|c)as:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})/i);
+    if(!m) return null;
+    const [, d, mo, y, h, mi] = m;
+    return {
+      iso: y + '-' + mo.padStart(2, '0') + '-' + d.padStart(2, '0'),
+      time: h.padStart(2, '0') + ':' + mi
+    };
+  }
+
   document.getElementById('prikazAddDocsBtn').addEventListener('click', ()=>{
     document.getElementById('prikazAddDocsInput').click();
   });
   document.getElementById('prikazAddDocsInput').addEventListener('change', async (e)=>{
     const files = Array.from(e.target.files || []);
+    const note = document.getElementById('prikazAddDocsNote');
+    note.style.display = 'none';
     for(const file of files){
       try{
         const data = await fileToBase64(file);
         prikazNewEventFiles.push({ data, mime: file.type || 'application/octet-stream', name: file.name });
       }catch(err){
         console.error('Načtení souboru selhalo:', file.name, err);
+        continue;
+      }
+      // Appka datum/čas z PDF doplní jen do prázdných polí — ruční zadání
+      // (nebo dřívější PDF ve stejném dávkovém výběru) appka nepřepisuje.
+      if(file.type === 'application/pdf'){
+        const datumEl = document.getElementById('prikazSpachaniDatum');
+        const casEl = document.getElementById('prikazSpachaniCas');
+        if(!datumEl.dataset.iso && !casEl.value){
+          try{
+            const found = await extractDatumCasFromPdf(file);
+            if(found){
+              datumEl._setDatePickerIso(found.iso);
+              casEl.value = found.time;
+              note.textContent = '✓ Datum a čas přestupku vyplněny z PDF (' + file.name + ')';
+              note.style.color = '';
+              note.style.display = 'block';
+            }
+          }catch(err){
+            console.error('Čtení data/času z PDF selhalo:', file.name, err);
+          }
+        }
       }
     }
     updatePrikazAddDocsLabel();
@@ -8386,6 +8453,8 @@
     // výběr z předchozí návštěvy dialogu.
     prikazNewEventFiles = [];
     if(document.getElementById('prikazAddDocsLabel')) updatePrikazAddDocsLabel();
+    const addDocsNote = document.getElementById('prikazAddDocsNote');
+    if(addDocsNote){ addDocsNote.style.display = 'none'; addDocsNote.textContent = ''; }
 
     // Když appka o pachateli už něco ví (typicky editace — mění se jen
     // způsob řešení, ale pachatel se dostaví/je stejný jako předtím,
