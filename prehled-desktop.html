@@ -8446,8 +8446,13 @@
     document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
     const r = currentDetailRecord;
     document.getElementById('prikazSpz').value = (prikazIsNewEvent && r && r.plate) || '';
-    prikazSpachaniDatumInput._setDatePickerIso(prikazIsNewEvent && r && r.date ? r.date : '');
-    document.getElementById('prikazSpachaniCas').value = (prikazIsNewEvent && r && r.time) || '';
+    // Pole appka schválně nechává PRÁZDNÁ (ne předvyplněná datem/časem
+    // založení záznamu) — jinak by nikdy nebyla "prázdná" pro extrakci
+    // data/času z přiloženého PDF výš (ta doplňuje jen prázdná pole).
+    // Když appka necháš prázdná i po zavření dialogu, při uložení appka
+    // spadne zpátky na datum/čas založení (viz prikazConfirmBtn).
+    prikazSpachaniDatumInput._setDatePickerIso('');
+    document.getElementById('prikazSpachaniCas').value = '';
     // Appka nabízené soubory resetuje při každém otevření — už uložené
     // (v Firestore) tím nezmizí, jen appka vyprázdní "rozpracovaný"
     // výběr z předchozí návštěvy dialogu.
