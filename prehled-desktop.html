@@ -939,6 +939,18 @@
           </div>
         </div>
         <div class="prikaz-row2">
+          <div class="field prikaz-suggest-wrap">
+            <label for="prikazBrand">Tovární značka</label>
+            <input type="text" id="prikazBrand" autocomplete="off" placeholder="nepovinné">
+            <div class="prikaz-suggest-list" id="prikazBrandSuggest"></div>
+          </div>
+          <div class="field prikaz-suggest-wrap">
+            <label for="prikazColor">Barva</label>
+            <input type="text" id="prikazColor" autocomplete="off" placeholder="nepovinné">
+            <div class="prikaz-suggest-list" id="prikazColorSuggest"></div>
+          </div>
+        </div>
+        <div class="prikaz-row2">
           <div class="field prikaz-datepicker-wrap" id="prikazSpachaniDatumField">
             <label for="prikazSpachaniDatum">Datum spáchání</label>
             <input type="text" id="prikazSpachaniDatum" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
@@ -8576,6 +8588,8 @@
     document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
     const r = currentDetailRecord;
     document.getElementById('prikazSpz').value = (prikazIsNewEvent && r && r.plate) || '';
+    document.getElementById('prikazBrand').value = (prikazIsNewEvent && r && r.brand) || '';
+    document.getElementById('prikazColor').value = (prikazIsNewEvent && r && r.color) || '';
     // Pole appka schválně nechává PRÁZDNÁ (ne předvyplněná datem/časem
     // založení záznamu) — jinak by nikdy nebyla "prázdná" pro extrakci
     // data/času z přiloženého PDF výš (ta doplňuje jen prázdná pole).
@@ -8771,6 +8785,30 @@
     });
     listEl.classList.add('open');
   }
+
+  // Tovární značka a barva u "Přidat událost" — appka nepoužívá API,
+  // je to čistě lokální seznam (stejné pořadí jako appka nabízí
+  // v terénu, index.html — na prázdné pole appka ukáže prvních 5 jako
+  // nejpoužívanější, při psaní appka filtruje celý seznam podstring
+  // shodou bez ohledu na velikost písmen). Obě pole jsou nepovinná.
+  const CAR_BRANDS = ['Škoda','Volkswagen','Audi','BMW','Mercedes-Benz','Opel','Ford','Peugeot','Citroën','Renault','Dacia','Fiat','Seat','Cupra','Volvo','Hyundai','Kia','Toyota','Honda','Nissan','Mazda','Suzuki','Mitsubishi','Subaru','Land Rover','Jaguar','Mini','Porsche','Lexus','Alfa Romeo','Lancia','Chevrolet','Jeep','Chrysler','Smart','DS','MG','SsangYong','Tesla','Jiná'];
+  const CAR_COLORS = ['Bílá','Stříbrná','Šedá','Tmavě šedá','Černá','Modrá','Světle modrá','Tmavě modrá','Tyrkysová','Zelená','Tmavě zelená','Žlutá','Zlatá','Bronzová','Oranžová','Hnědá','Béžová','Červená','Tmavě červená','Růžová','Fialová'];
+
+  function attachStaticSuggest(input, listEl, options){
+    function show(){
+      const q = input.value.trim().toLowerCase();
+      const pool = q ? options.filter(o => o.toLowerCase().includes(q)) : options.slice(0, 5);
+      renderSuggestList(listEl, pool.map(name => ({ name })), (item)=>{
+        input.value = item.name;
+        listEl.classList.remove('open');
+      });
+    }
+    input.addEventListener('focus', show);
+    input.addEventListener('input', show);
+    input.addEventListener('blur', ()=>{ setTimeout(()=> listEl.classList.remove('open'), 150); });
+  }
+  attachStaticSuggest(document.getElementById('prikazBrand'), document.getElementById('prikazBrandSuggest'), CAR_BRANDS);
+  attachStaticSuggest(document.getElementById('prikazColor'), document.getElementById('prikazColorSuggest'), CAR_COLORS);
 
   const prikazJmenoInput = document.getElementById('prikazJmeno');
   const prikazJmenoList = document.getElementById('prikazJmenoSuggest');
@@ -9228,13 +9266,16 @@
       btn.disabled = true;
       btn.classList.add('mpm-busy');
       btn.textContent = '...';
-      // Appka RZ/datum/čas uloží hned teď jako checkpoint (dřív se to
-      // dělo až při finálním "Potvrdit a uložit") — potřebuje je mít
-      // v record i pro samotný export do MPM (viz exportToMPManager).
+      // Appka RZ/datum/čas (a případně značku/barvu, pokud jsou
+      // vyplněné) uloží hned teď jako checkpoint (dřív se to dělo až při
+      // finálním "Potvrdit a uložit") — potřebuje je mít v record i pro
+      // samotný export do MPM (viz exportToMPManager).
       const spz = document.getElementById('prikazSpz').value.trim().toUpperCase();
       const spachaniDatumIso = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
       const spachaniCas = document.getElementById('prikazSpachaniCas').value || '';
-      const eventUpdate = { plate: spz || null, date: spachaniDatumIso, time: spachaniCas };
+      const brand = document.getElementById('prikazBrand').value.trim();
+      const color = document.getElementById('prikazColor').value.trim();
+      const eventUpdate = { plate: spz || null, date: spachaniDatumIso, time: spachaniCas, brand: brand || null, color: color || null };
       try{
         await db.collection('prestupky').doc(record.id).update(eventUpdate);
         Object.assign(record, eventUpdate);
@@ -9323,10 +9364,14 @@
       const spzNow = document.getElementById('prikazSpz').value.trim().toUpperCase();
       const spachaniDatumIsoNow = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
       const spachaniCasNow = document.getElementById('prikazSpachaniCas').value || '';
+      const brandNow = document.getElementById('prikazBrand').value.trim();
+      const colorNow = document.getElementById('prikazColor').value.trim();
       Object.assign(record, {
         plate: spzNow || null,
         date: spachaniDatumIsoNow || record.date,
-        time: spachaniCasNow || record.time
+        time: spachaniCasNow || record.time,
+        brand: brandNow || null,
+        color: colorNow || null
       });
 
       const jmeno = document.getElementById('prikazJmeno').value.trim();
@@ -9352,7 +9397,7 @@
       btn.textContent = 'Ukládám…';
       try{
         await db.collection('prestupky').doc(record.id).update({
-          plate: record.plate, date: record.date, time: record.time
+          plate: record.plate, date: record.date, time: record.time, brand: record.brand, color: record.color
         });
         if(pachatel){
           await db.collection('prestupky').doc(record.id).update({ pachatel });
