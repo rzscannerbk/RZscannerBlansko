@@ -672,6 +672,10 @@
      initMultiDatePicker) — širší panel se dvěma měsíci vedle sebe,
      šipky mezi nimi appce nechají posunout oba měsíce zároveň dál/zpět. */
   .prikaz-datepicker-panel.multi{width:auto; max-width:calc(100vw - 40px);}
+  .prikaz-multi-title{
+    font-size:12.5px; font-weight:700; color:var(--bad); text-align:center; margin-bottom:10px;
+    font-family:'Roboto Mono',monospace; letter-spacing:.06em; text-transform:uppercase;
+  }
   .prikaz-multi-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; gap:8px;}
   .prikaz-multi-nav button{
     background:var(--asphalt-2); border:1px solid var(--line); border-radius:8px; color:var(--text);
@@ -9166,7 +9170,13 @@
     function render(){
       let nextY = baseYear, nextM = baseMonth + 1;
       if(nextM > 11){ nextM = 0; nextY++; }
-      let html = '<div class="prikaz-multi-nav">' +
+      let html = '';
+      // Nadpis appka zobrazí, jen když ho volající předal (opts.title)
+      // — u ostatních použití initMultiDatePicker appka žádný nechce.
+      if(opts.title){
+        html += '<div class="prikaz-multi-title">' + escapeHtml(opts.title) + '</div>';
+      }
+      html += '<div class="prikaz-multi-nav">' +
         '<button type="button" class="dp-prev">‹ Dřív</button>' +
         '<button type="button" class="dp-today">Dnes</button>' +
         '<button type="button" class="dp-next">Později ›</button>' +
@@ -9264,7 +9274,7 @@
   const prikazPscList = document.getElementById('prikazPscSuggest');
   const prikazVyzvaDatumInput = document.getElementById('prikazVyzvaDatum');
   initDatePicker(prikazNarozeniInput, document.getElementById('prikazNarozeniPanel'), { defaultYear: 1990 });
-  initMultiDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'));
+  initMultiDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'), { title: 'Dostavit se dne' });
   const prikazSpachaniDatumInput = document.getElementById('prikazSpachaniDatum');
   initDatePicker(prikazSpachaniDatumInput, document.getElementById('prikazSpachaniDatumPanel'), {
     minYear: new Date().getFullYear() - 1, maxYear: new Date().getFullYear() + 1
