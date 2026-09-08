@@ -921,7 +921,7 @@
       <div id="prikazEventFieldsWrap" style="display:none;">
         <div class="prikaz-row2">
           <div class="field" id="prikazSpzField">
-            <label for="prikazSpz">RZ (SPZ)</label>
+            <label for="prikazSpz">Registrační značka</label>
             <input type="text" id="prikazSpz" autocomplete="off" placeholder="např. 1AB 2345" style="text-transform:uppercase;">
           </div>
           <div class="field">
@@ -947,7 +947,7 @@
       </div>
 
       <div class="prikaz-pachatel-head">
-        <span>PACHATEL</span>
+        <span id="prikazPachatelLabel">PACHATEL</span>
         <button type="button" class="prikaz-scan-btn" id="prikazScanBtn">
           <span class="cam-icon">📷</span> Skenovat OP
         </button>
@@ -8598,6 +8598,15 @@
     // a uložit (viz updatePrikazEventActionBtn níž).
     document.getElementById('prikazConfirmBtn').style.display = prikazIsNewEvent ? 'none' : '';
     document.getElementById('prikazEventActionBtn').style.display = prikazIsNewEvent ? '' : 'none';
+    // "Vlož provozovatele" appka u "Přidat událost" schová — tuhle roli
+    // teď plní tlačítko "Vložit" (viz prikazEventActionBtn), které navíc
+    // čte rovnou ze schránky bez nutnosti ručně vkládat do pole. U
+    // běžných záznamů appka pole nechává, je tam pořád jediná cesta.
+    // Popisek appka mění na "PROVOZOVATEL" jen u nové události — u
+    // běžného Příkazu/Oznámení appka řeší přímo přítomného pachatele, ne
+    // (nutně) provozovatele vozidla.
+    document.getElementById('prikazPasteField').style.display = prikazIsNewEvent ? 'none' : '';
+    document.getElementById('prikazPachatelLabel').textContent = prikazIsNewEvent ? 'PROVOZOVATEL' : 'PACHATEL';
     prikazEventBtnState = 'mpm';
     prikazEventPasted = false;
     // Automatické zaostření prvního pole appka dělá jen napoprvé (kdy
@@ -9219,6 +9228,10 @@
           prikazEventPasted = true;
           btn.textContent = 'Vloženo ✓';
           btn.classList.add('copied');
+          // Appka po úspěšném vložení rovnou pokračuje na termín
+          // dostavení — zaostří pole a hned otevře kalendář, ať appka
+          // strážníka nenechává hledat, kde má pokračovat.
+          focusField(document.getElementById('prikazVyzvaDatum'));
         } else {
           btn.textContent = 'Schránka je prázdná';
           btn.classList.add('copy-err');
@@ -9328,7 +9341,15 @@
         const filename = buildDocFilename('Výzva', record, pachatel);
         document.getElementById('prikazOverlay').classList.remove('open');
         const opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
-        if(opened) await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
+        if(opened){
+          await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
+          // Appka u "Přidat událost" po úspěšném vygenerování Výzvy
+          // zavře i detail záznamu a zůstane v hlavním přehledu — na
+          // rozdíl od běžného Dořešit u existujícího záznamu appka tady
+          // nemá důvod zůstávat na detailu (žádné foto/další kroky
+          // appka teď nečeká).
+          closeDetailModal();
+        }
       }catch(e){
         console.error('Uložení Výzvy selhalo:', e);
         alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
