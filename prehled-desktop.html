@@ -8631,7 +8631,8 @@
   const PRIKAZ_MODE_TITLES = {
     prikaz: 'Příkaz na místě',
     vyzva: 'Výzva k podání vysvětlení',
-    oznameni: 'Oznámení správnímu orgánu'
+    oznameni: 'Oznámení správnímu orgánu',
+    domluva: 'Domluva'
   };
   let prikazMode = 'prikaz';
   // true jen když appka dialog otevřela z "Přidat událost" (nový záznam
@@ -9981,6 +9982,13 @@
         const filename = buildDocFilename('Oznámení', record, pachatel);
         const opened = await exportOznameni(record, pachatel, filename);
         if(opened) await markResolved(record, 'oznameni', pachatel ? { pachatel } : undefined);
+      } else if(prikazMode === 'domluva'){
+        // Domluva appce žádný dokument negeneruje (na rozdíl od
+        // Výzvy/Oznámení) — appka jen uloží pachatele/provozovatele
+        // (pokud appka nějakého vyplnila) a rovnou označí záznam jako
+        // dořešený, stejně jako appka to dřív dělala bez dialogu vůbec.
+        document.getElementById('prikazOverlay').classList.remove('open');
+        await markResolved(record, 'domluva', pachatel ? { pachatel } : undefined);
       }
     }catch(e){
       console.error('Označení jako dořešeno selhalo:', e);
@@ -10592,20 +10600,16 @@
     document.getElementById('prikazPlatbaOverlay').classList.remove('open');
   });
 
-  document.getElementById('menuDomluvaBtn').addEventListener('click', async ()=>{
+  document.getElementById('menuDomluvaBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
     if(!record) return;
     document.getElementById('resolveMenuOverlay').classList.remove('open');
-    const btn = document.getElementById('menuDomluvaBtn');
-    btn.disabled = true;
-    btn.textContent = 'Ukládám…';
-    try{
-      await markResolved(record, 'domluva');
-    }catch(e){
-      console.error('Označení jako dořešeno selhalo:', e);
-      btn.disabled = false;
-      btn.textContent = 'Domluva (chyba, zkuste znovu)';
-    }
+    // Appka teď (na rozdíl od dřívějška, kdy appka rovnou uložila
+    // "Dořešeno domluvou" bez jakéhokoli dialogu) otevře stejný dialog
+    // jako u Příkazu/Výzvy/Oznámení, ať appka umí zapsat pachatele i
+    // u domluvy — uložení samo appka řeší v prikazConfirmBtn (viz
+    // větev prikazMode === 'domluva' výš).
+    openPrikazModal('domluva');
   });
 
   // Sdílená logika stažení fotek ze subkolekce — volá ji jak automatické
