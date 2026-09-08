@@ -993,7 +993,7 @@
             <div class="prikaz-datepicker-panel" id="prikazNarozeniPanel"></div>
           </div>
           <div class="field prikaz-suggest-wrap">
-            <label for="prikazDoklad">Číslo dokladu</label>
+            <label for="prikazDoklad" id="prikazDokladLabel">Číslo dokladu</label>
             <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
             <div class="prikaz-suggest-list" id="prikazDokladSuggest"></div>
           </div>
@@ -8713,6 +8713,13 @@
     // (nutně) provozovatele vozidla.
     document.getElementById('prikazPasteField').style.display = prikazIsNewEvent ? 'none' : '';
     document.getElementById('prikazPachatelLabel').textContent = prikazIsNewEvent ? 'PROVOZOVATEL' : 'PACHATEL';
+    // U "Přidat událost" appka pole "Číslo dokladu" (appka tam OP
+    // fyzicky neskenuje, takže ho stejně nevyužije) přemapuje na "Číslo
+    // jednací" — appka do něj vloží číslo z MPM (viz applyProvozovatelText)
+    // a strážník ho odtud může i ručně opravit/dopsat. U běžného
+    // Příkazu/Oznámení/Výzvy na existujícím záznamu (appka tam OP
+    // skenuje doopravdy) zůstává pole jako "Číslo dokladu".
+    document.getElementById('prikazDokladLabel').textContent = prikazIsNewEvent ? 'Číslo jednací' : 'Číslo dokladu';
     prikazEventBtnState = 'mpm';
     prikazEventPasted = false;
     prikazMpmCisloJednaci = null;
@@ -9424,19 +9431,28 @@
       const spachaniCasNow = document.getElementById('prikazSpachaniCas').value || '';
       const brandNow = document.getElementById('prikazBrand').value.trim();
       const colorNow = document.getElementById('prikazColor').value.trim();
+      // Číslo jednací appka bere přednostně z viditelného pole (přemapované
+      // "Číslo dokladu" — appka ho tam sama vyplní z "Vlož provozovatele",
+      // ale strážník ho tam může i ručně opravit/dopsat), a jen pro
+      // jistotu spadne zpátky na tichou proměnnou, kdyby pole zůstalo
+      // prázdné (např. appka vložila text, aniž by přes něj prošla).
+      const cisloJednaciNow = document.getElementById('prikazDoklad').value.trim();
       Object.assign(record, {
         plate: spzNow || null,
         date: spachaniDatumIsoNow || record.date,
         time: spachaniCasNow || record.time,
         brand: brandNow || null,
         color: colorNow || null,
-        mpmCisloJednaci: prikazMpmCisloJednaci || null
+        mpmCisloJednaci: cisloJednaciNow || prikazMpmCisloJednaci || null
       });
 
       const jmeno = document.getElementById('prikazJmeno').value.trim();
       const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
       const narozeni = document.getElementById('prikazNarozeni').value.trim();
-      const doklad = document.getElementById('prikazDoklad').value.trim();
+      // Pole appka tady zobrazuje jako "Číslo jednací" (viz výš,
+      // cisloJednaciNow) — u "Přidat událost" appka ho záměrně NEUKLÁDÁ
+      // jako číslo dokladu pachatele, protože to teď fakticky číslo
+      // dokladu není.
       const firma = document.getElementById('prikazFirma').value.trim();
       const ico = document.getElementById('prikazIco').value.trim();
       const mestoObec = document.getElementById('prikazMesto').value.trim();
@@ -9444,11 +9460,11 @@
       const mesto = [psc, mestoObec].filter(Boolean).join(', ');
       const ulice = document.getElementById('prikazUlice').value.trim();
       const cisloDomu = document.getElementById('prikazCisloDomu').value.trim();
-      const pachatel = (jmeno || prijmeni || narozeni || doklad || firma || ico || mesto) ? {
+      const pachatel = (jmeno || prijmeni || narozeni || firma || ico || mesto) ? {
         jmeno: jmeno || null,
         prijmeni: prijmeni || null,
         datumNarozeni: narozeni || null,
-        cisloDokladu: doklad || null,
+        cisloDokladu: null,
         firma: firma || null,
         ico: ico || null,
         mesto: mesto || null,
@@ -9931,7 +9947,15 @@
     // Appka číslo jednací nemá kam vyplnit do viditelného pole (žádné
     // v dialogu není — použije se jen tiše při generování dokumentu, viz
     // cisloJednaciPara) — appka si ho jen zapamatuje do proměnné.
-    if(p.cisloJednaci) prikazMpmCisloJednaci = p.cisloJednaci;
+    if(p.cisloJednaci){
+      // Appka si ho vždycky zapamatuje i do proměnné (záloha, kdyby
+      // appka tenhle text vložila mimo "Přidat událost", kde viditelné
+      // pole na číslo jednací appka nemá) — u "Přidat událost" appka ale
+      // navíc rovnou vyplní přemapované pole "Číslo jednací", ať ho
+      // strážník vidí a může i ručně opravit (viz cisloJednaciPara).
+      prikazMpmCisloJednaci = p.cisloJednaci;
+      if(prikazIsNewEvent) document.getElementById('prikazDoklad').value = p.cisloJednaci;
+    }
     // checkStreetsAndAdvance() výš mezitím přesouvá fokus (na Ulici) a
     // to umí některé z těchhle bublin (viz attachConfirmChip) nechat
     // otevřené — appka je tady po hromadném vyplnění všechny natvrdo
