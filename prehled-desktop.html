@@ -5362,7 +5362,11 @@
   // o právně závaznou lhůtu, kterou má určit strážník/vedoucí, ne appka
   // od oka. Vzor dodal Lukáš 28.8.2026 (Výzva_vzor.rtf).
   function addressForLetter(address){
-    if(!address) return { city: 'Blansko', locationPhrase: '' };
+    // Appka "city" ukládá rovnou ve 7. pádu (lokál) — jediné místo, kde
+    // se appka o něj používá, je věta "...v {city}..." (viz
+    // buildVyzvaDopisDocx níž), takže appka radši skloňuje tady na
+    // jednom místě, než aby dopis vyšel s "v Blansko" místo "v Blansku".
+    if(!address) return { city: 'Blansku', locationPhrase: '' };
     const parts = address.split(',').map(s => s.trim()).filter(Boolean);
     const first = parts[0] || '';
     // Appka dřív město do dopisu dávala natvrdo "Blansko" bez ohledu na
@@ -5370,8 +5374,11 @@
     // (Doubravice nad Svitavou, Rájec-Jestřebí…) to bylo špatně. Když
     // appka v adrese má i druhou část za čárkou (obec), použije ji;
     // jinak jde o místní část Blanska uloženou bez obce (jen "Těchov"
-    // apod.), kde zůstává dosavadní výchozí "Blansko".
-    const city = parts[1] || 'Blansko';
+    // apod.), kde zůstává dosavadní výchozí "Blansku". Skloňování jiných
+    // obcí appka neřeší (obecné skloňování českých místních jmen je
+    // samo o sobě velký úkol) — u nich appka jméno použije tak, jak je
+    // v adrese uložené, i za cenu drobně horší gramatiky.
+    const city = parts[1] || 'Blansku';
     if(MPM_LOCAL_PARTS.includes(first)){
       return { city, locationPhrase: 'v místní části ' + first };
     }
