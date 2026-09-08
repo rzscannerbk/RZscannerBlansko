@@ -980,6 +980,7 @@
         </div>
       </div>
 
+      <div id="prikazProvozovatelWrap">
       <div class="prikaz-pachatel-head">
         <span id="prikazPachatelLabel">PACHATEL</span>
         <button type="button" class="prikaz-scan-btn" id="prikazScanBtn">
@@ -1084,6 +1085,7 @@
           <label for="prikazVyzvaCasDo">Čas do</label>
           <select id="prikazVyzvaCasDo"><option value="">—</option><option value="00:00">0:00</option><option value="01:00">1:00</option><option value="02:00">2:00</option><option value="03:00">3:00</option><option value="04:00">4:00</option><option value="05:00">5:00</option><option value="06:00">6:00</option><option value="07:00">7:00</option><option value="08:00">8:00</option><option value="09:00">9:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option><option value="18:00">18:00</option><option value="19:00">19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option></select>
         </div>
+      </div>
       </div>
 
       <div class="prikaz-note" id="prikazScanNote" style="display:none;"></div>
@@ -5531,7 +5533,7 @@
     // PSČ + obec vedle sebe (appka posílá "PSČ obec" tak, jak ho vybral
     // z Mapy.com Suggest — pachatel.mesto tak už tenhle formát má).
     const headerLeft = isFirmaPachatel ? [
-      (pachatel.ico) || '[DOPLNIT IČO]',
+      pachatel.ico ? ('IČO: ' + pachatel.ico) : '[DOPLNIT IČO]',
       '',
       pachatel.firma || '[DOPLNIT NÁZEV FIRMY]',
       '',
@@ -8799,6 +8801,14 @@
     // (nutně) provozovatele vozidla.
     document.getElementById('prikazPasteField').style.display = prikazIsNewEvent ? 'none' : '';
     document.getElementById('prikazPachatelLabel').textContent = prikazIsNewEvent ? 'PROVOZOVATEL' : 'PACHATEL';
+    // U "Přidat událost" appka celý blok PROVOZOVATEL (jméno/firma,
+    // adresa, dostavit se dne) schová, dokud se strážník nevrátí z MP
+    // Manageru a nevloží údaje tlačítkem "Vložit" — do té doby appka
+    // nemá co zobrazovat a prázdná pole by jen zabírala místo (viz
+    // applyProvozovatelText, které blok zase odkryje). U běžného
+    // Příkazu/Oznámení/Výzvy appka blok nechává vidět pořád, appka tam
+    // žádné "Vložit" nemá.
+    document.getElementById('prikazProvozovatelWrap').style.display = prikazIsNewEvent ? 'none' : '';
     // U "Přidat událost" appka pole "Číslo dokladu" (appka tam OP
     // fyzicky neskenuje, takže ho stejně nevyužije) přemapuje na "Číslo
     // jednací" — appka do něj vloží číslo z MPM (viz applyProvozovatelText)
@@ -10154,6 +10164,11 @@
 
   function applyProvozovatelText(raw){
     const p = parseProvozovatelText(raw);
+    // U "Přidat událost" appka blok PROVOZOVATEL do teď měla schovaný
+    // (viz openPrikazModal) — jakmile appka vloží údaje, je čas ho
+    // ukázat. U běžných záznamů appka je stejně schovaná nikdy nebyla,
+    // takže tady jen bezpečně napíše display:'' znovu.
+    document.getElementById('prikazProvozovatelWrap').style.display = '';
     setPrikazProvozovatelMode(p.firma ? 'firma' : 'osoba');
     if(p.firma) document.getElementById('prikazFirma').value = p.firma;
     if(p.ico) document.getElementById('prikazIco').value = p.ico;
@@ -10206,26 +10221,46 @@
     e.target.value = '';
   });
 
-  // "Vyhledat DS" — appka NEUMÍ (zatím) dohledat ID datové schránky
-  // automaticky, protože veřejný Seznam držitelů datových schránek
-  // (www.datovka.gov.cz/sds/) je jen webová appka pro lidi, ne veřejné
-  // JSON API, které by appka mohla zavolat rovnou z prohlížeče (appka
-  // nemá ověřené, že by to šlo bez CORS problémů). Appka proto radši
-  // udělá to samé, co appka dělá jinde (viz mpm-bookmarklet.js) —
-  // zkopíruje IČO do schránky a otevře veřejný seznam v nové záložce,
-  // ať strážník IČO jen vloží (Ctrl+V) do vyhledávacího pole a nalezené
-  // ID schránky přenese zpátky sem ručně.
+  // "Vyhledat DS" — appka nejdřív zkusí dohledat ID datové schránky
+  // automaticky přes ARES (zdroj ROS, pole datoveSchranky[].identifikatorDs
+  // — appka to ověřila v OpenAPI schématu ARESu). Tenhle konkrétní zdroj
+  // (na rozdíl od základního ARES) dokumentace ale sama označuje jako
+  // "neveřejná část" — appka nemá jak z tohoto prostředí ověřit, jestli
+  // je bez přihlášení skutečně volatelný z prohlížeče (CORS/401). Pokud
+  // dotaz selže, appka spadne zpátky na osvědčené řešení odjinud
+  // (bookmarklety): zkopíruje IČO do schránky a otevře veřejný Seznam
+  // datových schránek v nové záložce k ručnímu dohledání.
   document.getElementById('prikazDsLookupBtn').addEventListener('click', async ()=>{
     const ico = document.getElementById('prikazIco').value.trim();
+    const btn = document.getElementById('prikazDsLookupBtn');
     if(!ico){
       alert('Nejdřív vyplň IČO — appka ho zkopíruje do schránky, ať ho můžeš rovnou vložit do vyhledávání.');
       document.getElementById('prikazIco').focus();
       return;
     }
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="cam-icon">🔍</span> Hledám…';
     try{
-      await navigator.clipboard.writeText(ico);
-    }catch(e){ /* appka kopírování bere jen jako pohodlí navíc, bez něj appka pokračuje dál */ }
-    window.open('https://www.datovka.gov.cz/sds/', '_blank');
+      const resp = await fetch('https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty-ros/' + encodeURIComponent(ico));
+      if(!resp.ok) throw new Error('ARES ROS vrátil status ' + resp.status);
+      const data = await resp.json();
+      const zaznam = data && Array.isArray(data.zaznamy) && data.zaznamy[0];
+      const ds = zaznam && Array.isArray(zaznam.datoveSchranky) && zaznam.datoveSchranky[0] && zaznam.datoveSchranky[0].identifikatorDs;
+      if(!ds) throw new Error('ARES ROS nevrátil žádnou datovou schránku pro tohle IČO');
+      document.getElementById('prikazDatovaSchranka').value = ds;
+      btn.classList.add('copied');
+      btn.innerHTML = '<span class="cam-icon">✓</span> Nalezeno';
+      setTimeout(()=>{ btn.disabled = false; btn.classList.remove('copied'); btn.innerHTML = originalHtml; }, 2500);
+    }catch(e){
+      console.error('Automatické dohledání DS přes ARES ROS se nezdařilo (appka jde na ruční cestu):', e);
+      try{
+        await navigator.clipboard.writeText(ico);
+      }catch(e2){ /* appka kopírování bere jen jako pohodlí navíc, bez něj appka pokračuje dál */ }
+      window.open('https://www.datovka.gov.cz/sds/', '_blank');
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
   });
 
   function parseOpFront(rawText){
