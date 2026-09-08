@@ -575,6 +575,10 @@
     background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
     padding:24px 26px; max-width:420px; width:100%; text-align:left;
   }
+  /* appka pro nově založené události z "Přidat událost" (víc polí najednou
+     — SPZ, datum a čas spáchání navíc k pachateli) roztáhne dialog šířeji,
+     ať se nemusí scrolovat. */
+  .prikaz-box.prikaz-box-wide{max-width:640px;}
   .prikaz-box h3{font-size:16px; margin:0 0 18px; color:var(--text); text-align:center;}
   .prikaz-box .field{margin-bottom:12px;}
   .admin-edit-box{max-width:560px;}
@@ -890,11 +894,33 @@
   </div>
 
   <div class="confirm-overlay" id="prikazOverlay">
-    <div class="prikaz-box">
+    <div class="prikaz-box" id="prikazBox">
       <h3 id="prikazDialogTitle">Příkaz na místě</h3>
       <div class="field" id="prikazCastkaField">
         <label for="prikazCastka">Částka (Kč)</label>
         <input type="number" id="prikazCastka" inputmode="numeric" min="0" step="1" placeholder="např. 1500">
+      </div>
+
+      <!-- Jen pro záznamy založené přes "Přidat událost" (appka je skrývá
+           u běžných záznamů z terénu, kde appka SPZ/datum/čas přestupku
+           už dávno má, viz prikazIsNewEvent v JS). Místo appka u těchto
+           událostí drží pevně podle volby v menu, needituje se tady. -->
+      <div id="prikazEventFieldsWrap" style="display:none;">
+        <div class="field">
+          <label for="prikazSpz">RZ (SPZ)</label>
+          <input type="text" id="prikazSpz" autocomplete="off" placeholder="např. 1AB 2345" style="text-transform:uppercase;">
+        </div>
+        <div class="prikaz-row2">
+          <div class="field prikaz-datepicker-wrap">
+            <label for="prikazSpachaniDatum">Datum spáchání</label>
+            <input type="text" id="prikazSpachaniDatum" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
+            <div class="prikaz-datepicker-panel" id="prikazSpachaniDatumPanel"></div>
+          </div>
+          <div class="field">
+            <label for="prikazSpachaniCas">Čas spáchání</label>
+            <input type="time" id="prikazSpachaniCas">
+          </div>
+        </div>
       </div>
 
       <div class="prikaz-pachatel-head">
@@ -7068,6 +7094,7 @@
   const ADD_EVENT_OFFENSES = {
     'Rožmitálova B28': {
       address: 'Rožmitálova',
+      lat: 49.3627322, lng: 16.6438239,
       label: 'Porušení zákazu zastavení — B28',
       verb: 'zastavil v místě se zákazem zastavení (B28)',
       citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
@@ -7076,6 +7103,7 @@
     },
     'Vodní B28': {
       address: 'Vodní',
+      lat: 49.3617672, lng: 16.6418578,
       label: 'Porušení zákazu zastavení — B28',
       verb: 'zastavil v místě se zákazem zastavení (B28)',
       citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
@@ -7084,6 +7112,7 @@
     },
     'Nám. Republiky B2': {
       address: 'Nám. Republiky',
+      lat: 49.3625033, lng: 16.6438558,
       label: 'Porušení zákazu vjezdu — B2 (zákaz vjezdu všech motorových vozidel)',
       verb: 'vjel v protisměru do jednosměrné komunikace se zákazem vjezdu všech motorových vozidel (B2)',
       citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
@@ -7092,6 +7121,7 @@
     },
     'Nám. Svobody B2': {
       address: 'Nám. Svobody',
+      lat: 49.3644161, lng: 16.6441000,
       label: 'Porušení zákazu vjezdu — B2 (zákaz vjezdu všech motorových vozidel)',
       verb: 'vjel v protisměru do jednosměrné komunikace se zákazem vjezdu všech motorových vozidel (B2)',
       citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
@@ -7172,8 +7202,8 @@
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       officerName: currentOfficerName() || null,
       noticeNumber,
-      lat: null,
-      lng: null,
+      lat: (typeof off.lat === 'number') ? off.lat : null,
+      lng: (typeof off.lng === 'number') ? off.lng : null,
       brand: null,
       color: null,
       docType: 'vyzva',
@@ -7192,7 +7222,7 @@
       const record = await createAddEventRecord(choiceKey);
       if(!record) return;
       openDetail(record);
-      openPrikazModal('vyzva');
+      openPrikazModal('vyzva', true);
     }catch(e){
       console.error('Založení nové události selhalo:', e);
       alert('Založení záznamu se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
@@ -8237,9 +8267,13 @@
     oznameni: 'Oznámení správnímu orgánu'
   };
   let prikazMode = 'prikaz';
+  // true jen když appka dialog otevřela z "Přidat událost" (nový záznam
+  // bez SPZ/data/času z terénu) — viz openPrikazModal a pickAddEventChoice.
+  let prikazIsNewEvent = false;
 
-  function openPrikazModal(mode){
+  function openPrikazModal(mode, isNewEvent){
     prikazMode = mode || 'prikaz';
+    prikazIsNewEvent = !!isNewEvent;
     const titleEl = document.getElementById('prikazDialogTitle');
     const baseTitle = PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz;
     // U příkazu appka přidá druhý řádek se zvoleným způsobem platby (viz
@@ -8250,6 +8284,19 @@
     document.getElementById('prikazCastkaField').style.display = (prikazMode === 'prikaz') ? '' : 'none';
     document.getElementById('prikazCastka').value = '';
     document.getElementById('prikazCastkaField').classList.toggle('prikaz-castka-missing', prikazMode === 'prikaz');
+
+    // Pole RZ/datum/čas spáchání appka zobrazí jen u záznamů založených
+    // přes "Přidat událost" (viz pickAddEventChoice) — u běžných záznamů
+    // z terénu appka tahle data už dávno má odjinud, needituje se tady.
+    // Dialog appka zároveň roztáhne šířeji, ať se s těmihle poli navíc
+    // nemusí scrolovat (viz .prikaz-box-wide).
+    document.getElementById('prikazEventFieldsWrap').style.display = prikazIsNewEvent ? '' : 'none';
+    document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
+    const r = currentDetailRecord;
+    document.getElementById('prikazSpz').value = (prikazIsNewEvent && r && r.plate) || '';
+    prikazSpachaniDatumInput._setDatePickerIso(prikazIsNewEvent && r && r.date ? r.date : '');
+    document.getElementById('prikazSpachaniCas').value = (prikazIsNewEvent && r && r.time) || '';
+
     // Když appka o pachateli už něco ví (typicky editace — mění se jen
     // způsob řešení, ale pachatel se dostaví/je stejný jako předtím,
     // např. Výzva → Příkaz), pole rovnou předvyplní. Poprvé, kdy se
@@ -8528,6 +8575,10 @@
   initDatePicker(prikazNarozeniInput, document.getElementById('prikazNarozeniPanel'), { defaultYear: 1990 });
   initDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'), {
     minYear: new Date().getFullYear(), maxYear: new Date().getFullYear() + 1
+  });
+  const prikazSpachaniDatumInput = document.getElementById('prikazSpachaniDatum');
+  initDatePicker(prikazSpachaniDatumInput, document.getElementById('prikazSpachaniDatumPanel'), {
+    minYear: new Date().getFullYear() - 1, maxYear: new Date().getFullYear() + 1
   });
   const prikazVyzvaCasOdInput = document.getElementById('prikazVyzvaCasOd');
   const prikazVyzvaCasDoInput = document.getElementById('prikazVyzvaCasDo');
@@ -8862,6 +8913,30 @@
       ulice: ulice || null,
       cisloDomu: cisloDomu || null
     } : null;
+
+    // U záznamů z "Přidat událost" appka ještě před uložením řešení
+    // zapíše RZ/datum/čas spáchání, které appka u téhle cesty nemá
+    // z terénu (viz prikazEventFieldsWrap/prikazIsNewEvent výš) — tahle
+    // pole appka zapisuje přímo do dokumentu záznamu (ne přes
+    // markResolved, ten řeší jen věci kolem způsobu vyřešení).
+    if(prikazIsNewEvent){
+      const spz = document.getElementById('prikazSpz').value.trim().toUpperCase();
+      const spachaniDatumIso = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
+      const spachaniCas = document.getElementById('prikazSpachaniCas').value || '';
+      const eventUpdate = {
+        plate: spz || null,
+        date: spachaniDatumIso || record.date,
+        time: spachaniCas || record.time
+      };
+      try{
+        await db.collection('prestupky').doc(record.id).update(eventUpdate);
+        Object.assign(record, eventUpdate);
+      }catch(e){
+        console.error('Uložení RZ/data/času spáchání selhalo:', e);
+        alert('Uložení RZ/data/času spáchání se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
+        return;
+      }
+    }
 
     const btn = document.getElementById('prikazConfirmBtn');
     btn.disabled = true;
