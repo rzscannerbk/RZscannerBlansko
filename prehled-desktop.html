@@ -279,6 +279,11 @@
   .record-thumb.empty{cursor:default;}
   .record-thumb.loading{opacity:.5; cursor:wait;}
   .record-thumb img{width:100%; height:100%; object-fit:cover;}
+  /* Ikonka PDF v miniatuře — appka ji dřív nechávala na výchozím
+     16px/tlumené barvě jako ostatní placeholdery (—, ?), což emoji 📄
+     dělalo skoro neviditelné. Appka jí dá vlastní, výrazně větší
+     a barevně odlišenou variantu. */
+  .record-thumb-placeholder.pdf{font-size:26px; color:var(--bad);}
   .record-thumb-count{
     position:absolute; right:2px; bottom:2px; background:rgba(0,0,0,.7); color:#fff;
     font-size:9px; font-weight:700; padding:0 4px; border-radius:7px; font-family:'Roboto Mono',monospace;
@@ -5893,7 +5898,7 @@
         // PDF appka jako miniaturu nevykresluje (žádné rozbité ikonky) —
         // ukáže stejnou ikonku jako u prázdného náhledu, jen s jiným
         // symbolem, ať je hned vidět, že je co otevřít, jen ne obrázkem.
-        thumbEl.innerHTML = '<span class="record-thumb-placeholder">📄</span>';
+        thumbEl.innerHTML = '<span class="record-thumb-placeholder pdf">📄</span>';
       } else {
         const img = document.createElement('img');
         img.src = 'data:' + firstMime + ';base64,' + photos[0];
@@ -8491,6 +8496,11 @@
   // (Potvrdit a uložit, jakmile je vyplněný termín dostavení). Viz
   // updatePrikazEventActionBtn a jeho click handler níž.
   let prikazEventBtnState = 'mpm';
+  // Appka ho krátce nastaví na true kolem programového přeskoku fokusu
+  // (viz "Vložit" u "Přidat událost" a blur handler Ulice výš) — zabrání
+  // to řetězovému auto-přeskoku Ulice -> Č.P., který by appce ukradl
+  // fokus zpátky z kalendáře.
+  let prikazSuppressAutoAdvance = false;
 
   // U "Přidat událost" appka nedovolí uložit, dokud nejsou vyplněné RZ,
   // datum spáchání a čas spáchání — vrací seznam id chybějících polí
@@ -9133,7 +9143,13 @@
   prikazUliceInput.addEventListener('input', debouncedUliceSearch);
   prikazUliceInput.addEventListener('blur', ()=>{
     setTimeout(()=> prikazUliceList.classList.remove('open'), 150);
-    if(!prikazUliceInput.disabled && prikazUliceInput.value.trim()) focusField(prikazCisloDomuInput);
+    // prikazSuppressAutoAdvance appka nastaví na chvíli po hromadném
+    // vyplnění (viz "Vložit" u "Přidat událost") — appka totiž vzápětí
+    // sama přeskakuje rovnou na "Dostavit se dne", a tenhle auto-skok na
+    // Č.P. by mezitím ukradl fokus a znovu otevřel jeho potvrzovací
+    // bublinu (appka na to narazila naživo — bublina zůstávala viditelná
+    // nad kalendářem).
+    if(!prikazSuppressAutoAdvance && !prikazUliceInput.disabled && prikazUliceInput.value.trim()) focusField(prikazCisloDomuInput);
   });
 
   // Č.p. → Datum dostavení se (jen u Výzvy — jinde je pole skryté, takže
@@ -9259,7 +9275,14 @@
           // Appka po úspěšném vložení rovnou pokračuje na termín
           // dostavení — zaostří pole a hned otevře kalendář, ať appka
           // strážníka nenechává hledat, kde má pokračovat.
+          // Appka po úspěšném vložení rovnou pokračuje na termín
+          // dostavení — zaostří pole a hned otevře kalendář, ať appka
+          // strážníka nenechává hledat, kde má pokračovat. prikazSuppressAutoAdvance
+          // kolem toho zabrání, aby blur Ulice mezitím ukradl fokus zpět
+          // na Č.P. (viz komentář u proměnné a u blur handleru Ulice).
+          prikazSuppressAutoAdvance = true;
           focusField(document.getElementById('prikazVyzvaDatum'));
+          prikazSuppressAutoAdvance = false;
         } else {
           btn.textContent = 'Schránka je prázdná';
           btn.classList.add('copy-err');
