@@ -7049,23 +7049,157 @@
     renderShiftSummary();
   });
 
-  // Tlačítko "Přidat událost" — zatím jen zástupný stav (placeholder).
-  // Bude sloužit k ručnímu ex-post zadání přestupků řešených radarem
-  // (§ 125c odst. 1 písm. f) body 2-4 — překročení rychlosti), které se
-  // na rozdíl od ostatních přestupků neřeší v terénu appkou index.html,
-  // ale až zpětně na služebně s exportem do MPM. Konkrétní podoba
-  // formuláře (pole, výpočet bodu podle naměřené rychlosti, nahrání
-  // fotky z radaru) bude doplněna v další iteraci.
   // Tlačítko "Přidat událost" — otevře dvouúrovňové menu (viz
   // addEventOverlay/addEventSpeedOverlay v HTML). Krok 1 nabízí 4 předem
   // dané kombinace ulice+značka plus "Rychlost", krok 2 (jen po kliku na
-  // Rychlost) nabízí stupně překročení K/F4/F3/F2. Appka zatím po výběru
-  // jen zaznamená volbu do addEventPick a zavře menu — co přesně se má
-  // stát dál (jaký formulář/pole se pak otevřou), čeká na doplnění.
-  let addEventPick = null;
+  // Rychlost) nabízí stupně překročení K/F4/F3/F2. Po výběru appka rovnou
+  // založí nový záznam v Firestore (nevyřešeno, stejné schéma jako appka
+  // ukládá z terénu přes index.html) a otevře na něm formulář "Výzva
+  // k podání vysvětlení" (viz openPrikazModal) — pachatel se doplní přes
+  // "Vlož provozovatele" nebo ručně.
+
+  // Katalog přestupků pro "Přidat událost" — label/verb/citace/mpmId/
+  // mpmText jsou PŘEVZATÉ 1:1 z katalogu OFFENSES v index.html (B28/B2),
+  // resp. z bodů 2-4 § 125c odst. 1 písm. f), které appka měla dřív i tady
+  // (ověřeno z MP Manageru). "K" (méně než 10 km/h, § 124 odst. 15 písm. d)
+  // zatím NEMÁ ověřené mpmId/mpmText z MP Manageru — dokument appka i tak
+  // vytvoří, jen bez automatického napojení na strom MPM (tlačítko MPM na
+  // detailu u něj nebude fungovat, dokud mpmId nedodáš).
+  const ADD_EVENT_OFFENSES = {
+    'Rožmitálova B28': {
+      address: 'Rožmitálova',
+      label: 'Porušení zákazu zastavení — B28',
+      verb: 'zastavil v místě se zákazem zastavení (B28)',
+      citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
+      mpmId: '51984',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. k - jiným jednáním nesplnila nebo porušila povinnost - stání a zastavení - zastavení nebo stání v zákazu zastavení B 28'
+    },
+    'Vodní B28': {
+      address: 'Vodní',
+      label: 'Porušení zákazu zastavení — B28',
+      verb: 'zastavil v místě se zákazem zastavení (B28)',
+      citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
+      mpmId: '51984',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. k - jiným jednáním nesplnila nebo porušila povinnost - stání a zastavení - zastavení nebo stání v zákazu zastavení B 28'
+    },
+    'Nám. Republiky B2': {
+      address: 'Nám. Republiky',
+      label: 'Porušení zákazu vjezdu — B2 (zákaz vjezdu všech motorových vozidel)',
+      verb: 'vjel v protisměru do jednosměrné komunikace se zákazem vjezdu všech motorových vozidel (B2)',
+      citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
+      mpmId: '51977',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. k - jiným jednáním nesplnila nebo porušila povinnost - vjezd - porušení zákazu vjezdu v protisměru do jednosměrné komunikace - B2'
+    },
+    'Nám. Svobody B2': {
+      address: 'Nám. Svobody',
+      label: 'Porušení zákazu vjezdu — B2 (zákaz vjezdu všech motorových vozidel)',
+      verb: 'vjel v protisměru do jednosměrné komunikace se zákazem vjezdu všech motorových vozidel (B2)',
+      citation: '§ 124 odst. 15 písm. a) — přestupek dle § 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
+      mpmId: '51977',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. k - jiným jednáním nesplnila nebo porušila povinnost - vjezd - porušení zákazu vjezdu v protisměru do jednosměrné komunikace - B2'
+    },
+    'K': {
+      address: null,
+      label: 'Překročení nejvyšší dovolené rychlosti o méně než 10 km/h',
+      verb: 'překročil nejvyšší dovolenou rychlost o méně než 10 km/h',
+      // Ověřeno přímo z MP Manageru — je to (na rozdíl od bodů 2-4) pod
+      // § 125c odst. 1 písm. k), ne pod písm. f) — appka to tam dřív měla
+      // jen jako odhad podle § 124 odst. 15 písm. d), teď opraveno.
+      citation: '§ 125c odst. 1 písm. k) (zákon č. 361/2000 Sb.)',
+      mpmId: '54735',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. k - jiným jednáním nesplnila nebo porušila povinnost - ostatní - překročí nejvyšší dovolenou rychlost o méně než 10 km/h'
+    },
+    'F4': {
+      address: null,
+      label: 'Překročení rychlosti o 10+ km/h',
+      verb: 'překročil nejvyšší dovolenou rychlost o 10 km/h a více',
+      citation: '§ 125c odst. 1 písm. f) bod 4 (zákon č. 361/2000 Sb.)',
+      mpmId: '53734',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. f - při řízení vozidla - bod 4. - překročí nejvyšší dovolenou rychlost o 10 km.h-1 a více,'
+    },
+    'F3': {
+      address: null,
+      label: 'Překročení rychlosti v obci 20+ km/h nebo mimo obec 30+ km/h',
+      verb: 'překročil nejvyšší dovolenou rychlost v obci o 20 km/h a více nebo mimo obec o 30 km/h a více',
+      citation: '§ 125c odst. 1 písm. f) bod 3 (zákon č. 361/2000 Sb.)',
+      mpmId: '51957',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. f - při řízení vozidla - bod 3. - překročí nejvyšší dovolenou rychlost v obci o 20 km.h-1 a více nebo mimo obec o 30 km.h-1 a více'
+    },
+    'F2': {
+      address: null,
+      label: 'Překročení rychlosti v obci 40+ km/h nebo mimo obec 50+ km/h',
+      verb: 'překročil nejvyšší dovolenou rychlost v obci o 40 km/h a více nebo mimo obec o 50 km/h a více',
+      citation: '§ 125c odst. 1 písm. f) bod 2 (zákon č. 361/2000 Sb.) — VÝHRADNĚ Policie ČR, obecní policie tohle nesmí řešit sama',
+      mpmId: '51956',
+      mpmText: 'Zákon č. 361/2000 Sb., o provozu na pozemních komunikacích - § 125c - Fyzická osoba - odst. 1 písm. f - při řízení vozidla - bod 2. - překročí nejvyšší dovolenou rychlost v obci o 40 km.h-1 a více nebo mimo obec o 50 km.h-1 a více'
+    }
+  };
+
+  // Stejná transakce jako getNextNoticeNumber() v index.html — appka
+  // schválně čte/píše do stejného meta/noticeCounter dokumentu, ať čísla
+  // výzev/oznámení navazují na sebe napříč terénní appkou i desktopem.
+  async function getNextNoticeNumberDesktop(){
+    const counterRef = db.collection('meta').doc('noticeCounter');
+    const next = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(counterRef);
+      const current = (snap.exists && typeof snap.data().value === 'number') ? snap.data().value : 0;
+      const nextVal = current + 1;
+      tx.set(counterRef, { value: nextVal }, { merge: true });
+      return nextVal;
+    });
+    return String(next).padStart(6, '0');
+  }
+
+  async function createAddEventRecord(choiceKey){
+    const off = ADD_EVENT_OFFENSES[choiceKey];
+    if(!off) return null;
+    const now = new Date();
+    const pad2 = n => String(n).padStart(2, '0');
+    const noticeNumber = await getNextNoticeNumberDesktop();
+    const docRef = db.collection('prestupky').doc();
+    const data = {
+      plate: null,
+      date: now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()),
+      time: now.toTimeString().slice(0, 5),
+      address: off.address || null,
+      offenseLabel: off.label,
+      offenseVerb: off.verb,
+      offenseCitation: off.citation,
+      hasPhotos: false,
+      resolved: false,
+      expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)),
+      submittedBy: auth.currentUser ? auth.currentUser.email : null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      officerName: currentOfficerName() || null,
+      noticeNumber,
+      lat: null,
+      lng: null,
+      brand: null,
+      color: null,
+      docType: 'vyzva',
+      mpmUdalostId: off.mpmId || null,
+      mpmUdalostText: off.mpmText || null
+    };
+    await docRef.set(data);
+    const snap = await docRef.get();
+    return { id: docRef.id, ...snap.data() };
+  }
+
+  async function pickAddEventChoice(choiceKey){
+    document.getElementById('addEventOverlay').classList.remove('open');
+    document.getElementById('addEventSpeedOverlay').classList.remove('open');
+    try{
+      const record = await createAddEventRecord(choiceKey);
+      if(!record) return;
+      openDetail(record);
+      openPrikazModal('vyzva');
+    }catch(e){
+      console.error('Založení nové události selhalo:', e);
+      alert('Založení záznamu se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
+    }
+  }
 
   document.getElementById('addEventBtn').addEventListener('click', ()=>{
-    addEventPick = null;
     document.getElementById('addEventOverlay').classList.add('open');
   });
   document.getElementById('addEventCancelBtn').addEventListener('click', ()=>{
@@ -7074,9 +7208,7 @@
   document.getElementById('addEventChoices').addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-choice]');
     if(!btn) return;
-    addEventPick = { kind:'lokalita', value: btn.dataset.choice };
-    document.getElementById('addEventOverlay').classList.remove('open');
-    console.log('addEventPick:', addEventPick);
+    pickAddEventChoice(btn.dataset.choice);
   });
   document.getElementById('addEventSpeedBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
@@ -7089,9 +7221,7 @@
   document.getElementById('addEventSpeedChoices').addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-choice]');
     if(!btn) return;
-    addEventPick = { kind:'rychlost', value: btn.dataset.choice };
-    document.getElementById('addEventSpeedOverlay').classList.remove('open');
-    console.log('addEventPick:', addEventPick);
+    pickAddEventChoice(btn.dataset.choice);
   });
 
   document.getElementById('shiftSummaryCloseBtn').addEventListener('click', ()=>{
