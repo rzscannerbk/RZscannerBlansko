@@ -5868,29 +5868,39 @@
   // na náhled. Výsledek se cachuje na record._resolvedPhotos, ať appka
   // fotky nedotahuje opakovaně.
   async function ensurePhotosLoaded(record){
-    if(record._resolvedPhotos) return { photos: record._resolvedPhotos, mime: record._resolvedMime || 'image/jpeg' };
+    if(record._resolvedPhotos) return { photos: record._resolvedPhotos, mime: record._resolvedMime || 'image/jpeg', mimes: record._resolvedMimes };
     const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
     const data = doc.exists ? doc.data() : null;
     const photos = (data && data.photos) || [];
     const mime = (data && data.photoMime) || 'image/jpeg';
+    const mimes = (data && data.photoMimes) || null;
     record._resolvedPhotos = photos;
     record._resolvedMime = mime;
-    return { photos, mime };
+    record._resolvedMimes = mimes;
+    return { photos, mime, mimes };
   }
 
   async function loadThumbFor(thumbEl, record){
     try{
-      const { photos, mime } = await ensurePhotosLoaded(record);
+      const { photos, mime, mimes } = await ensurePhotosLoaded(record);
       if(!photos.length){
         thumbEl.innerHTML = '<span class="record-thumb-placeholder">—</span>';
         thumbEl.classList.add('empty');
         return;
       }
-      const img = document.createElement('img');
-      img.src = 'data:' + mime + ';base64,' + photos[0];
-      img.alt = 'Fotodokumentace';
-      thumbEl.innerHTML = '';
-      thumbEl.appendChild(img);
+      const firstMime = (mimes && mimes[0]) || mime;
+      if(firstMime === 'application/pdf'){
+        // PDF appka jako miniaturu nevykresluje (žádné rozbité ikonky) —
+        // ukáže stejnou ikonku jako u prázdného náhledu, jen s jiným
+        // symbolem, ať je hned vidět, že je co otevřít, jen ne obrázkem.
+        thumbEl.innerHTML = '<span class="record-thumb-placeholder">📄</span>';
+      } else {
+        const img = document.createElement('img');
+        img.src = 'data:' + firstMime + ';base64,' + photos[0];
+        img.alt = 'Fotodokumentace';
+        thumbEl.innerHTML = '';
+        thumbEl.appendChild(img);
+      }
       if(photos.length > 1){
         const count = document.createElement('span');
         count.className = 'record-thumb-count';
@@ -5921,9 +5931,20 @@
   async function openLightbox(record, thumbEl){
     if(thumbEl) thumbEl.classList.add('loading');
     try{
-      const { photos, mime } = await ensurePhotosLoaded(record);
+      const { photos, mime, mimes } = await ensurePhotosLoaded(record);
       if(thumbEl) thumbEl.classList.remove('loading');
       if(!photos.length) return;
+      // Lightbox umí zobrazit jen obrázky — pro PDF (viz "Přidej
+      // fotodokumentaci" u "Přidat událost") appka radši otevře přímo
+      // PDF v nové záložce (přes Blob URL, viz stejný důvod jako
+      // u renderPhotoGallery), než aby ukázala rozbitou/prázdnou
+      // stránku v lightboxu.
+      const firstMime = (mimes && mimes[0]) || mime;
+      if(firstMime === 'application/pdf'){
+        const pdfBlob = new Blob([base64ToUint8Array(photos[0])], { type: 'application/pdf' });
+        window.open(URL.createObjectURL(pdfBlob), '_blank', 'noopener');
+        return;
+      }
       lightboxPhotos = photos;
       lightboxMime = mime;
       lightboxIndex = 0;
@@ -8001,9 +8022,16 @@
       if(isPdf){
         // PDF appka nezobrazí náhledem (jako <img> by to byla jen rozbitá
         // ikonka) — místo toho appka ukáže odkaz, co PDF otevře v nové
-        // záložce (prohlížeč si s datovou URL PDF poradí sám).
+        // záložce. Záměrně přes blob: URL, ne data: URL — Chrome umí
+        // "data:application/pdf;base64,..." otevřené přes target="_blank"
+        // (nebo window.open) nechat vykreslit jako prázdnou stránku,
+        // zatímco blob: URL svůj vestavěný PDF prohlížeč spolehlivě
+        // spustí (appka na to narazila naživo — appka proto b64 převádí
+        // na Blob přes existující base64ToUint8Array).
+        const pdfBlob = new Blob([base64ToUint8Array(b64)], { type: 'application/pdf' });
+        const pdfBlobUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
-        link.href = dataUrl;
+        link.href = pdfBlobUrl;
         link.target = '_blank';
         link.rel = 'noopener';
         link.className = 'photo-pdf-link';
@@ -9709,6 +9737,13 @@
     if(p.psc) prikazPscInput.value = p.psc;
     if(p.ulice) prikazUliceInput.value = p.ulice;
     if(p.cisloDomu) prikazCisloDomuInput.value = p.cisloDomu;
+    // checkStreetsAndAdvance() výš mezitím přesouvá fokus (na Ulici) a
+    // to umí některé z těchhle bublin (viz attachConfirmChip) nechat
+    // otevřené — appka je tady po hromadném vyplnění všechny natvrdo
+    // zavře, ať uživateli nepřekáží nad polem, na které appka pak sama
+    // skáče dál (Dostavit se dne).
+    [prikazJmenoList, prikazPrijmeniList, prikazDokladList, prikazMestoList, prikazPscList, prikazUliceList, prikazCisloDomuList]
+      .forEach(list => { list.classList.remove('open'); list.innerHTML = ''; });
   }
 
   document.getElementById('prikazPaste').addEventListener('paste', (e)=>{
