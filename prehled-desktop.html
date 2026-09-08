@@ -541,6 +541,12 @@
   .photo-item{margin-bottom:14px;}
   .photo-item:last-child{margin-bottom:0;}
   .photo-item img{width:100%; border-radius:12px; display:block;}
+  .photo-pdf-link{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    width:100%; box-sizing:border-box; padding:18px 12px; border-radius:12px;
+    background:var(--asphalt-4); border:1px solid var(--line); color:var(--text);
+    text-decoration:none; font-size:14px; font-weight:600;
+  }
   .photo-item a.download-link, .photo-item button.download-link{
     display:block; width:100%; text-align:center; margin-top:6px; font-size:12px;
     color:var(--muted); text-decoration:underline; background:none; border:none;
@@ -906,9 +912,18 @@
            už dávno má, viz prikazIsNewEvent v JS). Místo appka u těchto
            událostí drží pevně podle volby v menu, needituje se tady. -->
       <div id="prikazEventFieldsWrap" style="display:none;">
-        <div class="field">
-          <label for="prikazSpz">RZ (SPZ)</label>
-          <input type="text" id="prikazSpz" autocomplete="off" placeholder="např. 1AB 2345" style="text-transform:uppercase;">
+        <div class="prikaz-row2">
+          <div class="field">
+            <label for="prikazSpz">RZ (SPZ)</label>
+            <input type="text" id="prikazSpz" autocomplete="off" placeholder="např. 1AB 2345" style="text-transform:uppercase;">
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button type="button" class="prikaz-scan-btn" id="prikazAddDocsBtn" style="width:100%; justify-content:center;">
+              <span class="cam-icon">📎</span> <span id="prikazAddDocsLabel">Přidej fotodokumentaci</span>
+            </button>
+            <input type="file" id="prikazAddDocsInput" accept="image/*,application/pdf" multiple style="display:none;">
+          </div>
         </div>
         <div class="prikaz-row2">
           <div class="field prikaz-datepicker-wrap">
@@ -5511,14 +5526,23 @@
       // Fotky mohly být v této session už dřív načtené (viz openDetail /
       // loadAndShowPhotos) — jinak je stejným způsobem dotáhneme teď.
       let photosB64 = record._resolvedPhotos;
+      let photosMimes = record._resolvedMimes;
       if(!photosB64 && record.hasPhotos){
         const doc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
         const data = doc.exists ? doc.data() : null;
         photosB64 = (data && data.photos) || [];
+        photosMimes = (data && data.photoMimes) || null;
         record._resolvedPhotos = photosB64;
         record._resolvedMime = (data && data.photoMime) || 'image/jpeg';
+        record._resolvedMimes = photosMimes;
       }
-      const blob = await buildOznameniDocx(record, photosB64 || [], pachatel);
+      // Do Wordu appka vkládá jen obrázky — PDF přílohu (viz "Přidej
+      // fotodokumentaci" u "Přidat událost") appka do dokumentu vložit
+      // neumí, takže ji tady přeskočí (zůstává jen ke stažení v detailu).
+      const photosForDocx = photosMimes
+        ? photosB64.filter((b64, idx) => (photosMimes[idx] || 'image/jpeg').startsWith('image/'))
+        : (photosB64 || []);
+      const blob = await buildOznameniDocx(record, photosForDocx, pachatel);
       const filename = filenameOverride || ('Oznameni_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx');
       try{
         const file = new File([blob], filename, { type: blob.type });
@@ -7229,6 +7253,47 @@
     }
   }
 
+  // "Přidej fotodokumentaci" (jen u "Přidat událost") — appka soubory
+  // (obrázky i PDF) čte jako base64 a drží je v paměti, dokud se
+  // záznam neuloží (viz prikazConfirmBtn). Do Firestore appka ukládá
+  // photos[] (base64) + photoMimes[] (mime na stejném indexu, aby appka
+  // uměla obrázek od PDF rozlišit — viz renderPhotoGallery) do stejné
+  // podkolekce data/photos, jakou appka používá i pro fotky z terénu.
+  let prikazNewEventFiles = [];
+
+  function fileToBase64(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function updatePrikazAddDocsLabel(){
+    const label = document.getElementById('prikazAddDocsLabel');
+    label.textContent = prikazNewEventFiles.length
+      ? prikazNewEventFiles.length + ' soubor(ů) přidáno'
+      : 'Přidej fotodokumentaci';
+  }
+
+  document.getElementById('prikazAddDocsBtn').addEventListener('click', ()=>{
+    document.getElementById('prikazAddDocsInput').click();
+  });
+  document.getElementById('prikazAddDocsInput').addEventListener('change', async (e)=>{
+    const files = Array.from(e.target.files || []);
+    for(const file of files){
+      try{
+        const data = await fileToBase64(file);
+        prikazNewEventFiles.push({ data, mime: file.type || 'application/octet-stream', name: file.name });
+      }catch(err){
+        console.error('Načtení souboru selhalo:', file.name, err);
+      }
+    }
+    updatePrikazAddDocsLabel();
+    e.target.value = '';
+  });
+
   document.getElementById('addEventBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.add('open');
   });
@@ -7812,26 +7877,46 @@
     a.remove();
   }
 
-  function renderPhotoGallery(record, photos, mime){
+  // mimes (nepovinné) — pole mime typů, jeden na fotku/soubor, pro
+  // případy, kdy appka u jednoho záznamu drží dohromady fotky i PDF
+  // (viz "Přidej fotodokumentaci" u "Přidat událost"). Když mimes appka
+  // nedostane, chová se jako dřív — všechny soubory bere jako typ `mime`.
+  function renderPhotoGallery(record, photos, mime, mimes){
     const galleryFirst = document.getElementById('photoGalleryFirst');
     const galleryRest = document.getElementById('photoGallery');
     galleryFirst.innerHTML = '';
     galleryRest.innerHTML = '';
     photos.forEach((b64, idx)=>{
-      const dataUrl = 'data:' + mime + ';base64,' + b64;
-      const filename = (record.plate || 'prestupek') + '_' + (idx + 1) + '.jpg';
+      const itemMime = (mimes && mimes[idx]) || mime;
+      const isPdf = itemMime === 'application/pdf';
+      const dataUrl = 'data:' + itemMime + ';base64,' + b64;
+      const ext = isPdf ? '.pdf' : '.jpg';
+      const filename = (record.plate || 'prestupek') + '_' + (idx + 1) + ext;
       const item = document.createElement('div');
       item.className = 'photo-item';
 
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      img.alt = 'Fotodokumentace';
-      item.appendChild(img);
+      if(isPdf){
+        // PDF appka nezobrazí náhledem (jako <img> by to byla jen rozbitá
+        // ikonka) — místo toho appka ukáže odkaz, co PDF otevře v nové
+        // záložce (prohlížeč si s datovou URL PDF poradí sám).
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = 'photo-pdf-link';
+        link.textContent = '📄 PDF dokument' + (photos.length > 1 ? ' ' + (idx + 1) : '');
+        item.appendChild(link);
+      } else {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = 'Fotodokumentace';
+        item.appendChild(img);
+      }
 
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'download-link';
-      btn.textContent = 'Stáhnout fotku' + (photos.length > 1 ? ' ' + (idx + 1) : '');
+      btn.textContent = (isPdf ? 'Stáhnout PDF' : 'Stáhnout fotku') + (photos.length > 1 ? ' ' + (idx + 1) : '');
       btn.addEventListener('click', ()=> downloadPhoto(dataUrl, filename));
       item.appendChild(btn);
 
@@ -8012,7 +8097,7 @@
       // Fotky už byly v této session jednou staženy (ze subkolekce nebo
       // starého formátu) — obnovíme je z cache místo opětovného fetchování
       // a místo prázdné galerie po návratu do detailu.
-      renderPhotoGallery(record, record._resolvedPhotos, record._resolvedMime || 'image/jpeg');
+      renderPhotoGallery(record, record._resolvedPhotos, record._resolvedMime || 'image/jpeg', record._resolvedMimes);
       photoToggleBtn.textContent = 'Foto' + (record._resolvedPhotos.length > 1 ? ' (' + record._resolvedPhotos.length + ')' : '');
       photoToggleRow.style.display = 'block';
       photoWrap.classList.add('open');
@@ -8296,6 +8381,11 @@
     document.getElementById('prikazSpz').value = (prikazIsNewEvent && r && r.plate) || '';
     prikazSpachaniDatumInput._setDatePickerIso(prikazIsNewEvent && r && r.date ? r.date : '');
     document.getElementById('prikazSpachaniCas').value = (prikazIsNewEvent && r && r.time) || '';
+    // Appka nabízené soubory resetuje při každém otevření — už uložené
+    // (v Firestore) tím nezmizí, jen appka vyprázdní "rozpracovaný"
+    // výběr z předchozí návštěvy dialogu.
+    prikazNewEventFiles = [];
+    if(document.getElementById('prikazAddDocsLabel')) updatePrikazAddDocsLabel();
 
     // Když appka o pachateli už něco ví (typicky editace — mění se jen
     // způsob řešení, ale pachatel se dostaví/je stejný jako předtím,
@@ -8949,6 +9039,50 @@
         if(prikazPlatbaMetoda) extra.platba = prikazPlatbaMetoda;
         document.getElementById('prikazOverlay').classList.remove('open');
         await markResolved(record, 'prikaz', extra);
+      } else if(prikazMode === 'vyzva' && prikazIsNewEvent){
+        // U záznamu založeného přes "Přidat událost" appka "Potvrdit
+        // a uložit" použije jen na uložení dat (SPZ/datum/čas appka
+        // zapsala už výš, teď dopíše pachatele, pokud je vyplněný, a
+        // přiloženou fotodokumentaci) — NEgeneruje Výzvu a NEoznačuje
+        // záznam jako dořešený, protože v tuhle chvíli ještě nemusí být
+        // provozovatel vozidla známý (viz "Vlož provozovatele"). Appka
+        // dialog zavře a zůstane na detailu záznamu, odkud se pokračuje
+        // kdykoliv později tlačítkem "Dořešit" (až budou údaje kompletní).
+        if(pachatel){
+          await db.collection('prestupky').doc(record.id).update({ pachatel });
+          record.pachatel = pachatel;
+        }
+        if(prikazNewEventFiles.length){
+          const existingDoc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
+          const existing = existingDoc.exists ? existingDoc.data() : null;
+          const existingPhotos = (existing && existing.photos) || [];
+          const existingMime = (existing && existing.photoMime) || 'image/jpeg';
+          const existingMimes = (existing && existing.photoMimes) || existingPhotos.map(() => existingMime);
+          const newPhotos = existingPhotos.concat(prikazNewEventFiles.map(f => f.data));
+          const newMimes = existingMimes.concat(prikazNewEventFiles.map(f => f.mime));
+          const totalBytes = newPhotos.reduce((sum, p) => sum + p.length, 0);
+          if(totalBytes > 950000){
+            alert('Přiložené soubory jsou bohužel příliš velké pro uložení (limit Firestore ~1 MB dohromady). Zkus některý odebrat.');
+            document.getElementById('prikazOverlay').classList.add('open');
+            btn.disabled = false;
+            btn.textContent = 'Potvrdit a uložit';
+            return;
+          }
+          await db.collection('prestupky').doc(record.id).collection('data').doc('photos').set({
+            photos: newPhotos,
+            photoMimes: newMimes,
+            photoMime: newMimes[0] || 'image/jpeg'
+          });
+          await db.collection('prestupky').doc(record.id).update({ hasPhotos: true });
+          record.hasPhotos = true;
+          record._resolvedPhotos = newPhotos;
+          record._resolvedMimes = newMimes;
+          record._resolvedMime = newMimes[0] || 'image/jpeg';
+          prikazNewEventFiles = [];
+        }
+        document.getElementById('prikazOverlay').classList.remove('open');
+        refreshView();
+        openDetail(record);
       } else if(prikazMode === 'vyzva'){
         document.getElementById('prikazOverlay').classList.remove('open');
         const vyzvaDatumRaw = document.getElementById('prikazVyzvaDatum').dataset.iso || '';
@@ -9469,9 +9603,11 @@
       const data = doc.exists ? doc.data() : null;
       const photos = (data && data.photos) || [];
       const mime = (data && data.photoMime) || 'image/jpeg';
+      const mimes = (data && data.photoMimes) || null;
       record._resolvedPhotos = photos;
       record._resolvedMime = mime;
-      renderPhotoGallery(record, photos, mime);
+      record._resolvedMimes = mimes;
+      renderPhotoGallery(record, photos, mime, mimes);
       photoToggleBtn.textContent = 'Foto' + (photos.length > 1 ? ' (' + photos.length + ')' : '');
       photoToggleBtn.disabled = false;
       photoWrap.classList.add('open');
