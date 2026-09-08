@@ -1024,6 +1024,10 @@
         <button class="confirm-no confirm-btn" id="prikazCancelBtn">Zrušit</button>
         <button class="confirm-no confirm-btn" id="prikazClearBtn">Vymazat pole</button>
         <button class="confirm-yes confirm-btn" id="prikazConfirmBtn">Potvrdit a uložit</button>
+        <!-- Jen u "Přidat událost" — nahrazuje prikazConfirmBtn vícestavovým
+             tlačítkem MPM -> Vložit -> Potvrdit a uložit (viz
+             updatePrikazEventActionBtn/prikazEventActionBtn v JS). -->
+        <button class="confirm-yes confirm-btn btn" id="prikazEventActionBtn" style="display:none;">MPM</button>
       </div>
     </div>
   </div>
@@ -7355,6 +7359,7 @@
               note.style.color = '';
               note.style.display = 'block';
               updatePrikazEventFieldValidation();
+              updatePrikazEventActionBtn();
             }
           }catch(err){
             console.error('Čtení data/času z PDF selhalo:', file.name, err);
@@ -7369,9 +7374,15 @@
   // Živá validace RZ/datum/čas u "Přidat událost" — zvýraznění appka
   // aktualizuje průběžně, ne až při pokusu o uložení (viz
   // updatePrikazEventFieldValidation výš).
-  document.getElementById('prikazSpz').addEventListener('input', updatePrikazEventFieldValidation);
-  document.getElementById('prikazSpachaniCas').addEventListener('input', updatePrikazEventFieldValidation);
-  document.getElementById('prikazSpachaniDatum').addEventListener('change', updatePrikazEventFieldValidation);
+  document.getElementById('prikazSpz').addEventListener('input', ()=>{ updatePrikazEventFieldValidation(); updatePrikazEventActionBtn(); });
+  document.getElementById('prikazSpachaniCas').addEventListener('input', ()=>{ updatePrikazEventFieldValidation(); updatePrikazEventActionBtn(); });
+  document.getElementById('prikazSpachaniDatum').addEventListener('change', ()=>{ updatePrikazEventFieldValidation(); updatePrikazEventActionBtn(); });
+  // Termín dostavení (jen u "Přidat událost" relevantní) — jakmile je
+  // kompletní, tlačítko přejde na finální "Potvrdit a uložit" (viz
+  // prikazEventTerminReady/updatePrikazEventActionBtn výš).
+  document.getElementById('prikazVyzvaDatum').addEventListener('change', updatePrikazEventActionBtn);
+  document.getElementById('prikazVyzvaCasOd').addEventListener('change', updatePrikazEventActionBtn);
+  document.getElementById('prikazVyzvaCasDo').addEventListener('change', updatePrikazEventActionBtn);
 
   document.getElementById('addEventBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.add('open');
@@ -8434,6 +8445,11 @@
   // true jen když appka dialog otevřela z "Přidat událost" (nový záznam
   // bez SPZ/data/času z terénu) — viz openPrikazModal a pickAddEventChoice.
   let prikazIsNewEvent = false;
+  // Stav vícestavového tlačítka u "Přidat událost" — 'mpm' (zkopírovat
+  // do MPM) -> 'paste' (vložit provozovatele ze schránky) -> 'confirm'
+  // (Potvrdit a uložit, jakmile je vyplněný termín dostavení). Viz
+  // updatePrikazEventActionBtn a jeho click handler níž.
+  let prikazEventBtnState = 'mpm';
 
   // U "Přidat událost" appka nedovolí uložit, dokud nejsou vyplněné RZ,
   // datum spáchání a čas spáchání — vrací seznam id chybějících polí
@@ -8454,6 +8470,36 @@
     document.getElementById('prikazSpachaniDatumField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpachaniDatum'));
     document.getElementById('prikazSpachaniCasField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpachaniCas'));
     return missing.length === 0;
+  }
+
+  // Termín dostavení (Dostavit se dne + Čas od + Čas do) appka bere jako
+  // signál, že je formulář hotový k finálnímu odeslání — jakmile je
+  // kompletní, vícestavové tlačítko natrvalo přejde na "Potvrdit
+  // a uložit" bez ohledu na to, v jaké fázi (MPM/Vložit) předtím bylo.
+  function prikazEventTerminReady(){
+    return !!(
+      document.getElementById('prikazVyzvaDatum').dataset.iso &&
+      document.getElementById('prikazVyzvaCasOd').value &&
+      document.getElementById('prikazVyzvaCasDo').value
+    );
+  }
+
+  function updatePrikazEventActionBtn(){
+    const btn = document.getElementById('prikazEventActionBtn');
+    if(!btn || !prikazIsNewEvent) return;
+    if(prikazEventTerminReady()) prikazEventBtnState = 'confirm';
+    btn.classList.remove('copied', 'copy-err', 'mpm-busy');
+    if(prikazEventBtnState === 'mpm'){
+      btn.textContent = 'MPM';
+      btn.disabled = !updatePrikazEventFieldValidation();
+    } else if(prikazEventBtnState === 'paste'){
+      btn.textContent = prikazEventPasted ? 'Vloženo ✓' : 'Vložit';
+      btn.disabled = false;
+      if(prikazEventPasted) btn.classList.add('copied');
+    } else {
+      btn.textContent = 'Potvrdit a uložit';
+      btn.disabled = false;
+    }
   }
 
   function openPrikazModal(mode, isNewEvent){
@@ -8534,6 +8580,13 @@
     note.style.color = '';
     note.textContent = '';
     document.getElementById('prikazOverlay').classList.add('open');
+    // U "Přidat událost" appka schová obyčejné "Potvrdit a uložit" a
+    // místo něj ukáže vícestavové tlačítko MPM -> Vložit -> Potvrdit
+    // a uložit (viz updatePrikazEventActionBtn níž).
+    document.getElementById('prikazConfirmBtn').style.display = prikazIsNewEvent ? 'none' : '';
+    document.getElementById('prikazEventActionBtn').style.display = prikazIsNewEvent ? '' : 'none';
+    prikazEventBtnState = 'mpm';
+    prikazEventPasted = false;
     // Automatické zaostření prvního pole appka dělá jen napoprvé (kdy
     // appka o pachateli ještě nic neví) — při editaci, kdy se pole
     // rovnou předvyplnila z předchozího řešení, appka radši nezaostřuje
@@ -8546,6 +8599,7 @@
       (prikazMode === 'prikaz' ? document.getElementById('prikazCastka') : document.getElementById('prikazJmeno')).focus();
     }
     updatePrikazEventFieldValidation();
+    updatePrikazEventActionBtn();
   }
 
   document.getElementById('prikazCancelBtn').addEventListener('click', ()=>{
@@ -9080,6 +9134,160 @@
     const name = prefix + ' ' + rrMmDd + (bits.length ? ' - ' + bits.join(' - ') : '');
     return name.replace(/[\\/:*?"<>|]/g, '') + '.docx';
   }
+
+  // Zda appka po kliknutí na "Vložit" už úspěšně naplnila pole ze
+  // schránky (drží se odděleně od prikazEventBtnState, aby appka mohla
+  // rozlišit "ještě nevloženo" od "vloženo" ve stejném stavu 'paste' —
+  // viz updatePrikazEventActionBtn).
+  let prikazEventPasted = false;
+
+  document.getElementById('prikazEventActionBtn').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record) return;
+    const btn = document.getElementById('prikazEventActionBtn');
+
+    if(prikazEventBtnState === 'mpm'){
+      const complete = updatePrikazEventFieldValidation();
+      if(!complete){
+        const missing = prikazEventMissingFields();
+        focusField(document.getElementById(missing[0]));
+        return;
+      }
+      btn.disabled = true;
+      btn.classList.add('mpm-busy');
+      btn.textContent = '...';
+      // Appka RZ/datum/čas uloží hned teď jako checkpoint (dřív se to
+      // dělo až při finálním "Potvrdit a uložit") — potřebuje je mít
+      // v record i pro samotný export do MPM (viz exportToMPManager).
+      const spz = document.getElementById('prikazSpz').value.trim().toUpperCase();
+      const spachaniDatumIso = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
+      const spachaniCas = document.getElementById('prikazSpachaniCas').value || '';
+      const eventUpdate = { plate: spz || null, date: spachaniDatumIso, time: spachaniCas };
+      try{
+        await db.collection('prestupky').doc(record.id).update(eventUpdate);
+        Object.assign(record, eventUpdate);
+      }catch(e){
+        console.error('Uložení RZ/data/času spáchání selhalo:', e);
+        alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
+        btn.classList.remove('mpm-busy');
+        updatePrikazEventActionBtn();
+        return;
+      }
+      const ok = await exportToMPManager(record);
+      btn.classList.remove('mpm-busy');
+      btn.disabled = false;
+      btn.textContent = ok ? 'Zkopírováno ✓' : 'Nezdařilo se';
+      btn.classList.add(ok ? 'copied' : 'copy-err');
+      if(ok){
+        setTimeout(()=>{
+          // Mezitím appka mohla už mít termín kompletní (viz
+          // updatePrikazEventActionBtn, který stav přepne na 'confirm'
+          // sám) — v tom případě appka tenhle přechod na 'paste' přeskočí.
+          if(prikazEventBtnState === 'mpm') prikazEventBtnState = 'paste';
+          updatePrikazEventActionBtn();
+        }, 5000);
+      }
+    } else if(prikazEventBtnState === 'paste'){
+      btn.disabled = true;
+      btn.classList.add('mpm-busy');
+      btn.textContent = '...';
+      try{
+        const text = await navigator.clipboard.readText();
+        btn.classList.remove('mpm-busy');
+        btn.disabled = false;
+        if(text && text.trim()){
+          applyProvozovatelText(text);
+          prikazEventPasted = true;
+          btn.textContent = 'Vloženo ✓';
+          btn.classList.add('copied');
+        } else {
+          btn.textContent = 'Schránka je prázdná';
+          btn.classList.add('copy-err');
+          setTimeout(updatePrikazEventActionBtn, 2500);
+        }
+      }catch(e){
+        console.error('Čtení schránky selhalo:', e);
+        btn.classList.remove('mpm-busy');
+        btn.disabled = false;
+        btn.textContent = 'Nezdařilo se — zkus vložit ručně';
+        btn.classList.add('copy-err');
+        setTimeout(updatePrikazEventActionBtn, 3000);
+      }
+    } else {
+      // 'confirm' — appka teď (na rozdíl od dřívějšího jen-uložit
+      // mezikroku) rovnou vygeneruje Výzvu a označí záznam jako
+      // dořešený, stejně jako běžný tok u existujících záznamů.
+      const jmeno = document.getElementById('prikazJmeno').value.trim();
+      const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
+      const narozeni = document.getElementById('prikazNarozeni').value.trim();
+      const doklad = document.getElementById('prikazDoklad').value.trim();
+      const mestoObec = document.getElementById('prikazMesto').value.trim();
+      const psc = document.getElementById('prikazPsc').value.trim();
+      const mesto = [psc, mestoObec].filter(Boolean).join(', ');
+      const ulice = document.getElementById('prikazUlice').value.trim();
+      const cisloDomu = document.getElementById('prikazCisloDomu').value.trim();
+      const pachatel = (jmeno || prijmeni || narozeni || doklad || mesto) ? {
+        jmeno: jmeno || null,
+        prijmeni: prijmeni || null,
+        datumNarozeni: narozeni || null,
+        cisloDokladu: doklad || null,
+        mesto: mesto || null,
+        ulice: ulice || null,
+        cisloDomu: cisloDomu || null
+      } : null;
+
+      btn.disabled = true;
+      btn.textContent = 'Ukládám…';
+      try{
+        if(pachatel){
+          await db.collection('prestupky').doc(record.id).update({ pachatel });
+          record.pachatel = pachatel;
+        }
+        if(prikazNewEventFiles.length){
+          const existingDoc = await db.collection('prestupky').doc(record.id).collection('data').doc('photos').get();
+          const existing = existingDoc.exists ? existingDoc.data() : null;
+          const existingPhotos = (existing && existing.photos) || [];
+          const existingMime = (existing && existing.photoMime) || 'image/jpeg';
+          const existingMimes = (existing && existing.photoMimes) || existingPhotos.map(() => existingMime);
+          const newPhotos = existingPhotos.concat(prikazNewEventFiles.map(f => f.data));
+          const newMimes = existingMimes.concat(prikazNewEventFiles.map(f => f.mime));
+          const totalBytes = newPhotos.reduce((sum, p) => sum + p.length, 0);
+          if(totalBytes > 950000){
+            alert('Přiložené soubory jsou bohužel příliš velké pro uložení (limit Firestore ~1 MB dohromady). Zkus některý odebrat.');
+            btn.disabled = false;
+            updatePrikazEventActionBtn();
+            return;
+          }
+          await db.collection('prestupky').doc(record.id).collection('data').doc('photos').set({
+            photos: newPhotos, photoMimes: newMimes, photoMime: newMimes[0] || 'image/jpeg'
+          });
+          await db.collection('prestupky').doc(record.id).update({ hasPhotos: true });
+          record.hasPhotos = true;
+          record._resolvedPhotos = newPhotos;
+          record._resolvedMimes = newMimes;
+          record._resolvedMime = newMimes[0] || 'image/jpeg';
+          prikazNewEventFiles = [];
+        }
+        const vyzvaDatumRaw = document.getElementById('prikazVyzvaDatum').dataset.iso || '';
+        const dostaveniTermin = vyzvaDatumRaw ? {
+          datum: formatDateCz(vyzvaDatumRaw),
+          casOd: document.getElementById('prikazVyzvaCasOd').value || null,
+          casDo: document.getElementById('prikazVyzvaCasDo').value || null
+        } : null;
+        const filename = buildDocFilename('Výzva', record, pachatel);
+        document.getElementById('prikazOverlay').classList.remove('open');
+        const opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
+        if(opened) await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
+      }catch(e){
+        console.error('Uložení Výzvy selhalo:', e);
+        alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
+        document.getElementById('prikazOverlay').classList.add('open');
+      }finally{
+        btn.disabled = false;
+        btn.textContent = 'Potvrdit a uložit';
+      }
+    }
+  });
 
   document.getElementById('prikazConfirmBtn').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
