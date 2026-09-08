@@ -903,6 +903,10 @@
           <span class="cam-icon">📷</span> Skenovat OP
         </button>
       </div>
+      <div class="field" id="prikazPasteField">
+        <label for="prikazPaste">Vlož provozovatele</label>
+        <input type="text" id="prikazPaste" autocomplete="off" placeholder="vlož zkopírovaný text z lustrace (příjmení jméno, datum narození, adresa)">
+      </div>
       <div class="prikaz-row2">
         <div class="field prikaz-suggest-wrap">
           <label for="prikazJmeno">Jméno</label>
@@ -8884,6 +8888,92 @@
   }
   capitalizeFirstLetterLive(document.getElementById('prikazJmeno'));
   capitalizeFirstLetterLive(document.getElementById('prikazPrijmeni'));
+
+  // "Vlož provozovatele" — appka rozparsuje text zkopírovaný z lustrace
+  // (typicky výpis provozovatele vozidla) ve tvaru:
+  // "PŘÍJMENÍ JMÉNO, datum narození: DD.MM.RRRR, Ulice číslo/číslo, PSČ Obec"
+  // (ověřeno na reálném příkladu z appky). Appka je schválně shovívavá —
+  // pořadí polí za čárkami hledá vzorem, ne pevnou pozicí, ale pokud text
+  // vůbec neodpovídá téhle základní kostře (jméno+příjmení na začátku,
+  // čárkami oddělené díly), příslušné pole prostě zůstane nevyplněné bez
+  // chybové hlášky — strážník si zbytek dopíše ručně, appka ho nezdržuje.
+  function parseProvozovatelText(raw){
+    const result = {};
+    const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if(parts.length === 0) return result;
+
+    // Příjmení a jméno — appka čeká "PŘÍJMENÍ JMÉNO" (příjmení první,
+    // stejně jako appka i jinde předpokládá u textu z OP — viz toNameCase).
+    const nameTokens = parts[0].split(/\s+/).filter(Boolean);
+    if(nameTokens.length >= 2){
+      result.prijmeni = toNameCase(nameTokens[0]);
+      result.jmeno = toNameCase(nameTokens.slice(1).join(' '));
+    } else if(nameTokens.length === 1){
+      result.prijmeni = toNameCase(nameTokens[0]);
+    }
+
+    // Datum narození — appka ho hledá kdekoliv v textu (ne v konkrétním
+    // dílu za čárkou), ať appka nezávisí na přesném pořadí zbytku.
+    const dateMatch = raw.match(/datum narozen[íi]:?\s*(\d{1,2})\.(\d{1,2})\.(\d{4})/i);
+    if(dateMatch){
+      const [, d, m, y] = dateMatch;
+      result.narozeniIso = y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
+    }
+
+    // Ulice + číslo popisné/orientační — díl, co končí číslem (případně
+    // číslo/číslo), a zjevně to není datum narození.
+    const streetPart = parts.find(p => /^\D.*\s\d+(?:\/\d+)?$/.test(p) && !/datum narozen/i.test(p));
+    if(streetPart){
+      const sm = streetPart.match(/^(.+?)\s+(\d+(?:\/\d+)?)$/);
+      if(sm){
+        result.ulice = sm[1].trim();
+        result.cisloDomu = sm[2].trim();
+      }
+    }
+
+    // PSČ + obec — díl začínající pěti číslicemi.
+    const pscPart = parts.find(p => /^\d{5}\s+\S/.test(p));
+    if(pscPart){
+      const pm = pscPart.match(/^(\d{5})\s+(.+)$/);
+      if(pm){
+        result.psc = pm[1];
+        result.obec = pm[2].trim();
+      }
+    }
+    return result;
+  }
+
+  function applyProvozovatelText(raw){
+    const p = parseProvozovatelText(raw);
+    if(p.prijmeni) prikazPrijmeniInput.value = p.prijmeni;
+    if(p.jmeno) prikazJmenoInput.value = p.jmeno;
+    if(p.narozeniIso){
+      prikazNarozeniInput.dataset.iso = p.narozeniIso;
+      prikazNarozeniInput.value = isoToDotted(p.narozeniIso);
+    }
+    if(p.obec){
+      // Appka obec nastaví rovnou bez čekání na Mapy.com Suggest — text
+      // z lustrace je (na rozdíl od ručního psaní) už hotový a ověřený,
+      // netřeba ho appce nechávat znovu hledat. selectedMesto appka
+      // nastaví ručně (position appka nemá, není potřeba — používá se
+      // jen pro dohledání PSČ, které appka má rovnou z textu), ať
+      // checkStreetsAndAdvance() odemkne pole Ulice.
+      prikazMestoInput.value = p.obec;
+      selectedMesto = { name: p.obec, position: null };
+      checkStreetsAndAdvance();
+    }
+    if(p.psc) prikazPscInput.value = p.psc;
+    if(p.ulice) prikazUliceInput.value = p.ulice;
+    if(p.cisloDomu) prikazCisloDomuInput.value = p.cisloDomu;
+  }
+
+  document.getElementById('prikazPaste').addEventListener('paste', (e)=>{
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    if(!text || !text.trim()) return;
+    e.preventDefault();
+    applyProvozovatelText(text);
+    e.target.value = '';
+  });
 
   function parseOpFront(rawText){
     console.log('OP OCR raw text:', rawText); // pro ladění při špatném rozpoznání — viz DevTools konzole
