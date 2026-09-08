@@ -644,6 +644,9 @@
     padding:10px; box-shadow:0 10px 26px rgba(0,0,0,.45);
   }
   .prikaz-datepicker-panel.open{display:block;}
+  /* Když appka pod polem nemá dost místa (viz initDatePicker/open níž),
+     otevře kalendář místo dolů nahoru nad pole. */
+  .prikaz-datepicker-panel.upward{top:auto; bottom:100%; margin-top:0; margin-bottom:6px;}
   .prikaz-datepicker-head{display:flex; gap:6px; margin-bottom:8px;}
   .prikaz-datepicker-head select{
     flex:1; min-width:0; background:var(--asphalt-2); border:1px solid var(--line); border-radius:8px;
@@ -7269,6 +7272,11 @@
   // uměla obrázek od PDF rozlišit — viz renderPhotoGallery) do stejné
   // podkolekce data/photos, jakou appka používá i pro fotky z terénu.
   let prikazNewEventFiles = [];
+  // Počítadlo souborů, které appka právě čte (FileReader/PDF extrakce
+  // běží asynchronně) — "Potvrdit a uložit" na něj čeká, ať neuloží
+  // záznam dřív, než appka vůbec stihne přiložený soubor zpracovat (viz
+  // konec click handleru prikazEventActionBtn).
+  let prikazFileReadBusy = 0;
 
   function fileToBase64(file){
     return new Promise((resolve, reject)=>{
@@ -7337,34 +7345,39 @@
     const note = document.getElementById('prikazAddDocsNote');
     note.style.display = 'none';
     for(const file of files){
+      prikazFileReadBusy++;
       try{
-        const data = await fileToBase64(file);
-        prikazNewEventFiles.push({ data, mime: file.type || 'application/octet-stream', name: file.name });
-      }catch(err){
-        console.error('Načtení souboru selhalo:', file.name, err);
-        continue;
-      }
-      // Appka datum/čas z PDF doplní jen do prázdných polí — ruční zadání
-      // (nebo dřívější PDF ve stejném dávkovém výběru) appka nepřepisuje.
-      if(file.type === 'application/pdf'){
-        const datumEl = document.getElementById('prikazSpachaniDatum');
-        const casEl = document.getElementById('prikazSpachaniCas');
-        if(!datumEl.dataset.iso && !casEl.value){
-          try{
-            const found = await extractDatumCasFromPdf(file);
-            if(found){
-              datumEl._setDatePickerIso(found.iso);
-              casEl.value = found.time;
-              note.textContent = '✓ Datum a čas přestupku vyplněny z PDF (' + file.name + ')';
-              note.style.color = '';
-              note.style.display = 'block';
-              updatePrikazEventFieldValidation();
-              updatePrikazEventActionBtn();
+        try{
+          const data = await fileToBase64(file);
+          prikazNewEventFiles.push({ data, mime: file.type || 'application/octet-stream', name: file.name });
+        }catch(err){
+          console.error('Načtení souboru selhalo:', file.name, err);
+          continue;
+        }
+        // Appka datum/čas z PDF doplní jen do prázdných polí — ruční zadání
+        // (nebo dřívější PDF ve stejném dávkovém výběru) appka nepřepisuje.
+        if(file.type === 'application/pdf'){
+          const datumEl = document.getElementById('prikazSpachaniDatum');
+          const casEl = document.getElementById('prikazSpachaniCas');
+          if(!datumEl.dataset.iso && !casEl.value){
+            try{
+              const found = await extractDatumCasFromPdf(file);
+              if(found){
+                datumEl._setDatePickerIso(found.iso);
+                casEl.value = found.time;
+                note.textContent = '✓ Datum a čas přestupku vyplněny z PDF (' + file.name + ')';
+                note.style.color = '';
+                note.style.display = 'block';
+                updatePrikazEventFieldValidation();
+                updatePrikazEventActionBtn();
+              }
+            }catch(err){
+              console.error('Čtení data/času z PDF selhalo:', file.name, err);
             }
-          }catch(err){
-            console.error('Čtení data/času z PDF selhalo:', file.name, err);
           }
         }
+      }finally{
+        prikazFileReadBusy--;
       }
     }
     updatePrikazAddDocsLabel();
@@ -8797,6 +8810,12 @@
       viewYear = base ? base[0] : (opts.defaultYear || today.getFullYear());
       viewMonth = base ? base[1] - 1 : today.getMonth();
       render();
+      // Appka kalendář radši otevře nahoru, když by se dole (typicky
+      // u polí blízko spodku dlouhého dialogu, např. "Dostavit se dne")
+      // celý nevešel na obrazovku — 320px je bezpečný odhad výšky
+      // celého panelu (hlavička + mřížka dnů + patička).
+      const spaceBelow = window.innerHeight - input.getBoundingClientRect().bottom;
+      panel.classList.toggle('upward', spaceBelow < 320);
       panel.classList.add('open');
       setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
     }
@@ -9217,6 +9236,35 @@
       // 'confirm' — appka teď (na rozdíl od dřívějšího jen-uložit
       // mezikroku) rovnou vygeneruje Výzvu a označí záznam jako
       // dořešený, stejně jako běžný tok u existujících záznamů.
+      //
+      // Kdyby appka právě dočítala nějaký přiložený soubor (viz
+      // prikazFileReadBusy), počká na to — jinak by se mohlo stát, že
+      // appka uloží záznam dřív, než čtení souboru vůbec doběhne, a
+      // příloha by se ztratila.
+      if(prikazFileReadBusy > 0){
+        btn.disabled = true;
+        btn.textContent = 'Dokončuji načtení přílohy…';
+        await new Promise(resolve => {
+          const check = () => prikazFileReadBusy > 0 ? setTimeout(check, 100) : resolve();
+          check();
+        });
+      }
+      //
+      // RZ/datum/čas appka zapíše VŽDYCKY tady znovu, ne jen spoléhá na
+      // to, že proběhl krok "MPM" (ten to taky ukládá, ale appka se tam
+      // nemusí vůbec dostat — když termín dostavení appka vyplní dřív,
+      // než klikneš na MPM, tlačítko naskočí rovnou na "Potvrdit
+      // a uložit" a MPM krok appka přeskočí úplně; bez tohohle by pak RZ
+      // v dokumentu zůstalo prázdné).
+      const spzNow = document.getElementById('prikazSpz').value.trim().toUpperCase();
+      const spachaniDatumIsoNow = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
+      const spachaniCasNow = document.getElementById('prikazSpachaniCas').value || '';
+      Object.assign(record, {
+        plate: spzNow || null,
+        date: spachaniDatumIsoNow || record.date,
+        time: spachaniCasNow || record.time
+      });
+
       const jmeno = document.getElementById('prikazJmeno').value.trim();
       const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
       const narozeni = document.getElementById('prikazNarozeni').value.trim();
@@ -9239,6 +9287,9 @@
       btn.disabled = true;
       btn.textContent = 'Ukládám…';
       try{
+        await db.collection('prestupky').doc(record.id).update({
+          plate: record.plate, date: record.date, time: record.time
+        });
         if(pachatel){
           await db.collection('prestupky').doc(record.id).update({ pachatel });
           record.pachatel = pachatel;
