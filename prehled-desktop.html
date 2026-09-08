@@ -1032,6 +1032,18 @@
             <input type="text" id="prikazIco" inputmode="numeric" autocomplete="off">
           </div>
         </div>
+        <div class="prikaz-row2">
+          <div class="field">
+            <label for="prikazDatovaSchranka">Datová schránka (ID)</label>
+            <input type="text" id="prikazDatovaSchranka" autocomplete="off" placeholder="např. 7dpncbw">
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button type="button" class="prikaz-scan-btn" id="prikazDsLookupBtn" style="width:100%; justify-content:center;">
+              <span class="cam-icon">🔍</span> Vyhledat DS
+            </button>
+          </div>
+        </div>
       </div>
       <div class="prikaz-row-address">
         <div class="field prikaz-suggest-wrap prikaz-street-field">
@@ -5509,9 +5521,26 @@
     // jako placeholder k ručnímu dopsání.
     const pachatelJmeno = pachatel ? [pachatel.jmeno, pachatel.prijmeni].filter(Boolean).join(' ') : '';
     const pachatelUlice = pachatelBydlisteRadek1(pachatel);
+    // Firmu appka pozná podle vyplněného pole "firma" (viz
+    // setPrikazProvozovatelMode) — hlavička dopisu pak místo
+    // jméno/příjmení + datum narození dává IČO + název firmy, a navíc
+    // (jen u firmy) přidává poslední řádek s ID datové schránky, pokud
+    // ho appka má (viz "Vyhledat DS" tlačítko u pole IČO — appka ho
+    // zatím neumí dohledat sama, jen usnadní ruční vyhledání).
+    const isFirmaPachatel = !!(pachatel && pachatel.firma);
     // PSČ + obec vedle sebe (appka posílá "PSČ obec" tak, jak ho vybral
     // z Mapy.com Suggest — pachatel.mesto tak už tenhle formát má).
-    const headerLeft = [
+    const headerLeft = isFirmaPachatel ? [
+      (pachatel.ico) || '[DOPLNIT IČO]',
+      '',
+      pachatel.firma || '[DOPLNIT NÁZEV FIRMY]',
+      '',
+      pachatelUlice || '[DOPLNIT ULICE A ČP]',
+      '',
+      pachatel.mesto || '[DOPLNIT PSČ A OBEC]',
+      '',
+      pachatel.datovaSchranka ? ('ID DS: ' + pachatel.datovaSchranka) : '[DOPLNIT ID DATOVÉ SCHRÁNKY]'
+    ] : [
       pachatelJmeno || '[DOPLNIT JMÉNO A PŘÍJMENÍ]',
       '',
       (pachatel && pachatel.datumNarozeni) || '[DOPLNIT DATUM NAROZENÍ]',
@@ -5558,9 +5587,14 @@
     // nepovinné, appka je do věty přidá, jen když jsou vyplněné.
     const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
     const vehicleBoldPart = (vehicleBits ? (vehicleBits + ', ') : '') + 'RZ ' + (record.plate || '');
-    let vyzvaRuns = docxRun('Žádáme Vás, abyste se dostavil(a) dne ', { size: 20 }) +
+    // Věta záměrně žádá o dostavení "řidiče níže uvedeného vozidla", ne
+    // přímo adresáta dopisu ("Vás") — adresát (provozovatel, appka mu
+    // dopis posílá) totiž nemusí být totožný s řidičem, kterého appka
+    // hledá (proto "dosud neustanovený řidič" dál ve větě); appka ho
+    // jen žádá, ať dotyčného řidiče na uvedený termín zajistí/pošle.
+    let vyzvaRuns = docxRun('Žádáme Vás, aby se dne ', { size: 20 }) +
       docxRun(dostaveniDatumCasText, { size: 20, bold: true }) +
-      docxRun(' na Městskou policii Blansko, Sadová č. 2, k podání vysvětlení podle § 11 odst. 1 zákona č. 553/1991 Sb., ' +
+      docxRun(' dostavil na Městskou policii Blansko, Sadová č. 2, řidič níže uvedeného vozidla k podání vysvětlení podle § 11 odst. 1 zákona č. 553/1991 Sb., ' +
         'o obecní policii, ve znění pozdějších předpisů, ve věci objasnění skutečností důležitých pro odhalení pachatele ' +
         'přestupku podle ' + skutekBaseCite + ', kterého se dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') +
         ' hodin dopustil dosud neustanovený řidič vozidla ', { size: 20 }) +
@@ -8716,6 +8750,7 @@
     setPrikazProvozovatelMode(p && p.firma ? 'firma' : 'osoba');
     document.getElementById('prikazFirma').value = (p && p.firma) || '';
     document.getElementById('prikazIco').value = (p && p.ico) || '';
+    document.getElementById('prikazDatovaSchranka').value = (p && p.datovaSchranka) || '';
     document.getElementById('prikazJmeno').value = (p && p.jmeno) || '';
     document.getElementById('prikazPrijmeni').value = (p && p.prijmeni) || '';
     document.getElementById('prikazNarozeni')._setDatePickerIso(p && p.datumNarozeni ? dottedToIso(p.datumNarozeni) : '');
@@ -9499,7 +9534,7 @@
     const bits = [];
     if(record.noticeNumber) bits.push(record.noticeNumber);
     if(record.plate) bits.push(record.plate);
-    if(pachatel && pachatel.prijmeni) bits.push(pachatel.prijmeni);
+    if(pachatel && (pachatel.prijmeni || pachatel.firma)) bits.push(pachatel.prijmeni || pachatel.firma);
     const name = prefix + ' ' + rrMmDd + (bits.length ? ' - ' + bits.join(' - ') : '');
     return name.replace(/[\\/:*?"<>|]/g, '') + '.docx';
   }
@@ -9649,6 +9684,7 @@
       // dokladu není.
       const firma = document.getElementById('prikazFirma').value.trim();
       const ico = document.getElementById('prikazIco').value.trim();
+      const datovaSchranka = document.getElementById('prikazDatovaSchranka').value.trim();
       const mestoObec = document.getElementById('prikazMesto').value.trim();
       const psc = document.getElementById('prikazPsc').value.trim();
       const mesto = [psc, mestoObec].filter(Boolean).join(', ');
@@ -9661,6 +9697,7 @@
         cisloDokladu: null,
         firma: firma || null,
         ico: ico || null,
+        datovaSchranka: datovaSchranka || null,
         mesto: mesto || null,
         ulice: ulice || null,
         cisloDomu: cisloDomu || null
@@ -9765,6 +9802,7 @@
     const doklad = document.getElementById('prikazDoklad').value.trim();
     const firma = document.getElementById('prikazFirma').value.trim();
     const ico = document.getElementById('prikazIco').value.trim();
+    const datovaSchranka = document.getElementById('prikazDatovaSchranka').value.trim();
     const mestoObec = document.getElementById('prikazMesto').value.trim();
     const psc = document.getElementById('prikazPsc').value.trim();
     const mesto = [psc, mestoObec].filter(Boolean).join(', ');
@@ -9777,6 +9815,7 @@
       cisloDokladu: doklad || null,
       firma: firma || null,
       ico: ico || null,
+      datovaSchranka: datovaSchranka || null,
       mesto: mesto || null,
       ulice: ulice || null,
       cisloDomu: cisloDomu || null
@@ -10165,6 +10204,28 @@
     e.preventDefault();
     applyProvozovatelText(text);
     e.target.value = '';
+  });
+
+  // "Vyhledat DS" — appka NEUMÍ (zatím) dohledat ID datové schránky
+  // automaticky, protože veřejný Seznam držitelů datových schránek
+  // (www.datovka.gov.cz/sds/) je jen webová appka pro lidi, ne veřejné
+  // JSON API, které by appka mohla zavolat rovnou z prohlížeče (appka
+  // nemá ověřené, že by to šlo bez CORS problémů). Appka proto radši
+  // udělá to samé, co appka dělá jinde (viz mpm-bookmarklet.js) —
+  // zkopíruje IČO do schránky a otevře veřejný seznam v nové záložce,
+  // ať strážník IČO jen vloží (Ctrl+V) do vyhledávacího pole a nalezené
+  // ID schránky přenese zpátky sem ručně.
+  document.getElementById('prikazDsLookupBtn').addEventListener('click', async ()=>{
+    const ico = document.getElementById('prikazIco').value.trim();
+    if(!ico){
+      alert('Nejdřív vyplň IČO — appka ho zkopíruje do schránky, ať ho můžeš rovnou vložit do vyhledávání.');
+      document.getElementById('prikazIco').focus();
+      return;
+    }
+    try{
+      await navigator.clipboard.writeText(ico);
+    }catch(e){ /* appka kopírování bere jen jako pohodlí navíc, bez něj appka pokračuje dál */ }
+    window.open('https://www.datovka.gov.cz/sds/', '_blank');
   });
 
   function parseOpFront(rawText){
