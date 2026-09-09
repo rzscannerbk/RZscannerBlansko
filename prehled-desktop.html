@@ -9572,7 +9572,14 @@
     if(!selectedMesto || prikazUliceInput.disabled) return;
     const q = prikazUliceInput.value.trim();
     if(q.length < 2){ prikazUliceList.classList.remove('open'); return; }
-    const { items, error } = await mapySuggest(q, ['regional.street'], { locality: selectedMesto.name, limit: 8 });
+    // Appka do pole Ulice hledá i "regional.municipality_part" (místní
+    // části typu Blansko-Olešná, Blansko-Klepačov apod.), ne jen
+    // "regional.street" — u téhle skupiny obcí appka adresu nepíše jako
+    // ulici, ale jako "<místní část> <č.p.>" (stejný tvar appka pak
+    // skládá i do dokumentu, viz pachatelBydlisteRadek1), takže appka
+    // je sem chce nabízet stejně jako ulice, ať appka nemusí spoléhat
+    // na to, že strážník název přesně vyklepe sám.
+    const { items, error } = await mapySuggest(q, ['regional.street', 'regional.municipality_part'], { locality: selectedMesto.name, limit: 8 });
     renderSuggestList(prikazUliceList, items, (item)=>{
       prikazUliceInput.value = item.name;
       focusField(prikazCisloDomuInput);
