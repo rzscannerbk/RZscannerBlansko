@@ -8698,6 +8698,16 @@
     return missing.length === 0;
   }
 
+  // Vícestavové tlačítko MPM -> Vložit -> Potvrdit a uložit appka
+  // používá jak u "Přidat událost", tak (nově) u Výzvy na běžném
+  // terénním záznamu — appka tam totiž typicky taky řeší dosud
+  // neustanoveného řidiče/provozovatele přes lustraci, stejně jako
+  // u nové události. U ostatních způsobů (Příkaz/Domluva/Oznámení na
+  // existujícím záznamu) appka nechává obyčejné "Potvrdit a uložit".
+  function prikazUsesEventActionBtn(){
+    return prikazIsNewEvent || prikazMode === 'vyzva';
+  }
+
   // Termín dostavení (Dostavit se dne + Čas od + Čas do) appka bere jako
   // signál, že je formulář hotový k finálnímu odeslání — jakmile je
   // kompletní, vícestavové tlačítko natrvalo přejde na "Potvrdit
@@ -8712,7 +8722,7 @@
 
   function updatePrikazEventActionBtn(){
     const btn = document.getElementById('prikazEventActionBtn');
-    if(!btn || !prikazIsNewEvent) return;
+    if(!btn || !prikazUsesEventActionBtn()) return;
     if(prikazEventTerminReady()) prikazEventBtnState = 'confirm';
     btn.classList.remove('copied', 'copy-err', 'mpm-busy');
     if(prikazEventBtnState === 'mpm'){
@@ -8815,36 +8825,36 @@
     // U "Přidat událost" appka schová obyčejné "Potvrdit a uložit" a
     // místo něj ukáže vícestavové tlačítko MPM -> Vložit -> Potvrdit
     // a uložit (viz updatePrikazEventActionBtn níž).
-    document.getElementById('prikazConfirmBtn').style.display = prikazIsNewEvent ? 'none' : '';
-    document.getElementById('prikazEventActionBtn').style.display = prikazIsNewEvent ? '' : 'none';
-    // "Vlož provozovatele" appka schovává u "Přidat událost" (tuhle roli
-    // tam plní tlačítko "Vložit", viz prikazEventActionBtn), a teď nově
-    // i u Příkazu na místě a Domluvy na běžném terénním záznamu — tam
-    // strážník řeší přímo přítomného přestupce (doklad má v ruce), takže
-    // appka žádné kopírování z lustrace nepotřebuje. U Výzvy a Oznámení
-    // pole appka nechává — tam appka typicky řeší dosud neustanoveného
-    // řidiče/provozovatele zjištěného přes lustraci vozidla.
-    // Popisek appka mění na "PROVOZOVATEL" jen u nové události — u
-    // běžného Příkazu/Oznámení appka řeší přímo přítomného pachatele, ne
-    // (nutně) provozovatele vozidla.
-    const showPasteField = !prikazIsNewEvent && (prikazMode === 'vyzva' || prikazMode === 'oznameni');
+    document.getElementById('prikazConfirmBtn').style.display = prikazUsesEventActionBtn() ? 'none' : '';
+    document.getElementById('prikazEventActionBtn').style.display = prikazUsesEventActionBtn() ? '' : 'none';
+    // "Vlož provozovatele" appka schovává u "Přidat událost" i u Výzvy
+    // na běžném záznamu (tuhle roli tam plní tlačítko "Vložit", viz
+    // prikazEventActionBtn — čte schránku rovnou, bez ručního vkládání
+    // do pole), a taky u Příkazu na místě a Domluvy — tam strážník řeší
+    // přímo přítomného přestupce (doklad má v ruce), takže appka žádné
+    // kopírování z lustrace nepotřebuje. U Oznámení appka pole zatím
+    // nechává — appka tam řeší dosud neustanoveného řidiče/provozovatele
+    // stejně jako u Výzvy, ale appka tam vícestavové tlačítko zatím
+    // nezavedla.
+    const showPasteField = !prikazUsesEventActionBtn() && prikazMode === 'oznameni';
     document.getElementById('prikazPasteField').style.display = showPasteField ? '' : 'none';
-    document.getElementById('prikazPachatelLabel').textContent = prikazIsNewEvent ? 'PROVOZOVATEL' : 'PACHATEL';
+    document.getElementById('prikazPachatelLabel').textContent = prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL';
     // U "Přidat událost" appka celý blok PROVOZOVATEL (jméno/firma,
     // adresa, dostavit se dne) schová, dokud se strážník nevrátí z MP
     // Manageru a nevloží údaje tlačítkem "Vložit" — do té doby appka
     // nemá co zobrazovat a prázdná pole by jen zabírala místo (viz
-    // applyProvozovatelText, které blok zase odkryje). U běžného
-    // Příkazu/Oznámení/Výzvy appka blok nechává vidět pořád, appka tam
-    // žádné "Vložit" nemá.
-    document.getElementById('prikazProvozovatelWrap').style.display = prikazIsNewEvent ? 'none' : '';
-    // U "Přidat událost" appka pole "Číslo dokladu" (appka tam OP
-    // fyzicky neskenuje, takže ho stejně nevyužije) přemapuje na "Číslo
-    // jednací" — appka do něj vloží číslo z MPM (viz applyProvozovatelText)
-    // a strážník ho odtud může i ručně opravit/dopsat. U běžného
-    // Příkazu/Oznámení/Výzvy na existujícím záznamu (appka tam OP
-    // skenuje doopravdy) zůstává pole jako "Číslo dokladu".
-    document.getElementById('prikazDokladLabel').textContent = prikazIsNewEvent ? 'Číslo jednací' : 'Číslo dokladu';
+    // applyProvozovatelText, které blok zase odkryje). Stejně appka
+    // postupuje teď i u Výzvy na běžném záznamu. U Příkazu/Oznámení/
+    // Domluvy appka blok nechává vidět pořád, appka tam žádné "Vložit"
+    // nemá.
+    document.getElementById('prikazProvozovatelWrap').style.display = prikazUsesEventActionBtn() ? 'none' : '';
+    // U "Přidat událost" i (nově) u Výzvy na běžném záznamu appka pole
+    // "Číslo dokladu" (appka tam OP fyzicky neskenuje, takže ho stejně
+    // nevyužije) přemapuje na "Číslo jednací" — appka do něj vloží číslo
+    // z MPM (viz applyProvozovatelText) a strážník ho odtud může i ručně
+    // opravit/dopsat. U Příkazu/Oznámení/Domluvy (appka tam OP skenuje
+    // doopravdy) zůstává pole jako "Číslo dokladu".
+    document.getElementById('prikazDokladLabel').textContent = prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu';
     prikazEventBtnState = 'mpm';
     prikazEventPasted = false;
     prikazMpmCisloJednaci = null;
@@ -9611,25 +9621,29 @@
       btn.disabled = true;
       btn.classList.add('mpm-busy');
       btn.textContent = '...';
-      // Appka RZ/datum/čas (a případně značku/barvu, pokud jsou
-      // vyplněné) uloží hned teď jako checkpoint (dřív se to dělo až při
-      // finálním "Potvrdit a uložit") — potřebuje je mít v record i pro
-      // samotný export do MPM (viz exportToMPManager).
-      const spz = document.getElementById('prikazSpz').value.trim().toUpperCase();
-      const spachaniDatumIso = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
-      const spachaniCas = document.getElementById('prikazSpachaniCas').value || '';
-      const brand = document.getElementById('prikazBrand').value.trim();
-      const color = document.getElementById('prikazColor').value.trim();
-      const eventUpdate = { plate: spz || null, date: spachaniDatumIso, time: spachaniCas, brand: brand || null, color: color || null };
-      try{
-        await db.collection('prestupky').doc(record.id).update(eventUpdate);
-        Object.assign(record, eventUpdate);
-      }catch(e){
-        console.error('Uložení RZ/data/času spáchání selhalo:', e);
-        alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
-        btn.classList.remove('mpm-busy');
-        updatePrikazEventActionBtn();
-        return;
+      // RZ/datum/čas (a případně značku/barvu) appka přepisuje jen
+      // u "Přidat událost" — appka je tam bere z polí v dialogu, protože
+      // appka je jinde nemá. U Výzvy na běžném terénním záznamu appka
+      // tahle data už dávno má z appky index.html (pole appka tady ani
+      // nezobrazuje, viz prikazEventFieldsWrap) — appka je nechává být
+      // a rovnou exportuje, co record už má.
+      if(prikazIsNewEvent){
+        const spz = document.getElementById('prikazSpz').value.trim().toUpperCase();
+        const spachaniDatumIso = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
+        const spachaniCas = document.getElementById('prikazSpachaniCas').value || '';
+        const brand = document.getElementById('prikazBrand').value.trim();
+        const color = document.getElementById('prikazColor').value.trim();
+        const eventUpdate = { plate: spz || null, date: spachaniDatumIso, time: spachaniCas, brand: brand || null, color: color || null };
+        try{
+          await db.collection('prestupky').doc(record.id).update(eventUpdate);
+          Object.assign(record, eventUpdate);
+        }catch(e){
+          console.error('Uložení RZ/data/času spáchání selhalo:', e);
+          alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
+          btn.classList.remove('mpm-busy');
+          updatePrikazEventActionBtn();
+          return;
+        }
       }
       const ok = await exportToMPManager(record);
       btn.classList.remove('mpm-busy');
@@ -9709,31 +9723,38 @@
         });
       }
       //
-      // RZ/datum/čas appka zapíše VŽDYCKY tady znovu, ne jen spoléhá na
-      // to, že proběhl krok "MPM" (ten to taky ukládá, ale appka se tam
-      // nemusí vůbec dostat — když termín dostavení appka vyplní dřív,
-      // než klikneš na MPM, tlačítko naskočí rovnou na "Potvrdit
-      // a uložit" a MPM krok appka přeskočí úplně; bez tohohle by pak RZ
-      // v dokumentu zůstalo prázdné).
-      const spzNow = document.getElementById('prikazSpz').value.trim().toUpperCase();
-      const spachaniDatumIsoNow = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
-      const spachaniCasNow = document.getElementById('prikazSpachaniCas').value || '';
-      const brandNow = document.getElementById('prikazBrand').value.trim();
-      const colorNow = document.getElementById('prikazColor').value.trim();
+      // RZ/datum/čas appka přepisuje jen u "Přidat událost" — appka je
+      // tam zapisuje VŽDYCKY tady znovu, ne jen spoléhá na to, že
+      // proběhl krok "MPM" (ten to taky ukládá, ale appka se tam nemusí
+      // vůbec dostat — když termín dostavení appka vyplní dřív, než
+      // klikneš na MPM, tlačítko naskočí rovnou na "Potvrdit a uložit"
+      // a MPM krok appka přeskočí úplně; bez tohohle by pak RZ
+      // v dokumentu zůstalo prázdné). U Výzvy na běžném záznamu appka
+      // tahle pole vůbec nezobrazuje (record už RZ/datum/čas dávno má),
+      // takže appka je tady nechává být.
+      if(prikazIsNewEvent){
+        const spzNow = document.getElementById('prikazSpz').value.trim().toUpperCase();
+        const spachaniDatumIsoNow = document.getElementById('prikazSpachaniDatum').dataset.iso || '';
+        const spachaniCasNow = document.getElementById('prikazSpachaniCas').value || '';
+        const brandNow = document.getElementById('prikazBrand').value.trim();
+        const colorNow = document.getElementById('prikazColor').value.trim();
+        Object.assign(record, {
+          plate: spzNow || null,
+          date: spachaniDatumIsoNow || record.date,
+          time: spachaniCasNow || record.time,
+          brand: brandNow || null,
+          color: colorNow || null
+        });
+      }
       // Číslo jednací appka bere přednostně z viditelného pole (přemapované
-      // "Číslo dokladu" — appka ho tam sama vyplní z "Vlož provozovatele",
-      // ale strážník ho tam může i ručně opravit/dopsat), a jen pro
-      // jistotu spadne zpátky na tichou proměnnou, kdyby pole zůstalo
-      // prázdné (např. appka vložila text, aniž by přes něj prošla).
+      // "Číslo dokladu" — appka ho tam sama vyplní z "Vlož provozovatele"
+      // / tlačítka "Vložit", ale strážník ho tam může i ručně opravit/
+      // dopsat), a jen pro jistotu spadne zpátky na tichou proměnnou,
+      // kdyby pole zůstalo prázdné (např. appka vložila text, aniž by
+      // přes něj prošla). Platí stejně pro novou událost i pro Výzvu na
+      // běžném záznamu.
       const cisloJednaciNow = document.getElementById('prikazDoklad').value.trim();
-      Object.assign(record, {
-        plate: spzNow || null,
-        date: spachaniDatumIsoNow || record.date,
-        time: spachaniCasNow || record.time,
-        brand: brandNow || null,
-        color: colorNow || null,
-        mpmCisloJednaci: cisloJednaciNow || prikazMpmCisloJednaci || null
-      });
+      record.mpmCisloJednaci = cisloJednaciNow || prikazMpmCisloJednaci || record.mpmCisloJednaci || null;
 
       const jmeno = document.getElementById('prikazJmeno').value.trim();
       const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
@@ -9813,8 +9834,10 @@
           // zavře i detail záznamu a zůstane v hlavním přehledu — na
           // rozdíl od běžného Dořešit u existujícího záznamu appka tady
           // nemá důvod zůstávat na detailu (žádné foto/další kroky
-          // appka teď nečeká).
-          closeDetailModal();
+          // appka teď nečeká). U Výzvy na běžném terénním záznamu appka
+          // naopak detail nechává otevřený, stejně jako u ostatních
+          // způsobů řešení (markResolved appka detail sama obnoví).
+          if(prikazIsNewEvent) closeDetailModal();
         }
       }catch(e){
         console.error('Uložení Výzvy selhalo:', e);
@@ -10264,12 +10287,12 @@
     // cisloJednaciPara) — appka si ho jen zapamatuje do proměnné.
     if(p.cisloJednaci){
       // Appka si ho vždycky zapamatuje i do proměnné (záloha, kdyby
-      // appka tenhle text vložila mimo "Přidat událost", kde viditelné
-      // pole na číslo jednací appka nemá) — u "Přidat událost" appka ale
+      // appka tenhle text vložila mimo "Přidat událost"/Výzvu, kde
+      // viditelné pole na číslo jednací appka nemá) — u obou appka ale
       // navíc rovnou vyplní přemapované pole "Číslo jednací", ať ho
       // strážník vidí a může i ručně opravit (viz cisloJednaciPara).
       prikazMpmCisloJednaci = p.cisloJednaci;
-      if(prikazIsNewEvent) document.getElementById('prikazDoklad').value = 'MP ' + p.cisloJednaci;
+      if(prikazUsesEventActionBtn()) document.getElementById('prikazDoklad').value = 'MP ' + p.cisloJednaci;
     }
     // checkStreetsAndAdvance() výš mezitím přesouvá fokus (na Ulici) a
     // to umí některé z těchhle bublin (viz attachConfirmChip) nechat
