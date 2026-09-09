@@ -731,6 +731,18 @@
   }
   .prikaz-scan-btn:hover{border-color:#2F6FED; color:#2F6FED;}
   .prikaz-scan-btn .cam-icon{font-size:15px; line-height:1;}
+  .prikaz-docs-list{margin-top:8px; display:flex; flex-direction:column; gap:5px;}
+  .prikaz-docs-item{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    background:var(--asphalt-3); border:1px solid var(--line); border-radius:8px;
+    padding:5px 8px 5px 10px; font-size:12px; color:var(--muted);
+  }
+  .prikaz-docs-item-name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .prikaz-docs-item-remove{
+    flex:0 0 auto; background:transparent; border:none; color:var(--bad); font-size:16px;
+    line-height:1; cursor:pointer; padding:2px 4px; font-weight:700;
+  }
+  .prikaz-docs-item-remove:hover{color:#fff; background:var(--bad); border-radius:5px;}
   .prikaz-note{font-size:11.5px; color:var(--faint); margin:-4px 0 14px; line-height:1.4; text-align:center;}
   .prikaz-actions{display:flex; gap:12px; margin-top:6px;}
 
@@ -972,6 +984,7 @@
             </button>
             <input type="file" id="prikazAddDocsInput" accept="image/*,application/pdf" multiple style="display:none;">
             <div id="prikazAddDocsNote" style="display:none; font-size:11.5px; color:var(--muted); margin-top:4px;"></div>
+            <div id="prikazAddDocsList" class="prikaz-docs-list"></div>
           </div>
         </div>
         <div class="prikaz-row2">
@@ -5757,9 +5770,13 @@
         record._resolvedMime = (data && data.photoMime) || 'image/jpeg';
         record._resolvedMimes = photosMimes;
       }
-      // Do Wordu appka vkládá jen obrázky — PDF přílohu (viz "Přidej
-      // fotodokumentaci" u "Přidat událost") appka do dokumentu vložit
-      // neumí, takže ji tady přeskočí (zůstává jen ke stažení v detailu).
+      // Do Wordu appka vkládá jen obrázky — PDF přílohu appka do
+      // dokumentu vložit neumí. Nové PDF appka teď při nahrání sama
+      // převádí na JPEG (viz renderPdfToJpegPages u "Přidej
+      // fotodokumentaci"), takže se sem prakticky nedostane — tenhle
+      // filtr appka nechává jen jako záchrannou síť pro starší záznamy,
+      // které appka měla přiložené jako syrové PDF ještě před touhle
+      // opravou.
       const photosForDocx = photosMimes
         ? photosB64.filter((b64, idx) => (photosMimes[idx] || 'image/jpeg').startsWith('image/'))
         : (photosB64 || []);
@@ -7522,6 +7539,35 @@
     label.textContent = prikazNewEventFiles.length
       ? prikazNewEventFiles.length + ' soubor(ů) přidáno'
       : 'Přidej fotodokumentaci';
+    renderPrikazAddDocsList();
+  }
+
+  // Appka pod tlačítkem appka vypíše jednotlivé přiložené soubory se
+  // samostatným "✕" appka appka jde jimi jednotlivě odebrat — appka
+  // dřív šlo jen přidávat, appka nemělo jak omylem přiložený/moc velký
+  // soubor zase odebrat bez "Vymazat pole" (appka tím ale smaže úplně
+  // všechno vyplněné v dialogu, ne jen přílohy).
+  function renderPrikazAddDocsList(){
+    const wrap = document.getElementById('prikazAddDocsList');
+    wrap.innerHTML = '';
+    prikazNewEventFiles.forEach((f, idx)=>{
+      const row = document.createElement('div');
+      row.className = 'prikaz-docs-item';
+      const name = document.createElement('span');
+      name.className = 'prikaz-docs-item-name';
+      name.textContent = f.name || ('soubor ' + (idx + 1));
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'prikaz-docs-item-remove';
+      removeBtn.textContent = '✕';
+      removeBtn.addEventListener('click', ()=>{
+        prikazNewEventFiles.splice(idx, 1);
+        updatePrikazAddDocsLabel();
+      });
+      row.appendChild(name);
+      row.appendChild(removeBtn);
+      wrap.appendChild(row);
+    });
   }
 
   // Lazy-load pdf.js (stejný vzor jako loadTesseract níž pro OCR OP) —
@@ -7567,6 +7613,41 @@
     };
   }
 
+  // Appka PDF nepřikládá tak, jak ho appka dostane (appka je z exportů
+  // ATEAS/MKDS — obvykle jedna vyfocená stránka, ale i tak appka dokáže
+  // snadno přesáhnout 1 MB) — appka ho rovnou překreslí na JPEG přes
+  // canvas (appka renderuje stránku pomocí pdf.js) a uloží jen JPEG.
+  // Vyřeší to dvě věci najednou: appka se vejde pod 1 MB limit na
+  // dokument ve Firestore (appka tam appka fotky/PDF ukládá jako
+  // base64 přímo v dokumentu), a appka umí přílohu vložit i do
+  // generovaného Oznámení — appka tam appka embeduje jen obrázky, PDF
+  // appka do dokumentu vložit neuměla.
+  async function renderPdfToJpegPages(file, quality, maxDim){
+    await loadPdfJs();
+    const buf = await file.arrayBuffer();
+    const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    const pages = [];
+    for(let i = 1; i <= pdf.numPages; i++){
+      const page = await pdf.getPage(i);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(2, (maxDim || 1600) / Math.max(base.width, base.height));
+      const viewport = page.getViewport({ scale: scale > 0 ? scale : 1 });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(viewport.width);
+      canvas.height = Math.round(viewport.height);
+      const ctx = canvas.getContext('2d');
+      // Bílé pozadí appka appka vykreslí ručně — PDF appka může mít
+      // průhledné pozadí, které by se do JPEG appka (bez alfa kanálu)
+      // jinak vybarvilo černě.
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      const dataUrl = canvas.toDataURL('image/jpeg', quality || 0.72);
+      pages.push(dataUrl.split(',')[1]);
+    }
+    return pages;
+  }
+
   document.getElementById('prikazAddDocsBtn').addEventListener('click', ()=>{
     document.getElementById('prikazAddDocsInput').click();
   });
@@ -7577,15 +7658,11 @@
     for(const file of files){
       prikazFileReadBusy++;
       try{
-        try{
-          const data = await fileToBase64(file);
-          prikazNewEventFiles.push({ data, mime: file.type || 'application/octet-stream', name: file.name });
-        }catch(err){
-          console.error('Načtení souboru selhalo:', file.name, err);
-          continue;
-        }
         // Appka datum/čas z PDF doplní jen do prázdných polí — ruční zadání
         // (nebo dřívější PDF ve stejném dávkovém výběru) appka nepřepisuje.
+        // Appka to čte z PŮVODNÍHO PDF (textová vrstva appka appka
+        // appka appka z JPEG appka appka), takže appka to musí proběhnout
+        // PŘED převodem appka.
         if(file.type === 'application/pdf'){
           const datumEl = document.getElementById('prikazSpachaniDatum');
           const casEl = document.getElementById('prikazSpachaniCas');
@@ -7604,6 +7681,34 @@
             }catch(err){
               console.error('Čtení data/času z PDF selhalo:', file.name, err);
             }
+          }
+          // PDF appka nepřikládá napřímo (viz komentář u
+          // renderPdfToJpegPages výš) — appka ho převede na JPEG. Kdyby
+          // se to nepovedlo (poškozené PDF, appka nepodporovaný formát
+          // uvnitř), appka radši přiloží originální PDF beze změny, než
+          // aby appka celý soubor zahodila.
+          try{
+            const jpegPages = await renderPdfToJpegPages(file, 0.72, 1600);
+            const baseName = file.name.replace(/\.pdf$/i, '');
+            jpegPages.forEach((data, idx)=>{
+              const suffix = jpegPages.length > 1 ? ('_str' + (idx + 1)) : '';
+              prikazNewEventFiles.push({ data, mime: 'image/jpeg', name: baseName + suffix + '.jpg' });
+            });
+          }catch(err){
+            console.error('Převod PDF na obrázek selhal, appka přiloží PDF beze změny:', file.name, err);
+            try{
+              const data = await fileToBase64(file);
+              prikazNewEventFiles.push({ data, mime: file.type || 'application/pdf', name: file.name });
+            }catch(err2){
+              console.error('Načtení souboru selhalo:', file.name, err2);
+            }
+          }
+        } else {
+          try{
+            const data = await fileToBase64(file);
+            prikazNewEventFiles.push({ data, mime: file.type || 'application/octet-stream', name: file.name });
+          }catch(err){
+            console.error('Načtení souboru selhalo:', file.name, err);
           }
         }
       }finally{
@@ -9143,7 +9248,14 @@
         listEl.classList.remove('open');
       });
     }
-    input.addEventListener('focus', show);
+    // Appka nabídku otevírá jen na 'focus' u PRÁZDNÉHO pole — appka
+    // "5 nejpoužívanějších" appka nabízí jako pomůcku, dokud pole nic
+    // nemá. Jakmile má appka pole hodnotu, focus samotný appka
+    // znovu neotvírá (typicky se to stávalo, když se appka vrátila do
+    // téhle záložky prohlížeče po použití bookmarkletu v MP Manageru —
+    // pole zůstalo zaostřené a nabídka appce vyskočila přes už vyplněné
+    // pole níž). Psaní appka pořád normálně filtruje přes 'input'.
+    input.addEventListener('focus', ()=>{ if(!input.value.trim()) show(); });
     input.addEventListener('input', show);
     input.addEventListener('blur', ()=>{ setTimeout(()=> listEl.classList.remove('open'), 150); });
   }
