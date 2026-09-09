@@ -8934,6 +8934,22 @@
     updatePrikazEventActionBtn();
   }
 
+  // Kliknutí na JAKÉKOLIV tlačítko v dialogu appka odchytí i na
+  // 'mousedown' (ne jen 'click') a zavolá preventDefault — jinak by
+  // prohlížeč nejdřív odebral fokus z pole, kde zrovna byl (typicky
+  // Ulice), což by spustilo JEHO blur handler a ten by automaticky
+  // skočil na Č.P. (appka to tam má schválně kvůli běžnému ručnímu
+  // vyplňování — viz blur handler u prikazUliceInput). Klik na tlačítko
+  // appka odjinud v dialogu (Vyhledat DS, Skenovat OP, Potvrdit
+  // a uložit, MPM/Vložit, Zrušit, Vymazat pole, …) ale žádný takový
+  // skok vyvolat nemá — appka to řeší jedním delegovaným posluchačem
+  // na celém boxu, ať appka nemusí tenhle trik lepit zvlášť na každé
+  // tlačítko a nezapomene na nějaké příští. Stejný trik appka používá
+  // u potvrzovacích bublin (viz attachConfirmChip).
+  document.getElementById('prikazBox').addEventListener('mousedown', (e)=>{
+    if(e.target.closest('button')) e.preventDefault();
+  });
+
   document.getElementById('prikazCancelBtn').addEventListener('click', ()=>{
     document.getElementById('prikazOverlay').classList.remove('open');
   });
@@ -10417,18 +10433,6 @@
   // dotaz selže, appka spadne zpátky na osvědčené řešení odjinud
   // (bookmarklety): zkopíruje IČO do schránky a otevře veřejný Seznam
   // datových schránek v nové záložce k ručnímu dohledání.
-  //
-  // Kliknutí na tlačítko appka musí odchytit i na 'mousedown' (ne jen
-  // 'click') a zavolat preventDefault — jinak by prohlížeč nejdřív
-  // odebral fokus z pole, kde zrovna byl (typicky Ulice), což by
-  // spustilo JEHO blur handler a ten by automaticky skočil na Č.P.
-  // (appka to tam má schválně kvůli běžnému ručnímu vyplňování). Klik na
-  // tlačítko appka odjinud v dialogu ale žádný takový skok vyvolat nemá
-  // — stejný trik appka používá u potvrzovacích bublin (viz
-  // attachConfirmChip).
-  document.getElementById('prikazDsLookupBtn').addEventListener('mousedown', (e)=>{
-    e.preventDefault();
-  });
   document.getElementById('prikazDsLookupBtn').addEventListener('click', async ()=>{
     const ico = document.getElementById('prikazIco').value.trim();
     const btn = document.getElementById('prikazDsLookupBtn');
