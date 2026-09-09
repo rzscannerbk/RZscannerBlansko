@@ -8895,8 +8895,12 @@
     const p = currentDetailRecord && currentDetailRecord.pachatel;
     // Reset appka dělá PŘED voláním setPrikazProvozovatelMode hned pod
     // tím — jinak by initial volání počítalo isPrestupce ještě se
-    // starou hodnotou z minulého otevření dialogu.
-    prikazPrestupceToggled = false;
+    // starou hodnotou z minulého otevření dialogu. U Oznámení appka
+    // rovnou defaultně nastaví PŘESTUPCE (appka tam typicky řeší osobu,
+    // co se dostavila a nesouhlasí, ne adresování dopisu provozovateli
+    // jako u Výzvy) — appka to samozřejmě jde kdykoliv ručně přepnout
+    // zpátky na PROVOZOVATEL tlačítkem ⇄.
+    prikazPrestupceToggled = (prikazMode === 'oznameni');
     setPrikazProvozovatelMode(p && p.firma ? 'firma' : 'osoba');
     document.getElementById('prikazFirma').value = (p && p.firma) || '';
     document.getElementById('prikazIco').value = (p && p.ico) || '';
