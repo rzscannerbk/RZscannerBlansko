@@ -8778,6 +8778,12 @@
     return prikazIsNewEvent || prikazMode === 'vyzva' || prikazMode === 'oznameni';
   }
 
+  // Appka "PŘESTUPCE" pozná stejně na obou místech, kde na to appka
+  // potřebuje reagovat — tady i v setPrikazProvozovatelMode (viz níž).
+  function prikazPrestupceActive(){
+    return prikazPrestupceToggled && (prikazProvozovatelMode !== 'firma') && prikazUsesEventActionBtn();
+  }
+
   // Termín dostavení (Dostavit se dne + Čas od + Čas do) appka bere jako
   // signál, že je formulář hotový k finálnímu odeslání — jakmile je
   // kompletní, vícestavové tlačítko natrvalo přejde na "Potvrdit
@@ -8787,7 +8793,19 @@
   // něco, co nikdy nepřijde, a tlačítko by navždy zůstalo viset na
   // "Vloženo ✓". U Oznámení appka bere jako signál "hotovo" už samotné
   // úspěšné vložení dat (prikazEventPasted).
+  //
+  // U PŘESTUPCE appka žádné "Vložit" vůbec nečeká — appka jméno/
+  // příjmení/datum narození/doklad appka dostala rovnou napsáním do
+  // dialogu (viz prikazPrestupceActive), ne vložením ze schránky, takže
+  // appce jako signál "hotovo" stačí, že appka má vyplněné Jméno
+  // a Příjmení.
   function prikazEventTerminReady(){
+    if(prikazPrestupceActive()){
+      return !!(
+        document.getElementById('prikazJmeno').value.trim() &&
+        document.getElementById('prikazPrijmeni').value.trim()
+      );
+    }
     if(prikazMode === 'oznameni') return prikazEventPasted;
     return !!(
       document.getElementById('prikazVyzvaDatum').dataset.iso &&
@@ -10473,7 +10491,7 @@
     // firmy (PROVOZOVATEL) a u běžného PACHATELE (Příkaz/Domluva na
     // rovnou přítomném přestupci appka adresu potřebuje kvůli
     // generovanému dokumentu) appka blok adresy nechává vždycky.
-    const isPrestupce = prikazPrestupceToggled && (mode !== 'firma') && prikazUsesEventActionBtn();
+    const isPrestupce = prikazPrestupceActive();
     document.getElementById('prikazPachatelLabel').textContent =
       (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : (prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL'));
     document.getElementById('prikazAdresaWrap').style.display = isPrestupce ? 'none' : '';
