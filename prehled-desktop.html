@@ -716,9 +716,14 @@
   .related-empty{padding:18px 4px; text-align:center; color:var(--muted); font-size:13px;}
   .prikaz-pachatel-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 10px;}
   .prikaz-pachatel-head span{font-size:12.5px; color:var(--muted); font-weight:600;}
-  .prikaz-pachatel-toggle{cursor:pointer; user-select:none;}
-  .prikaz-pachatel-toggle:hover span{color:var(--text);}
-  .prikaz-pachatel-toggle-icon{opacity:.7;}
+  .prikaz-pachatel-toggle{
+    cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:5px;
+    background:var(--amber-glow); border:1.5px solid var(--amber-dim); border-radius:20px;
+    padding:5px 12px 5px 10px;
+  }
+  .prikaz-pachatel-toggle span{color:var(--amber) !important;}
+  .prikaz-pachatel-toggle:hover{border-color:var(--amber); background:rgba(255,176,32,.22);}
+  .prikaz-pachatel-toggle-icon{opacity:1; font-size:14px;}
   .prikaz-scan-btn{
     display:flex; align-items:center; gap:6px; background:transparent; border:1.5px solid var(--line);
     color:var(--text); border-radius:9px; padding:6px 12px; font-size:12.5px; font-family:inherit;
