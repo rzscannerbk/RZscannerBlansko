@@ -9731,6 +9731,15 @@
           prikazEventPasted = true;
           btn.textContent = 'Vloženo ✓';
           btn.classList.add('copied');
+          // Appka tady musí sama zavolat přepočet stavu — u Oznámení
+          // (na rozdíl od Výzvy) appka dál nic nenutí vyplnit, takže by
+          // se tlačítko jinak nikdy nepřepnulo na "Potvrdit a uložit"
+          // a navždy zůstalo viset na "Vloženo ✓" (viz
+          // prikazEventTerminReady, která u Oznámení appce stačí jako
+          // signál "hotovo" už tahle prikazEventPasted=true). U Výzvy
+          // termín ještě nebude kompletní, takže appka tu zůstane ve
+          // stavu 'paste' — beze změny oproti dřívějšku.
+          updatePrikazEventActionBtn();
           // Appka po úspěšném vložení rovnou pokračuje na termín
           // dostavení — zaostří pole a hned otevře kalendář, ať appka
           // strážníka nenechává hledat, kde má pokračovat.
@@ -9739,9 +9748,13 @@
           // strážníka nenechává hledat, kde má pokračovat. prikazSuppressAutoAdvance
           // kolem toho zabrání, aby blur Ulice mezitím ukradl fokus zpět
           // na Č.P. (viz komentář u proměnné a u blur handleru Ulice).
-          prikazSuppressAutoAdvance = true;
-          focusField(document.getElementById('prikazVyzvaDatum'));
-          prikazSuppressAutoAdvance = false;
+          // U Oznámení appka žádné pole "Dostavit se dne" nemá (viz
+          // showVyzvaTermin), takže appka tenhle skok jen u Výzvy.
+          if(prikazMode === 'vyzva'){
+            prikazSuppressAutoAdvance = true;
+            focusField(document.getElementById('prikazVyzvaDatum'));
+            prikazSuppressAutoAdvance = false;
+          }
         } else {
           btn.textContent = 'Schránka je prázdná';
           btn.classList.add('copy-err');
