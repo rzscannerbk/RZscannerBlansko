@@ -10213,13 +10213,20 @@
     // Adresu (ulice+číslo, PSČ+obec) appka umí vytáhnout stejně pro
     // osobu i firmu — sdílená pomocná funkce nad libovolným seznamem
     // čárkou oddělených dílů, ať appka tu logiku nemá dvakrát.
+    // MP Manager appka posílá číslo popisné/orientační jako "200/0",
+    // když orientační číslo neexistuje (jen "0" na místě, kde jinak
+    // bývá skutečné orientační číslo) — appka to "/0" odsekne, ať do
+    // dokumentu nejde nesmyslné "200/0" místo prostého "200".
+    function stripZeroOrientacni(num){
+      return num.replace(/\/0$/, '');
+    }
     function extractAddress(parts, into){
       const streetPart = parts.find(p => /^\D.*\s\d+(?:\/\d+)?$/.test(p) && !/datum narozen/i.test(p));
       if(streetPart){
         const sm = streetPart.match(/^(.+?)\s+(\d+(?:\/\d+)?)$/);
         if(sm){
           into.ulice = sm[1].trim();
-          into.cisloDomu = sm[2].trim();
+          into.cisloDomu = stripZeroOrientacni(sm[2].trim());
         }
       } else {
         // Malé obce bez pojmenovaných ulic appka (MP Manager) posílá
@@ -10227,7 +10234,7 @@
         // "108" místo "Hlavní 108", viz shrnutí předchozí session) —
         // appka ho tedy bere jako číslo popisné a ulici nechá prázdnou.
         const bareNumberPart = parts.find(p => /^\d+(?:\/\d+)?$/.test(p));
-        if(bareNumberPart) into.cisloDomu = bareNumberPart.trim();
+        if(bareNumberPart) into.cisloDomu = stripZeroOrientacni(bareNumberPart.trim());
       }
       const pscPart = parts.find(p => /^\d{5}\s+\S/.test(p));
       if(pscPart){
