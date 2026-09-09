@@ -4892,16 +4892,20 @@
     // Způsob řešení (Rej) v MP Manageru appka doplní podle toho, jak byl
     // přestupek doopravdy vyřešený v RZ Scanneru — ID zjištěná přímo
     // z formuláře MP Manageru (viz "Přístup na služby" strom u tlačítka
-    // Vybrat u pole "Způsob řešení").
+    // Vybrat u pole "Způsob řešení"). Appka appka u každého způsobu
+    // řešení počítá s polem ID (ne jedním) — appka to nechává jako
+    // pole, i když teď má každý způsob jen jednu položku, ať appka jde
+    // v budoucnu snadno přidat další (KPPP appka schválně nepřidává,
+    // appka řeší jen dopravní přestupky, kde appce stačí ODSA).
     const MPM_SOLUTION_ID_BY_METHOD = {
-      prikaz: '51761',   // Bloková pokuta (PB)
-      vyzva: '51773',    // Zaslána výzva k podání vysvětlení
-      oznameni: '52146', // ODSA
-      domluva: '51760'   // Domluva
+      prikaz: ['51761'],   // Bloková pokuta (PB)
+      vyzva: ['51773'],    // Zaslána výzva k podání vysvětlení
+      oznameni: ['52146'], // ODSA
+      domluva: ['51760']   // Domluva
     };
-    const methodSolutionId = MPM_SOLUTION_ID_BY_METHOD[record.resolvedMethod];
-    if(methodSolutionId){
-      solutionIds.push(methodSolutionId);
+    const methodSolutionIds = MPM_SOLUTION_ID_BY_METHOD[record.resolvedMethod];
+    if(methodSolutionIds){
+      solutionIds.push(...methodSolutionIds);
     } else if(!isBoticka){
       // Způsob řešení appka ještě nezná (typicky úplně první "MPM"
       // checkpoint u čerstvě založené události, appka se tam teprve
