@@ -4868,13 +4868,20 @@
       descLines.push('GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6));
     }
 
-    // Začátek události appka posílá jako datum/čas, kdy appka přestupek
-    // vůbec založila (record.createdAt); Konec události jako datum/čas
-    // posledního řešení/editace (record.resolvedAt — markResolved ho
-    // posouvá na nejnovější změnu). Dokud přestupek není vyřešený,
-    // appka pro Konec použije totéž jako Začátek, ať pole nezůstane
-    // prázdné.
-    const eventStart = timestampToMpmDateTime(record.createdAt);
+    // Začátek události appka posílá jako datum/čas, kdy byl přestupek
+    // doopravdy spáchán (record.date/record.time — appka je má
+    // z terénu nebo appka je appka ručně vyplnila u "Přidat událost"),
+    // NE kdy appka záznam v Scanneru založila (record.createdAt by u
+    // "Přidat událost"/dodatečně zapsaných přestupků bylo klidně
+    // o dny pozdějc než skutečný přestupek). Konec události appka bere
+    // jako datum/čas posledního řešení/editace (record.resolvedAt —
+    // markResolved ho posouvá na nejnovější změnu), dokud přestupek
+    // není vyřešený, appka pro Konec použije totéž jako Začátek, ať
+    // pole nezůstane prázdné. Kdyby record.date/record.time chybělo
+    // (neměl by nastat, ale appka radši nenechá pole úplně prázdné),
+    // appka spadne zpátky na createdAt jako dřív.
+    const offenseDateTime = { date: isoToCzDate(record.date), time: record.time || '' };
+    const eventStart = (offenseDateTime.date && offenseDateTime.time) ? offenseDateTime : timestampToMpmDateTime(record.createdAt);
     const eventEnd = record.resolved ? timestampToMpmDateTime(record.resolvedAt) : eventStart;
     const isBoticka = record.docType === 'boticka';
 
@@ -4882,9 +4889,8 @@
     if(isBoticka) authorizationIds.push('40009');
 
     const solutionIds = ['51772'];
-    if(!isBoticka) solutionIds.push('51919');
-    // Způsob řešení (Rej) v MP Manageru appka teď doplní podle toho, jak
-    // byl přestupek doopravdy vyřešený v RZ Scanneru — ID zjištěná přímo
+    // Způsob řešení (Rej) v MP Manageru appka doplní podle toho, jak byl
+    // přestupek doopravdy vyřešený v RZ Scanneru — ID zjištěná přímo
     // z formuláře MP Manageru (viz "Přístup na služby" strom u tlačítka
     // Vybrat u pole "Způsob řešení").
     const MPM_SOLUTION_ID_BY_METHOD = {
@@ -4894,7 +4900,18 @@
       domluva: '51760'   // Domluva
     };
     const methodSolutionId = MPM_SOLUTION_ID_BY_METHOD[record.resolvedMethod];
-    if(methodSolutionId) solutionIds.push(methodSolutionId);
+    if(methodSolutionId){
+      solutionIds.push(methodSolutionId);
+    } else if(!isBoticka){
+      // Způsob řešení appka ještě nezná (typicky úplně první "MPM"
+      // checkpoint u čerstvě založené události, appka se tam teprve
+      // rozhoduje) — appka jako záchrannou síť přidá starou obecnou
+      // "Výzva pro nepřítomného řidiče", ať appka v Manageru nemá pole
+      // úplně prázdné. U "Přidat událost"/Výzvy/Oznámení appka ale
+      // resolvedMethod na tenhle export dopředu nastaví sama (viz
+      // prikazMpmExportRecord), takže se appka sem prakticky nedostane.
+      solutionIds.push('51919');
+    }
 
     const data = {
       rz: record.plate || '',
@@ -9696,13 +9713,20 @@
 
   // Appka do MPM (tlačítko "MPM", checkpoint appka volá dřív, než appka
   // rozepsané pole vůbec uloží přes "Potvrdit a uložit") potřebuje
-  // poslat AKTUÁLNĚ rozepsaného pachatele/přestupce z dialogu, ne
+  // poslat jednak AKTUÁLNĚ rozepsaného pachatele/přestupce z dialogu, ne
   // starého uloženého v record.pachatel (typicky nastane, když appka
   // právě přepnula na PŘESTUPCE tlačítkem ⇄ a vyplnila jméno/příjmení/
-  // datum narození/číslo dokladu, ale ještě nic neuložila) — appka
-  // vrátí MĚLKOU kopii record s přepsaným .pachatel, aby appka nijak
-  // netrvale neměnila skutečný record/currentDetailRecord dřív, než se
-  // appka opravdu uloží.
+  // datum narození/číslo dokladu, ale ještě nic neuložila), a jednak
+  // i "resolvedMethod" — appka ho record ještě nemá (appka ho tam
+  // zapisuje až finálním "Potvrdit a uložit"), ale appka aktuální mód
+  // dialogu (Výzva/Oznámení) zná jistě (viz prikazMode) a je to přesně
+  // to, co appka do "Způsobu řešení" v Manageru chce rovnou napsat (viz
+  // MPM_SOLUTION_ID_BY_METHOD v exportToMPManager) — bez tohohle appka
+  // dřív u čerstvě založené události nevěděla žádný způsob řešení
+  // a spadala na starou obecnou "Výzva pro nepřítomného řidiče" místo
+  // konkrétní "Zaslána výzva k podání vysvětlení"/"ODSA". Appka vrátí
+  // MĚLKOU kopii record, aby appka nijak netrvale neměnila skutečný
+  // record/currentDetailRecord dřív, než se appka opravdu uloží.
   function prikazMpmExportRecord(record){
     const dokladJeCisloDokladu = document.getElementById('prikazDokladLabel').textContent === 'Číslo dokladu';
     const jmeno = document.getElementById('prikazJmeno').value.trim();
@@ -9715,7 +9739,9 @@
       datumNarozeni: narozeni || null,
       cisloDokladu: dokladJeCisloDokladu ? (doklad || null) : null
     } : null;
-    return pachatelNow ? Object.assign({}, record, { pachatel: pachatelNow }) : record;
+    const overrides = { resolvedMethod: prikazMode };
+    if(pachatelNow) overrides.pachatel = pachatelNow;
+    return Object.assign({}, record, overrides);
   }
 
   document.getElementById('prikazEventActionBtn').addEventListener('click', async ()=>{
