@@ -8710,6 +8710,17 @@
   let prikazMpmCisloJednaci = null;
   // 'osoba' nebo 'firma' — viz setPrikazProvozovatelMode.
   let prikazProvozovatelMode = 'osoba';
+  // true jen když appka mód osoba/firma nastavila kliknutím na popisek
+  // "PROVOZOVATEL ⇄"/"PŘESTUPCE ⇄" (viz prikazPachatelToggle) — appka
+  // to potřebuje odlišit od výchozího/auto-detekovaného stavu (fresh
+  // dialog, nebo mód nastavený automaticky z lustrace přes Vložit),
+  // protože jen po ručním přepnutí appka schovává adresu a ukazuje
+  // "PŘESTUPCE" (viz isPrestupce v setPrikazProvozovatelMode) — jinak
+  // by appka u úplně nové "Přidat událost" (kde je mód 'osoba' už jako
+  // výchozí) omylem hned od začátku schovala adresu, ačkoliv appka
+  // ještě vůbec neví, jestli nalezený provozovatel bude osoba nebo
+  // firma, a adresu appka pro Výzvu i tak potřebuje.
+  let prikazPrestupceToggled = false;
   // Appka na true nastaví v okamžiku, kdy strážník aspoň jednou klikne
   // na "Vyhledat DS" (ať už appka najde ID automaticky, nebo appka jen
   // otevře veřejný seznam k ručnímu dohledání) — appka to bere jako
@@ -8860,6 +8871,10 @@
     // dialog otevírá, record.pachatel ještě neexistuje, takže pole
     // zůstanou prázdná stejně jako dřív.
     const p = currentDetailRecord && currentDetailRecord.pachatel;
+    // Reset appka dělá PŘED voláním setPrikazProvozovatelMode hned pod
+    // tím — jinak by initial volání počítalo isPrestupce ještě se
+    // starou hodnotou z minulého otevření dialogu.
+    prikazPrestupceToggled = false;
     setPrikazProvozovatelMode(p && p.firma ? 'firma' : 'osoba');
     document.getElementById('prikazFirma').value = (p && p.firma) || '';
     document.getElementById('prikazIco').value = (p && p.ico) || '';
@@ -10431,17 +10446,22 @@
     document.getElementById('prikazOsobaFields').style.display = (mode === 'firma') ? 'none' : '';
     document.getElementById('prikazFirmaFields').style.display = (mode === 'firma') ? '' : 'none';
     document.getElementById('prikazMestoLabel').textContent = (mode === 'firma') ? 'Sídlo firmy' : 'Adresa trvalého pobytu';
-    // "PŘESTUPCE" appka pozná jako kombinaci: osoba (ne firma) + appka
-    // je zrovna v módu, kde jinak řeší neznámého řidiče/provozovatele
-    // přes MPM (Výzva/Oznámení/"Přidat událost") — typicky se ale na
-    // místě dostavila konkrétní fyzická osoba, appka na ni ručně
-    // přepnula (viz prikazPachatelToggle) a appka teď potřebuje jen
-    // jméno/příjmení/datum narození/číslo OP k přenosu přes MPM do
-    // Manageru (tKontaktJM/PR/DN/Papers), ne celou adresu ani termín
-    // dostavení. U firmy (PROVOZOVATEL) a u běžného PACHATELE (Příkaz/
-    // Domluva na rovnou přítomném přestupci appka adresu potřebuje
-    // kvůli generovanému dokumentu) appka blok adresy nechává.
-    const isPrestupce = (mode !== 'firma') && prikazUsesEventActionBtn();
+    // "PŘESTUPCE" appka pozná jako kombinaci: appka je zrovna v módu,
+    // kde jinak řeší neznámého řidiče/provozovatele přes MPM (Výzva/
+    // Oznámení/"Přidat událost") + osoba (ne firma) + strážník na
+    // popisek "PROVOZOVATEL ⇄" opravdu ručně klikl (viz
+    // prikazPachatelToggle/prikazPrestupceToggled) — typicky se na
+    // místě dostavila jiná konkrétní fyzická osoba a appka teď
+    // potřebuje jen jméno/příjmení/datum narození/číslo OP k přenosu
+    // přes MPM do Manageru (tKontaktJM/PR/DN/Papers), ne celou adresu
+    // ani termín dostavení. Bez toho ručního přepnutí appka ukazuje
+    // "PROVOZOVATEL" s plnými poli i u osoby — appka totiž na začátku
+    // ještě neví, jestli nalezený provozovatel bude osoba nebo firma,
+    // a adresu appka pro Výzvu/Oznámení potřebuje v obou případech. U
+    // firmy (PROVOZOVATEL) a u běžného PACHATELE (Příkaz/Domluva na
+    // rovnou přítomném přestupci appka adresu potřebuje kvůli
+    // generovanému dokumentu) appka blok adresy nechává vždycky.
+    const isPrestupce = prikazPrestupceToggled && (mode !== 'firma') && prikazUsesEventActionBtn();
     document.getElementById('prikazPachatelLabel').textContent =
       (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : 'PACHATEL');
     document.getElementById('prikazAdresaWrap').style.display = isPrestupce ? 'none' : '';
@@ -10459,6 +10479,7 @@
   // pole nemaže, jen schová/odkryje — když appka klikne zpátky, appka
   // najde rozepsané údaje tak, jak appka je nechala.
   document.getElementById('prikazPachatelToggle').addEventListener('click', ()=>{
+    prikazPrestupceToggled = true;
     setPrikazProvozovatelMode(prikazProvozovatelMode === 'firma' ? 'osoba' : 'firma');
   });
 
@@ -10469,6 +10490,12 @@
     // ukázat. U běžných záznamů appka je stejně schovaná nikdy nebyla,
     // takže tady jen bezpečně napíše display:'' znovu.
     document.getElementById('prikazProvozovatelWrap').style.display = '';
+    // Appka vložený text bere jako čerstvě nalezeného provozovatele
+    // (přes lustraci/MPM), ne jako ručně přepnutého PŘESTUPCE — i když
+    // vyjde najevo, že je to osoba (ne firma), appka chce plná pole
+    // včetně adresy pro Výzvu/Oznámení, takže appka tady ruční přepnutí
+    // resetuje, kdyby náhodou zůstalo nastavené z dřívějška.
+    prikazPrestupceToggled = false;
     setPrikazProvozovatelMode(p.firma ? 'firma' : 'osoba');
     if(p.firma) document.getElementById('prikazFirma').value = p.firma;
     if(p.ico) document.getElementById('prikazIco').value = p.ico;
