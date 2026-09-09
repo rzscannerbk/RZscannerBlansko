@@ -9821,7 +9821,15 @@
         btn.classList.remove('mpm-busy');
         btn.disabled = false;
         if(text && text.trim()){
-          applyProvozovatelText(text);
+          const applied = applyProvozovatelText(text);
+          if(!applied){
+            // applyProvozovatelText appka sama ukázala alert s vysvětlením
+            // (typicky appky vlastní JSON místo textu z lustrace) — appka
+            // tlačítko nechá ve stavu "Vložit", ať to jde rovnou zkusit
+            // znovu, jakmile appka schránku doplní správným textem.
+            btn.textContent = 'Vložit';
+            return;
+          }
           prikazEventPasted = true;
           btn.textContent = 'Vloženo ✓';
           btn.classList.add('copied');
@@ -10463,7 +10471,7 @@
     // generovanému dokumentu) appka blok adresy nechává vždycky.
     const isPrestupce = prikazPrestupceToggled && (mode !== 'firma') && prikazUsesEventActionBtn();
     document.getElementById('prikazPachatelLabel').textContent =
-      (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : 'PACHATEL');
+      (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : (prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL'));
     document.getElementById('prikazAdresaWrap').style.display = isPrestupce ? 'none' : '';
     document.getElementById('prikazDokladLabel').textContent = isPrestupce ? 'Číslo dokladu' : (prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu');
   }
@@ -10484,6 +10492,16 @@
   });
 
   function applyProvozovatelText(raw){
+    // Appka pozná, když do schránky omylem přišel JSON appky samotné
+    // (appka ho tam dává tlačítkem "MPM" pro bookmarklet, ne text
+    // z lustrace) — takový text by appka jinak potichu naparsovala
+    // nesmyslně (první "díl" před čárkou by skončil v Příjmení, viz
+    // parseProvozovatelText). Appka radši rovnou odmítne a vysvětlí, co
+    // se nejspíš stalo, místo aby appka do pole nacpala smetí.
+    if(/^\s*[{[]/.test(raw)){
+      alert('Ve schránce je teď appky vlastní JSON (appka ho tam dala tlačítkem "MPM" pro bookmarklet), ne text z lustrace z MP Manageru. Nejdřív v Manageru spusť bookmarklet "MP to RZ" (zkopíruje provozovatele do schránky), pak se vrať sem a zkus Vložit znovu.');
+      return false;
+    }
     const p = parseProvozovatelText(raw);
     // U "Přidat událost" appka blok PROVOZOVATEL do teď měla schovaný
     // (viz openPrikazModal) — jakmile appka vloží údaje, je čas ho
@@ -10537,6 +10555,7 @@
     // skáče dál (Dostavit se dne).
     [prikazJmenoList, prikazPrijmeniList, prikazDokladList, prikazMestoList, prikazPscList, prikazUliceList, prikazCisloDomuList]
       .forEach(list => { list.classList.remove('open'); list.innerHTML = ''; });
+    return true;
   }
 
   document.getElementById('prikazPaste').addEventListener('paste', (e)=>{
