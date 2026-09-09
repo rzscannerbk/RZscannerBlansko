@@ -98,6 +98,13 @@
   #loginScreen h1{font-size:22px; text-transform:uppercase; margin-bottom:6px;}
   #loginScreen p.hint{color:var(--muted); font-size:13px; line-height:1.5; margin:0 0 26px;}
   .field{background:var(--asphalt-3); border:1px solid var(--line); border-radius:12px; padding:10px 14px; margin-bottom:14px;}
+  /* Souhrn RZ/místa/data-času/kvalifikace u Výzvy na běžném záznamu —
+     appka tady nic needituje, jen strážníkovi připomene, co se pošle do
+     MPM a co appka vypíše do dokumentu, ještě než klikne "MPM"/"Vložit". */
+  .prikaz-record-summary{background:var(--asphalt-3); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:14px; display:flex; flex-direction:column; gap:8px;}
+  .prikaz-record-summary-row{display:flex; gap:10px; align-items:baseline;}
+  .prikaz-record-summary-label{font-size:10.5px; color:var(--muted); font-family:'Roboto Mono',monospace; letter-spacing:.08em; text-transform:uppercase; flex:0 0 92px;}
+  .prikaz-record-summary-value{font-size:14px; color:var(--text); font-family:'Inter',sans-serif;}
   #prikazCastkaField{text-align:center;}
   #prikazCastkaField label{text-align:center;}
   #prikazCastkaField input{text-align:center;}
@@ -981,6 +988,25 @@
             <label for="prikazSpachaniCas">Čas spáchání</label>
             <input type="time" id="prikazSpachaniCas">
           </div>
+        </div>
+      </div>
+
+      <div id="prikazRecordSummary" class="prikaz-record-summary" style="display:none;">
+        <div class="prikaz-record-summary-row">
+          <span class="prikaz-record-summary-label">RZ</span>
+          <span id="prikazSummaryPlate" class="prikaz-record-summary-value"></span>
+        </div>
+        <div class="prikaz-record-summary-row">
+          <span class="prikaz-record-summary-label">Místo</span>
+          <span id="prikazSummaryAddress" class="prikaz-record-summary-value"></span>
+        </div>
+        <div class="prikaz-record-summary-row">
+          <span class="prikaz-record-summary-label">Datum a čas</span>
+          <span id="prikazSummaryDatetime" class="prikaz-record-summary-value"></span>
+        </div>
+        <div class="prikaz-record-summary-row">
+          <span class="prikaz-record-summary-label">Kvalifikace</span>
+          <span id="prikazSummaryOffense" class="prikaz-record-summary-value"></span>
         </div>
       </div>
 
@@ -8760,6 +8786,21 @@
     document.getElementById('prikazEventFieldsWrap').style.display = prikazIsNewEvent ? '' : 'none';
     document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
     const r = currentDetailRecord;
+    // Souhrn RZ/místa/data-času/kvalifikace appka ukáže jen u Výzvy na
+    // běžném terénním záznamu (ne u "Přidat událost", tam appka stejná
+    // pole rovnou needituje výš, ani u Příkazu/Domluvy/Oznámení, kde
+    // strážník řeší přímo přítomného přestupce a tenhle souhrn by jen
+    // zabíral místo) — appka to nechává jen jako čistě informativní
+    // připomínku, needituje se to tady.
+    const showRecordSummary = !prikazIsNewEvent && prikazUsesEventActionBtn();
+    document.getElementById('prikazRecordSummary').style.display = showRecordSummary ? '' : 'none';
+    if(showRecordSummary && r){
+      document.getElementById('prikazSummaryPlate').textContent = r.plate || '—';
+      document.getElementById('prikazSummaryAddress').textContent = r.address || '—';
+      const datumCas = (r.date ? isoToCzDate(r.date) : '—') + (r.time ? ' ' + r.time : '');
+      document.getElementById('prikazSummaryDatetime').textContent = datumCas;
+      document.getElementById('prikazSummaryOffense').textContent = r.offenseLabel || '—';
+    }
     document.getElementById('prikazSpz').value = (prikazIsNewEvent && r && r.plate) || '';
     document.getElementById('prikazBrand').value = (prikazIsNewEvent && r && r.brand) || '';
     document.getElementById('prikazColor').value = (prikazIsNewEvent && r && r.color) || '';
