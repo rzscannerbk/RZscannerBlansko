@@ -8725,13 +8725,14 @@
   }
 
   // Vícestavové tlačítko MPM -> Vložit -> Potvrdit a uložit appka
-  // používá jak u "Přidat událost", tak (nově) u Výzvy na běžném
-  // terénním záznamu — appka tam totiž typicky taky řeší dosud
+  // používá jak u "Přidat událost", tak u Výzvy a (nově) i Oznámení na
+  // běžném terénním záznamu — appka tam totiž typicky taky řeší dosud
   // neustanoveného řidiče/provozovatele přes lustraci, stejně jako
-  // u nové události. U ostatních způsobů (Příkaz/Domluva/Oznámení na
-  // existujícím záznamu) appka nechává obyčejné "Potvrdit a uložit".
+  // u nové události. U Příkazu/Domluvy na existujícím záznamu appka
+  // nechává obyčejné "Potvrdit a uložit" — tam appka řeší přímo
+  // přítomného přestupce.
   function prikazUsesEventActionBtn(){
-    return prikazIsNewEvent || prikazMode === 'vyzva';
+    return prikazIsNewEvent || prikazMode === 'vyzva' || prikazMode === 'oznameni';
   }
 
   // Termín dostavení (Dostavit se dne + Čas od + Čas do) appka bere jako
@@ -8786,9 +8787,9 @@
     document.getElementById('prikazEventFieldsWrap').style.display = prikazIsNewEvent ? '' : 'none';
     document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
     const r = currentDetailRecord;
-    // Souhrn RZ/místa/data-času/kvalifikace appka ukáže jen u Výzvy na
-    // běžném terénním záznamu (ne u "Přidat událost", tam appka stejná
-    // pole rovnou needituje výš, ani u Příkazu/Domluvy/Oznámení, kde
+    // Souhrn RZ/místa/data-času/kvalifikace appka ukáže u Výzvy
+    // i Oznámení na běžném terénním záznamu (ne u "Přidat událost", tam
+    // appka stejná pole rovnou needituje výš, ani u Příkazu/Domluvy, kde
     // strážník řeší přímo přítomného přestupce a tenhle souhrn by jen
     // zabíral místo) — appka to nechává jen jako čistě informativní
     // připomínku, needituje se to tady.
@@ -8868,16 +8869,16 @@
     // a uložit (viz updatePrikazEventActionBtn níž).
     document.getElementById('prikazConfirmBtn').style.display = prikazUsesEventActionBtn() ? 'none' : '';
     document.getElementById('prikazEventActionBtn').style.display = prikazUsesEventActionBtn() ? '' : 'none';
-    // "Vlož provozovatele" appka schovává u "Přidat událost" i u Výzvy
-    // na běžném záznamu (tuhle roli tam plní tlačítko "Vložit", viz
+    // "Vlož provozovatele" appka teď schovává úplně vždycky — u Výzvy
+    // i Oznámení (appka tam typicky řeší dosud neustanoveného řidiče/
+    // provozovatele) tuhle roli plní tlačítko "Vložit" (viz
     // prikazEventActionBtn — čte schránku rovnou, bez ručního vkládání
-    // do pole), a taky u Příkazu na místě a Domluvy — tam strážník řeší
-    // přímo přítomného přestupce (doklad má v ruce), takže appka žádné
-    // kopírování z lustrace nepotřebuje. U Oznámení appka pole zatím
-    // nechává — appka tam řeší dosud neustanoveného řidiče/provozovatele
-    // stejně jako u Výzvy, ale appka tam vícestavové tlačítko zatím
-    // nezavedla.
-    const showPasteField = !prikazUsesEventActionBtn() && prikazMode === 'oznameni';
+    // do pole), stejně jako u "Přidat událost". U Příkazu na místě
+    // a Domluvy appka řeší přímo přítomného přestupce (doklad má
+    // v ruce), takže appka žádné kopírování z lustrace nepotřebuje.
+    // Pole appka v DOMu nechává (kdyby se v budoucnu hodilo), jen ho
+    // appka drží trvale skryté.
+    const showPasteField = !prikazUsesEventActionBtn() && false;
     document.getElementById('prikazPasteField').style.display = showPasteField ? '' : 'none';
     document.getElementById('prikazPachatelLabel').textContent = prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL';
     // U "Přidat událost" appka celý blok PROVOZOVATEL (jméno/firma,
@@ -8885,20 +8886,20 @@
     // Manageru a nevloží údaje tlačítkem "Vložit" — do té doby appka
     // nemá co zobrazovat a prázdná pole by jen zabírala místo (viz
     // applyProvozovatelText, které blok zase odkryje). Stejně appka
-    // postupuje teď i u Výzvy na běžném záznamu — ALE jen když appka
-    // o pachateli ještě nic neví (p je null): editaci už vyřešeného
-    // záznamu (mění se jen způsob řešení, appka pachatele/provozovatele
-    // má už uloženého a rovnou ho výš předvyplnila) appka schovávat
-    // nemá důvod, tam appka blok rovnou ukáže i s vyplněnými poli. U
-    // Příkazu/Oznámení/Domluvy appka blok nechává vidět pořád, appka
-    // tam žádné "Vložit" nemá.
+    // postupuje teď i u Výzvy a Oznámení na běžném záznamu — ALE jen
+    // když appka o pachateli ještě nic neví (p je null): editaci už
+    // vyřešeného záznamu (mění se jen způsob řešení, appka pachatele/
+    // provozovatele má už uloženého a rovnou ho výš předvyplnila) appka
+    // schovávat nemá důvod, tam appka blok rovnou ukáže i s vyplněnými
+    // poli. U Příkazu/Domluvy appka blok nechává vidět pořád, appka tam
+    // žádné "Vložit" nemá.
     document.getElementById('prikazProvozovatelWrap').style.display = (prikazUsesEventActionBtn() && !p) ? 'none' : '';
-    // U "Přidat událost" i (nově) u Výzvy na běžném záznamu appka pole
-    // "Číslo dokladu" (appka tam OP fyzicky neskenuje, takže ho stejně
-    // nevyužije) přemapuje na "Číslo jednací" — appka do něj vloží číslo
-    // z MPM (viz applyProvozovatelText) a strážník ho odtud může i ručně
-    // opravit/dopsat. U Příkazu/Oznámení/Domluvy (appka tam OP skenuje
-    // doopravdy) zůstává pole jako "Číslo dokladu".
+    // U "Přidat událost" i (nově) u Výzvy a Oznámení na běžném záznamu
+    // appka pole "Číslo dokladu" (appka tam OP fyzicky neskenuje, takže
+    // ho stejně nevyužije) přemapuje na "Číslo jednací" — appka do něj
+    // vloží číslo z MPM (viz applyProvozovatelText) a strážník ho odtud
+    // může i ručně opravit/dopsat. U Příkazu/Domluvy (appka tam OP
+    // skenuje doopravdy) zůstává pole jako "Číslo dokladu".
     document.getElementById('prikazDokladLabel').textContent = prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu';
     prikazEventBtnState = 'mpm';
     prikazEventPasted = false;
@@ -9864,28 +9865,39 @@
           record._resolvedMime = newMimes[0] || 'image/jpeg';
           prikazNewEventFiles = [];
         }
-        const vyzvaDatumyIso = getVyzvaDatumyIso();
-        const dostaveniTermin = vyzvaDatumyIso.length ? {
-          datumy: vyzvaDatumyIso.map(formatDateCz),
-          casOd: document.getElementById('prikazVyzvaCasOd').value || null,
-          casDo: document.getElementById('prikazVyzvaCasDo').value || null
-        } : null;
-        const filename = buildDocFilename('Výzva', record, pachatel);
+        // Dokument appka generuje podle způsobu — Výzva má navíc termín
+        // dostavení (Dostavit se dne appka zobrazuje jen u ní, viz
+        // showVyzvaTermin), Oznámení žádný termín nemá a exportOznameni
+        // ho ani nebere jako parametr.
+        const docLabel = prikazMode === 'oznameni' ? 'Oznámení' : 'Výzva';
+        const filename = buildDocFilename(docLabel, record, pachatel);
         document.getElementById('prikazOverlay').classList.remove('open');
-        const opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
+        let opened;
+        if(prikazMode === 'oznameni'){
+          opened = await exportOznameni(record, pachatel, filename);
+        } else {
+          const vyzvaDatumyIso = getVyzvaDatumyIso();
+          const dostaveniTermin = vyzvaDatumyIso.length ? {
+            datumy: vyzvaDatumyIso.map(formatDateCz),
+            casOd: document.getElementById('prikazVyzvaCasOd').value || null,
+            casDo: document.getElementById('prikazVyzvaCasDo').value || null
+          } : null;
+          opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
+        }
         if(opened){
-          await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
-          // Appka u "Přidat událost" po úspěšném vygenerování Výzvy
+          await markResolved(record, prikazMode, pachatel ? { pachatel } : undefined);
+          // Appka u "Přidat událost" po úspěšném vygenerování dokumentu
           // zavře i detail záznamu a zůstane v hlavním přehledu — na
           // rozdíl od běžného Dořešit u existujícího záznamu appka tady
           // nemá důvod zůstávat na detailu (žádné foto/další kroky
-          // appka teď nečeká). U Výzvy na běžném terénním záznamu appka
-          // naopak detail nechává otevřený, stejně jako u ostatních
-          // způsobů řešení (markResolved appka detail sama obnoví).
+          // appka teď nečeká). U Výzvy/Oznámení na běžném terénním
+          // záznamu appka naopak detail nechává otevřený, stejně jako
+          // u ostatních způsobů řešení (markResolved appka detail sama
+          // obnoví).
           if(prikazIsNewEvent) closeDetailModal();
         }
       }catch(e){
-        console.error('Uložení Výzvy selhalo:', e);
+        console.error('Uložení dokumentu selhalo:', e);
         alert('Uložení se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
         document.getElementById('prikazOverlay').classList.add('open');
       }finally{
