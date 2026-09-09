@@ -8739,7 +8739,13 @@
   // signál, že je formulář hotový k finálnímu odeslání — jakmile je
   // kompletní, vícestavové tlačítko natrvalo přejde na "Potvrdit
   // a uložit" bez ohledu na to, v jaké fázi (MPM/Vložit) předtím bylo.
+  // U Oznámení appka žádný termín dostavení nemá (to pole appka u něj
+  // vůbec nezobrazuje, viz showVyzvaTermin) — appka by tak čekala na
+  // něco, co nikdy nepřijde, a tlačítko by navždy zůstalo viset na
+  // "Vloženo ✓". U Oznámení appka bere jako signál "hotovo" už samotné
+  // úspěšné vložení dat (prikazEventPasted).
   function prikazEventTerminReady(){
+    if(prikazMode === 'oznameni') return prikazEventPasted;
     return !!(
       document.getElementById('prikazVyzvaDatum').dataset.iso &&
       document.getElementById('prikazVyzvaCasOd').value &&
