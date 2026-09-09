@@ -1045,10 +1045,9 @@
           </div>
         </div>
         <div class="prikaz-row2">
-          <div class="field prikaz-datepicker-wrap">
+          <div class="field">
             <label for="prikazNarozeni">Datum narození</label>
-            <input type="text" id="prikazNarozeni" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
-            <div class="prikaz-datepicker-panel" id="prikazNarozeniPanel"></div>
+            <input type="text" id="prikazNarozeni" inputmode="numeric" autocomplete="off" placeholder="DD.MM.RRRR">
           </div>
           <div class="field prikaz-suggest-wrap">
             <label for="prikazDoklad" id="prikazDokladLabel">Číslo dokladu</label>
@@ -8850,7 +8849,7 @@
     document.getElementById('prikazDatovaSchranka').value = (p && p.datovaSchranka) || '';
     document.getElementById('prikazJmeno').value = (p && p.jmeno) || '';
     document.getElementById('prikazPrijmeni').value = (p && p.prijmeni) || '';
-    document.getElementById('prikazNarozeni')._setDatePickerIso(p && p.datumNarozeni ? dottedToIso(p.datumNarozeni) : '');
+    document.getElementById('prikazNarozeni').value = (p && p.datumNarozeni) || '';
     document.getElementById('prikazDoklad').value = (p && p.cisloDokladu) || '';
     // pachatel.mesto appka ukládá jako spojené "PSČ, Obec" (viz confirm
     // handler níž) — appka ho tady zase rozdělí zpátky do dvou polí.
@@ -8976,7 +8975,7 @@
   document.getElementById('prikazClearBtn').addEventListener('click', ()=>{
     document.getElementById('prikazJmeno').value = '';
     document.getElementById('prikazPrijmeni').value = '';
-    document.getElementById('prikazNarozeni')._setDatePickerIso('');
+    document.getElementById('prikazNarozeni').value = '';
     document.getElementById('prikazDoklad').value = '';
     document.getElementById('prikazMesto').value = '';
     document.getElementById('prikazPsc').value = '';
@@ -9365,7 +9364,12 @@
   const prikazPscInput = document.getElementById('prikazPsc');
   const prikazPscList = document.getElementById('prikazPscSuggest');
   const prikazVyzvaDatumInput = document.getElementById('prikazVyzvaDatum');
-  initDatePicker(prikazNarozeniInput, document.getElementById('prikazNarozeniPanel'), { defaultYear: 1990 });
+  // Datum narození appka záměrně nechává jako obyčejné textové pole bez
+  // kalendáře (na rozdíl od Data spáchání/Dostavit se dne) — u data
+  // narození appka typicky skáče desítky let zpátky, což by se přes
+  // kalendář jen zbytečně proklikávalo; rovnou naťukat "15.01.1954" je
+  // rychlejší, zvlášť u PŘESTUPCE, kde appka tohle pole vyplňuje ručně
+  // z dokladu.
   initMultiDatePicker(prikazVyzvaDatumInput, document.getElementById('prikazVyzvaDatumPanel'), { title: 'Dostavit se dne' });
   const prikazSpachaniDatumInput = document.getElementById('prikazSpachaniDatum');
   initDatePicker(prikazSpachaniDatumInput, document.getElementById('prikazSpachaniDatumPanel'), {
@@ -10445,7 +10449,6 @@
     if(p.prijmeni) prikazPrijmeniInput.value = p.prijmeni;
     if(p.jmeno) prikazJmenoInput.value = p.jmeno;
     if(p.narozeniIso){
-      prikazNarozeniInput.dataset.iso = p.narozeniIso;
       prikazNarozeniInput.value = isoToDotted(p.narozeniIso);
     }
     if(p.obec){
@@ -10628,7 +10631,7 @@
 
       if(parsed.jmeno) document.getElementById('prikazJmeno').value = toNameCase(parsed.jmeno);
       if(parsed.prijmeni) document.getElementById('prikazPrijmeni').value = toNameCase(parsed.prijmeni);
-      if(parsed.datumNarozeni) document.getElementById('prikazNarozeni')._setDatePickerIso(dottedToIso(parsed.datumNarozeni));
+      if(parsed.datumNarozeni) document.getElementById('prikazNarozeni').value = parsed.datumNarozeni;
       if(parsed.cisloDokladu) document.getElementById('prikazDoklad').value = parsed.cisloDokladu;
 
       const note = document.getElementById('prikazScanNote');
