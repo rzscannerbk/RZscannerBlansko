@@ -716,6 +716,9 @@
   .related-empty{padding:18px 4px; text-align:center; color:var(--muted); font-size:13px;}
   .prikaz-pachatel-head{display:flex; align-items:center; justify-content:space-between; margin:14px 0 10px;}
   .prikaz-pachatel-head span{font-size:12.5px; color:var(--muted); font-weight:600;}
+  .prikaz-pachatel-toggle{cursor:pointer; user-select:none;}
+  .prikaz-pachatel-toggle:hover span{color:var(--text);}
+  .prikaz-pachatel-toggle-icon{opacity:.7;}
   .prikaz-scan-btn{
     display:flex; align-items:center; gap:6px; background:transparent; border:1.5px solid var(--line);
     color:var(--text); border-radius:9px; padding:6px 12px; font-size:12.5px; font-family:inherit;
@@ -1012,7 +1015,9 @@
 
       <div id="prikazProvozovatelWrap">
       <div class="prikaz-pachatel-head">
-        <span id="prikazPachatelLabel">PACHATEL</span>
+        <span class="prikaz-pachatel-toggle" id="prikazPachatelToggle" title="Klikni pro přepnutí osoba/firma">
+          <span id="prikazPachatelLabel">PACHATEL</span> <span class="prikaz-pachatel-toggle-icon">⇄</span>
+        </span>
         <button type="button" class="prikaz-scan-btn" id="prikazScanBtn">
           <span class="cam-icon">📷</span> Skenovat OP
         </button>
@@ -10364,6 +10369,20 @@
     document.getElementById('prikazFirmaFields').style.display = (mode === 'firma') ? '' : 'none';
     document.getElementById('prikazMestoLabel').textContent = (mode === 'firma') ? 'Sídlo firmy' : 'Adresa trvalého pobytu';
   }
+
+  // Appka appku sama pozná firmu/osobu jen podle textu vloženého
+  // z lustrace (viz applyProvozovatelText) — když ale na místo dorazí
+  // jiná fyzická osoba (řidič, ne provozovatel-firma z první fáze
+  // Výzvy) a appka chce založit Oznámení na ni, dřív appka neměla jak
+  // přepnout zpátky na pole osoby, i když adresa/pole vlevo pořád
+  // existovala. Appka teď nechá popisek "PACHATEL"/"PROVOZOVATEL"
+  // klikací — přepne mezi osobou a firmou ručně, kdykoliv appka usoudí,
+  // že to appka poznala špatně nebo že se situace změnila. Appka žádná
+  // pole nemaže, jen schová/odkryje — když appka klikne zpátky, appka
+  // najde rozepsané údaje tak, jak appka je nechala.
+  document.getElementById('prikazPachatelToggle').addEventListener('click', ()=>{
+    setPrikazProvozovatelMode(prikazProvozovatelMode === 'firma' ? 'osoba' : 'firma');
+  });
 
   function applyProvozovatelText(raw){
     const p = parseProvozovatelText(raw);
