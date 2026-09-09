@@ -1081,6 +1081,7 @@
           </div>
         </div>
       </div>
+      <div id="prikazAdresaWrap">
       <div class="prikaz-row-address">
         <div class="field prikaz-suggest-wrap prikaz-street-field">
           <label for="prikazMesto" id="prikazMestoLabel">Adresa trvalého pobytu</label>
@@ -1120,6 +1121,7 @@
           <label for="prikazVyzvaCasDo">Čas do</label>
           <select id="prikazVyzvaCasDo"><option value="">—</option><option value="00:00">0:00</option><option value="01:00">1:00</option><option value="02:00">2:00</option><option value="03:00">3:00</option><option value="04:00">4:00</option><option value="05:00">5:00</option><option value="06:00">6:00</option><option value="07:00">7:00</option><option value="08:00">8:00</option><option value="09:00">9:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option><option value="18:00">18:00</option><option value="19:00">19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option></select>
         </div>
+      </div>
       </div>
       </div>
 
@@ -8891,7 +8893,8 @@
     // appka drží trvale skryté.
     const showPasteField = !prikazUsesEventActionBtn() && false;
     document.getElementById('prikazPasteField').style.display = showPasteField ? '' : 'none';
-    document.getElementById('prikazPachatelLabel').textContent = prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL';
+    // Popisek appka nastaví setPrikazProvozovatelMode výš (podle módu
+    // osoba/firma) — appka ho tady už znovu nepřepisuje.
     // U "Přidat událost" appka celý blok PROVOZOVATEL (jméno/firma,
     // adresa, dostavit se dne) schová, dokud se strážník nevrátí z MP
     // Manageru a nevloží údaje tlačítkem "Vložit" — do té doby appka
@@ -8905,13 +8908,9 @@
     // poli. U Příkazu/Domluvy appka blok nechává vidět pořád, appka tam
     // žádné "Vložit" nemá.
     document.getElementById('prikazProvozovatelWrap').style.display = (prikazUsesEventActionBtn() && !p) ? 'none' : '';
-    // U "Přidat událost" i (nově) u Výzvy a Oznámení na běžném záznamu
-    // appka pole "Číslo dokladu" (appka tam OP fyzicky neskenuje, takže
-    // ho stejně nevyužije) přemapuje na "Číslo jednací" — appka do něj
-    // vloží číslo z MPM (viz applyProvozovatelText) a strážník ho odtud
-    // může i ručně opravit/dopsat. U Příkazu/Domluvy (appka tam OP
-    // skenuje doopravdy) zůstává pole jako "Číslo dokladu".
-    document.getElementById('prikazDokladLabel').textContent = prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu';
+    // Popisek pole "Číslo dokladu"/"Číslo jednací" appka nastaví
+    // setPrikazProvozovatelMode výš (podle módu osoba/firma) — appka ho
+    // tady už znovu nepřepisuje.
     prikazEventBtnState = 'mpm';
     prikazEventPasted = false;
     prikazMpmCisloJednaci = null;
@@ -10368,6 +10367,21 @@
     document.getElementById('prikazOsobaFields').style.display = (mode === 'firma') ? 'none' : '';
     document.getElementById('prikazFirmaFields').style.display = (mode === 'firma') ? '' : 'none';
     document.getElementById('prikazMestoLabel').textContent = (mode === 'firma') ? 'Sídlo firmy' : 'Adresa trvalého pobytu';
+    // "PŘESTUPCE" appka pozná jako kombinaci: osoba (ne firma) + appka
+    // je zrovna v módu, kde jinak řeší neznámého řidiče/provozovatele
+    // přes MPM (Výzva/Oznámení/"Přidat událost") — typicky se ale na
+    // místě dostavila konkrétní fyzická osoba, appka na ni ručně
+    // přepnula (viz prikazPachatelToggle) a appka teď potřebuje jen
+    // jméno/příjmení/datum narození/číslo OP k přenosu přes MPM do
+    // Manageru (tKontaktJM/PR/DN/Papers), ne celou adresu ani termín
+    // dostavení. U firmy (PROVOZOVATEL) a u běžného PACHATELE (Příkaz/
+    // Domluva na rovnou přítomném přestupci appka adresu potřebuje
+    // kvůli generovanému dokumentu) appka blok adresy nechává.
+    const isPrestupce = (mode !== 'firma') && prikazUsesEventActionBtn();
+    document.getElementById('prikazPachatelLabel').textContent =
+      (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : 'PACHATEL');
+    document.getElementById('prikazAdresaWrap').style.display = isPrestupce ? 'none' : '';
+    document.getElementById('prikazDokladLabel').textContent = isPrestupce ? 'Číslo dokladu' : (prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu');
   }
 
   // Appka appku sama pozná firmu/osobu jen podle textu vloženého
