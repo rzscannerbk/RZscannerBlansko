@@ -9685,6 +9685,30 @@
   // viz updatePrikazEventActionBtn).
   let prikazEventPasted = false;
 
+  // Appka do MPM (tlačítko "MPM", checkpoint appka volá dřív, než appka
+  // rozepsané pole vůbec uloží přes "Potvrdit a uložit") potřebuje
+  // poslat AKTUÁLNĚ rozepsaného pachatele/přestupce z dialogu, ne
+  // starého uloženého v record.pachatel (typicky nastane, když appka
+  // právě přepnula na PŘESTUPCE tlačítkem ⇄ a vyplnila jméno/příjmení/
+  // datum narození/číslo dokladu, ale ještě nic neuložila) — appka
+  // vrátí MĚLKOU kopii record s přepsaným .pachatel, aby appka nijak
+  // netrvale neměnila skutečný record/currentDetailRecord dřív, než se
+  // appka opravdu uloží.
+  function prikazMpmExportRecord(record){
+    const dokladJeCisloDokladu = document.getElementById('prikazDokladLabel').textContent === 'Číslo dokladu';
+    const jmeno = document.getElementById('prikazJmeno').value.trim();
+    const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
+    const narozeni = document.getElementById('prikazNarozeni').value.trim();
+    const doklad = document.getElementById('prikazDoklad').value.trim();
+    const pachatelNow = (jmeno || prijmeni || narozeni || (dokladJeCisloDokladu && doklad)) ? {
+      jmeno: jmeno || null,
+      prijmeni: prijmeni || null,
+      datumNarozeni: narozeni || null,
+      cisloDokladu: dokladJeCisloDokladu ? (doklad || null) : null
+    } : null;
+    return pachatelNow ? Object.assign({}, record, { pachatel: pachatelNow }) : record;
+  }
+
   document.getElementById('prikazEventActionBtn').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
     if(!record) return;
@@ -9724,7 +9748,7 @@
           return;
         }
       }
-      const ok = await exportToMPManager(record);
+      const ok = await exportToMPManager(prikazMpmExportRecord(record));
       btn.classList.remove('mpm-busy');
       btn.disabled = false;
       btn.textContent = ok ? 'Zkopírováno ✓' : 'Nezdařilo se';
@@ -9851,10 +9875,15 @@
       const jmeno = document.getElementById('prikazJmeno').value.trim();
       const prijmeni = document.getElementById('prikazPrijmeni').value.trim();
       const narozeni = document.getElementById('prikazNarozeni').value.trim();
-      // Pole appka tady zobrazuje jako "Číslo jednací" (viz výš,
-      // cisloJednaciNow) — u "Přidat událost" appka ho záměrně NEUKLÁDÁ
-      // jako číslo dokladu pachatele, protože to teď fakticky číslo
-      // dokladu není.
+      // Pole appka jinak zobrazuje jako "Číslo jednací" (viz výš,
+      // cisloJednaciNow) — v tom případě appka ho záměrně NEUKLÁDÁ jako
+      // číslo dokladu pachatele, protože to fakticky číslo dokladu není.
+      // Výjimka je PŘESTUPCE (appka na osobu ručně přepnula tlačítkem
+      // ⇄ — viz setPrikazProvozovatelMode): tam appka pole opravdu
+      // zobrazuje jako "Číslo dokladu", protože appka fyzicky skenuje
+      // OP nově příchozí osoby, takže appka ho tam i uloží.
+      const dokladJeCisloDokladu = document.getElementById('prikazDokladLabel').textContent === 'Číslo dokladu';
+      const doklad = document.getElementById('prikazDoklad').value.trim();
       const firma = document.getElementById('prikazFirma').value.trim();
       const ico = document.getElementById('prikazIco').value.trim();
       const datovaSchranka = document.getElementById('prikazDatovaSchranka').value.trim();
@@ -9867,7 +9896,7 @@
         jmeno: jmeno || null,
         prijmeni: prijmeni || null,
         datumNarozeni: narozeni || null,
-        cisloDokladu: null,
+        cisloDokladu: dokladJeCisloDokladu ? (doklad || null) : null,
         firma: firma || null,
         ico: ico || null,
         datovaSchranka: datovaSchranka || null,
