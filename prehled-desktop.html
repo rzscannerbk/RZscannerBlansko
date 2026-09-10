@@ -917,25 +917,54 @@
     </div>
   </div>
 
-  <!-- Přidat událost — krok 1: výběr přestupku/lokality, nebo "Rychlost"
-       jako vstup do podvýběru (viz addEventSpeedOverlay níž). Zatím appka
-       jen zaznamená volbu (viz addEventPick v JS) — co se má stát dál po
-       vybrání konkrétní položky, čeká na doplnění. -->
+  <!-- Přidat událost — krok 1: appka nejdřív nabídne skupiny (stejný vzor
+       jako "Rychlost" — appka jen zaznamená volbu, viz addEventPick v JS).
+       "Přestupky z MKDS" appka rozbaluje 4 předem dané kombinace ulice+
+       značka (viz addEventMkdsOverlay níž), "Placenky" appka zatím nemá
+       naplněné — appka na to čeká na konkrétní zadání (přestupek/citaci/
+       MPM hodnoty), prázdnou podnabídku appka má už připravenou. -->
   <div class="confirm-overlay" id="addEventOverlay">
     <div class="confirm-box">
       <div class="confirm-text">Přidat událost</div>
       <div class="confirm-btns confirm-btns-col" id="addEventChoices">
-        <button class="confirm-btn confirm-no" data-choice="Rožmitálova B28">Rožmitálova B28</button>
-        <button class="confirm-btn confirm-no" data-choice="Vodní B28">Vodní B28</button>
-        <button class="confirm-btn confirm-no" data-choice="Nám. Republiky B2">Nám. Republiky B2</button>
-        <button class="confirm-btn confirm-no" data-choice="Nám. Svobody B2">Nám. Svobody B2</button>
+        <button class="confirm-btn confirm-yes" id="addEventMkdsBtn">Přestupky z MKDS</button>
+        <button class="confirm-btn confirm-yes" id="addEventPlacenkyBtn">Placenky</button>
         <button class="confirm-btn confirm-yes" id="addEventSpeedBtn">Rychlost</button>
         <button class="confirm-cancel" id="addEventCancelBtn">Zrušit</button>
       </div>
     </div>
   </div>
 
-  <!-- Přidat událost — krok 2: podvýběr pro "Rychlost", stupně
+  <!-- Přidat událost — podvýběr "Přestupky z MKDS": appka sem přesunula
+       4 předem dané kombinace ulice+značka, dřív appka byly rovnou
+       v kroku 1 spolu s "Rychlostí". -->
+  <div class="confirm-overlay" id="addEventMkdsOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text">Přestupky z MKDS</div>
+      <div class="confirm-btns confirm-btns-col" id="addEventMkdsChoices">
+        <button class="confirm-btn confirm-no" data-choice="Rožmitálova B28">Rožmitálova B28</button>
+        <button class="confirm-btn confirm-no" data-choice="Vodní B28">Vodní B28</button>
+        <button class="confirm-btn confirm-no" data-choice="Nám. Republiky B2">Nám. Republiky B2</button>
+        <button class="confirm-btn confirm-no" data-choice="Nám. Svobody B2">Nám. Svobody B2</button>
+        <button class="confirm-cancel" id="addEventMkdsBackBtn">← Zpět</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Přidat událost — podvýběr "Placenky": appka nemá zatím žádnou
+       položku naplněnou (čeká na konkrétní zadání — přestupek, citaci,
+       GPS a mpmId/mpmText ověřené z MP Manageru, stejně jako appka má
+       u MKDS výš). -->
+  <div class="confirm-overlay" id="addEventPlacenkyOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text">Placenky</div>
+      <div class="confirm-btns confirm-btns-col" id="addEventPlacenkyChoices">
+        <button class="confirm-cancel" id="addEventPlacenkyBackBtn">← Zpět</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Přidat událost — podvýběr "Rychlost": stupně
        překročení podle § 124 odst. 15 písm. d) (K — appka to zatím
        nazývá "K", MP to smí řešit sama i pod 10 km/h, ale appka to
        nemá dořešené, jak přesně) a § 125c odst. 1 písm. f) body 2/3/4. -->
@@ -7809,7 +7838,28 @@
   document.getElementById('addEventCancelBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
   });
-  document.getElementById('addEventChoices').addEventListener('click', (e)=>{
+  document.getElementById('addEventMkdsBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventOverlay').classList.remove('open');
+    document.getElementById('addEventMkdsOverlay').classList.add('open');
+  });
+  document.getElementById('addEventMkdsBackBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventMkdsOverlay').classList.remove('open');
+    document.getElementById('addEventOverlay').classList.add('open');
+  });
+  document.getElementById('addEventMkdsChoices').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-choice]');
+    if(!btn) return;
+    pickAddEventChoice(btn.dataset.choice);
+  });
+  document.getElementById('addEventPlacenkyBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventOverlay').classList.remove('open');
+    document.getElementById('addEventPlacenkyOverlay').classList.add('open');
+  });
+  document.getElementById('addEventPlacenkyBackBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventPlacenkyOverlay').classList.remove('open');
+    document.getElementById('addEventOverlay').classList.add('open');
+  });
+  document.getElementById('addEventPlacenkyChoices').addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-choice]');
     if(!btn) return;
     pickAddEventChoice(btn.dataset.choice);
