@@ -9394,6 +9394,7 @@
     // nemusí scrolovat (viz .prikaz-box-wide).
     document.getElementById('prikazEventFieldsWrap').style.display = prikazIsNewEvent ? '' : 'none';
     document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
+    const r = currentDetailRecord;
     // ClickPark pole (Vložit z ClickParku / Místo přestupku / Číslo
     // pokuty) appka zobrazuje jen u "Parkoviště s parkovacím poplatkem"
     // — u ostatních voleb (MKDS/Rychlost) appka adresu má napevno
@@ -9402,7 +9403,10 @@
     // "Přidat událost" — když appka dialog zrušíš a záznam otevřeš znovu
     // později (např. z hlavního přehledu), appka se pozná i podle
     // uložené kvalifikace (mpmUdalostId 51989 appka má jen tenhle typ
-    // události, viz ADD_EVENT_OFFENSES.Parkoviste výš).
+    // události, viz ADD_EVENT_OFFENSES.Parkoviste výš). DŮLEŽITÉ: tenhle
+    // blok MUSÍ být až PO "const r = currentDetailRecord;" výš — dřív tu
+    // byl nad ním, což appce shazovalo úplně KAŽDÉ "Přidat událost"
+    // (i MKDS) na "Cannot access 'r' before initialization".
     const isClickParkEvent = prikazIsNewEvent && (currentAddEventChoiceKey === 'Parkoviste' || (r && r.mpmUdalostId === '51989'));
     document.getElementById('prikazClickParkFieldsWrap').style.display = isClickParkEvent ? '' : 'none';
     if(isClickParkEvent){
@@ -9419,7 +9423,6 @@
         mapLink.style.display = 'none';
       }
     }
-    const r = currentDetailRecord;
     // Souhrn RZ/místa/data-času/kvalifikace appka ukáže u Výzvy
     // i Oznámení na běžném terénním záznamu (ne u "Přidat událost", tam
     // appka stejná pole rovnou needituje výš, ani u Příkazu/Domluvy, kde
