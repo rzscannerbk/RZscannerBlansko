@@ -747,18 +747,6 @@
   }
   .prikaz-scan-btn:hover{border-color:#2F6FED; color:#2F6FED;}
   .prikaz-scan-btn .cam-icon{font-size:15px; line-height:1;}
-  .prikaz-docs-list{margin-top:8px; display:flex; flex-direction:column; gap:5px;}
-  .prikaz-docs-item{
-    display:flex; align-items:center; justify-content:space-between; gap:8px;
-    background:var(--asphalt-3); border:1px solid var(--line); border-radius:8px;
-    padding:5px 8px 5px 10px; font-size:12px; color:var(--muted);
-  }
-  .prikaz-docs-item-name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .prikaz-docs-item-remove{
-    flex:0 0 auto; background:transparent; border:none; color:var(--bad); font-size:16px;
-    line-height:1; cursor:pointer; padding:2px 4px; font-weight:700;
-  }
-  .prikaz-docs-item-remove:hover{color:#fff; background:var(--bad); border-radius:5px;}
   .prikaz-note{font-size:11.5px; color:var(--faint); margin:-4px 0 14px; line-height:1.4; text-align:center;}
   .prikaz-actions{display:flex; gap:12px; margin-top:6px;}
 
@@ -1000,7 +988,6 @@
             </button>
             <input type="file" id="prikazAddDocsInput" accept="image/*,application/pdf" multiple style="display:none;">
             <div id="prikazAddDocsNote" style="display:none; font-size:11.5px; color:var(--muted); margin-top:4px;"></div>
-            <div id="prikazAddDocsList" class="prikaz-docs-list"></div>
           </div>
         </div>
         <div class="prikaz-row2">
@@ -1187,6 +1174,16 @@
       <div class="related-sub" id="photosModalSub"></div>
       <div class="related-list" id="photosModalList"></div>
       <button class="confirm-cancel" id="photosModalCloseBtn">Zavřít</button>
+    </div>
+  </div>
+
+  <div class="confirm-overlay" id="prikazDocsModalOverlay">
+    <div class="related-box">
+      <h3>Přiložené soubory</h3>
+      <div class="related-sub" id="prikazDocsModalSub"></div>
+      <div class="related-list" id="prikazDocsModalList"></div>
+      <button class="btn" id="prikazDocsModalAddBtn" style="width:100%; margin-bottom:10px;">+ Přidat další soubor</button>
+      <button class="confirm-cancel" id="prikazDocsModalCloseBtn">Zavřít</button>
     </div>
   </div>
 
@@ -7558,35 +7555,71 @@
     label.textContent = prikazNewEventFiles.length
       ? prikazNewEventFiles.length + ' soubor(ů) přidáno'
       : 'Přidej fotodokumentaci';
-    renderPrikazAddDocsList();
+    renderPrikazDocsModalList();
   }
 
-  // Appka pod tlačítkem vypíše jednotlivé přiložené soubory se
-  // samostatným "✕", kterým appka jde jednotlivě odebrat — dřív appka
-  // šlo jen přidávat, nešlo jak omylem přiložený/moc velký soubor zase
-  // odebrat bez "Vymazat pole" (to ale smaže úplně všechno vyplněné
-  // v dialogu, ne jen přílohy).
-  function renderPrikazAddDocsList(){
-    const wrap = document.getElementById('prikazAddDocsList');
-    wrap.innerHTML = '';
-    prikazNewEventFiles.forEach((f, idx)=>{
-      const row = document.createElement('div');
-      row.className = 'prikaz-docs-item';
-      const name = document.createElement('span');
-      name.className = 'prikaz-docs-item-name';
-      name.textContent = f.name || ('soubor ' + (idx + 1));
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'prikaz-docs-item-remove';
-      removeBtn.textContent = '✕';
-      removeBtn.addEventListener('click', ()=>{
-        prikazNewEventFiles.splice(idx, 1);
-        updatePrikazAddDocsLabel();
-      });
-      row.appendChild(name);
-      row.appendChild(removeBtn);
-      wrap.appendChild(row);
+  // Appka přiložené soubory (ještě neuložené, appka je drží jen
+  // v paměti v prikazNewEventFiles) vypisuje v samostatném okně —
+  // stejný vzor appka používá i pro fotky u už uloženého záznamu (viz
+  // photosModalOverlay/renderPhotosModalItem) — místo aby appka
+  // soubory stohovala inline pod tlačítkem a natahovala tím dialog.
+  function renderPrikazDocsModalItem(f, idx){
+    const isImg = (f.mime || '').indexOf('image/') === 0;
+    const row = document.createElement('div');
+    row.className = 'photos-modal-item';
+
+    const thumbBtn = document.createElement('button');
+    thumbBtn.type = 'button';
+    thumbBtn.className = 'photos-modal-thumb';
+    if(isImg){
+      const img = document.createElement('img');
+      img.src = 'data:' + f.mime + ';base64,' + f.data;
+      img.alt = '';
+      img.style.cssText = 'width:100%; height:100%; object-fit:cover; border-radius:8px;';
+      thumbBtn.appendChild(img);
+    } else {
+      thumbBtn.textContent = '📄';
+    }
+    thumbBtn.addEventListener('click', ()=>{
+      const blob = new Blob([base64ToUint8Array(f.data)], { type: f.mime || 'application/octet-stream' });
+      window.open(URL.createObjectURL(blob), '_blank', 'noopener');
     });
+
+    const info = document.createElement('div');
+    info.className = 'photos-modal-info';
+    const name = document.createElement('div');
+    name.className = 'photos-modal-name';
+    name.textContent = f.name || ('soubor ' + (idx + 1));
+    info.appendChild(name);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'photos-modal-remove';
+    removeBtn.textContent = 'Odebrat';
+    removeBtn.addEventListener('click', ()=>{
+      prikazNewEventFiles.splice(idx, 1);
+      updatePrikazAddDocsLabel();
+      if(!prikazNewEventFiles.length) document.getElementById('prikazDocsModalOverlay').classList.remove('open');
+    });
+
+    row.appendChild(thumbBtn);
+    row.appendChild(info);
+    row.appendChild(removeBtn);
+    return row;
+  }
+
+  function renderPrikazDocsModalList(){
+    const listEl = document.getElementById('prikazDocsModalList');
+    const subEl = document.getElementById('prikazDocsModalSub');
+    if(!listEl) return;
+    listEl.innerHTML = '';
+    if(!prikazNewEventFiles.length){
+      listEl.innerHTML = '<div class="related-empty">Žádné přílohy.</div>';
+      subEl.textContent = '';
+      return;
+    }
+    subEl.textContent = prikazNewEventFiles.length + ' soubor(ů)';
+    prikazNewEventFiles.forEach((f, idx)=> listEl.appendChild(renderPrikazDocsModalItem(f, idx)));
   }
 
   // Lazy-load pdf.js (stejný vzor jako loadTesseract níž pro OCR OP) —
@@ -7667,8 +7700,27 @@
     return pages;
   }
 
+  // "Přidej fotodokumentaci" appka otevírá výběr souborů, jen dokud
+  // appka nic nemá — jakmile appka aspoň jeden soubor přidá, popisek se
+  // změní na "N soubor(ů) přidáno" a klik appka místo toho otevře
+  // samostatné okno se seznamem (appka tam appka i další soubory umí
+  // přidat tlačítkem uvnitř, viz prikazDocsModalAddBtn).
   document.getElementById('prikazAddDocsBtn').addEventListener('click', ()=>{
+    if(prikazNewEventFiles.length){
+      renderPrikazDocsModalList();
+      document.getElementById('prikazDocsModalOverlay').classList.add('open');
+    } else {
+      document.getElementById('prikazAddDocsInput').click();
+    }
+  });
+  document.getElementById('prikazDocsModalAddBtn').addEventListener('click', ()=>{
     document.getElementById('prikazAddDocsInput').click();
+  });
+  document.getElementById('prikazDocsModalCloseBtn').addEventListener('click', ()=>{
+    document.getElementById('prikazDocsModalOverlay').classList.remove('open');
+  });
+  document.getElementById('prikazDocsModalOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'prikazDocsModalOverlay') document.getElementById('prikazDocsModalOverlay').classList.remove('open');
   });
   document.getElementById('prikazAddDocsInput').addEventListener('change', async (e)=>{
     const files = Array.from(e.target.files || []);
@@ -9146,6 +9198,7 @@
     // výběr z předchozí návštěvy dialogu.
     prikazNewEventFiles = [];
     if(document.getElementById('prikazAddDocsLabel')) updatePrikazAddDocsLabel();
+    document.getElementById('prikazDocsModalOverlay').classList.remove('open');
     const addDocsNote = document.getElementById('prikazAddDocsNote');
     if(addDocsNote){ addDocsNote.style.display = 'none'; addDocsNote.textContent = ''; }
 
