@@ -596,11 +596,36 @@
   .prikaz-box{
     background:var(--asphalt-2); border:1px solid var(--line); border-radius:16px;
     padding:24px 26px; max-width:420px; width:100%; text-align:left;
+    /* Pojistka proti tomu, aby tlačítka na konci dialogu utekla mimo
+       viditelnou plochu prohlížeče (stávalo se u dlouhých formulářů
+       na menších/přiblížených oknech) — dialog teď radši scroluje
+       sám v sobě, než aby přetékal přes okraj obrazovky. */
+    max-height:92vh; overflow-y:auto;
   }
-  /* appka pro nově založené události z "Přidat událost" (víc polí najednou
+  /* pro nově založené události z "Přidat událost" (víc polí najednou
      — SPZ, datum a čas spáchání navíc k pachateli) roztáhne dialog šířeji,
      ať se nemusí scrolovat. */
   .prikaz-box.prikaz-box-wide{max-width:640px;}
+  /* U ClickParku ("Parkoviště s parkovacím poplatkem") dialog zobrazí
+     najednou pole RZ/datum/čas SPÁCHÁNÍ i celou sekci PROVOZOVATEL
+     (viz prikazIsClickParkEvent v JS) — na výšku by se to do jednoho
+     sloupce nevešlo, proto se dialog v tomhle případě rozloží do dvou
+     sloupců vedle sebe (viz .prikaz-box-2col níž) a dostane víc šířky. */
+  .prikaz-box.prikaz-box-clickpark{max-width:900px;}
+  .prikaz-box.prikaz-box-2col{display:grid; grid-template-columns:1fr 1fr; column-gap:28px;}
+  /* Titulek, částka (u Příkazu), poznámka a tlačítka nechává dialog přes
+     celou šířku (grid-column: 1/-1) — jen RZ/datum/čas
+     (#prikazEventFieldsWrap) jdou do levého sloupce a PROVOZOVATEL
+     (#prikazProvozovatelWrap) do pravého; grid auto-placement je sám
+     spáruje do stejného řádku, protože oba mají volnou pozici hned za
+     titulkem. */
+  .prikaz-box-2col > h3,
+  .prikaz-box-2col > #prikazCastkaField,
+  .prikaz-box-2col > #prikazRecordSummary,
+  .prikaz-box-2col > .prikaz-note,
+  .prikaz-box-2col > .prikaz-actions{grid-column:1 / -1;}
+  .prikaz-box-2col > #prikazEventFieldsWrap{grid-column:1;}
+  .prikaz-box-2col > #prikazProvozovatelWrap{grid-column:2;}
   .prikaz-box h3{font-size:16px; margin:0 0 18px; color:var(--text); text-align:center;}
   .prikaz-box .field{margin-bottom:12px;}
   .admin-edit-box{max-width:560px;}
@@ -9415,6 +9440,8 @@
     // nemusí scrolovat (viz .prikaz-box-wide).
     document.getElementById('prikazEventFieldsWrap').style.display = prikazIsNewEvent ? '' : 'none';
     document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
+    document.getElementById('prikazBox').classList.toggle('prikaz-box-clickpark', prikazIsClickParkEvent);
+    document.getElementById('prikazBox').classList.toggle('prikaz-box-2col', prikazIsClickParkEvent);
     const r = currentDetailRecord;
     // ClickPark pole (Místo přestupku / Číslo pokuty) appka zobrazuje jen
     // u "Parkoviště s parkovacím poplatkem" (isClickParkEvent appka už
