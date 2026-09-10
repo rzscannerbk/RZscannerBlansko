@@ -9551,8 +9551,14 @@
     // provozovatele má už uloženého a rovnou ho výš předvyplnila) appka
     // schovávat nemá důvod, tam appka blok rovnou ukáže i s vyplněnými
     // poli. U Příkazu/Domluvy appka blok nechává vidět pořád, appka tam
-    // žádné "Vložit" nemá.
-    document.getElementById('prikazProvozovatelWrap').style.display = (prikazUsesEventActionBtn() && !p) ? 'none' : '';
+    // žádné "Vložit" nemá. U ClickParku appka blok NIKDY neschová (i
+    // když o pachateli ještě nic neví) — fyzicky sedí hned pod Datum/Čas
+    // spáchání (viz DOM pořadí: prikazEventFieldsWrap ->
+    // prikazProvozovatelWrap), takže appka strážník jméno/příjmení/
+    // datum narození/adresu (se stejným našeptávačem obcí/ulic, jaký
+    // appka používá jinde) může rovnou vyplnit ručně, aniž by musel
+    // čekat na MPM/RSV.
+    document.getElementById('prikazProvozovatelWrap').style.display = (prikazUsesEventActionBtn() && !p && !prikazIsClickParkEvent) ? 'none' : '';
     // Popisek pole "Číslo dokladu"/"Číslo jednací" appka nastaví
     // setPrikazProvozovatelMode výš (podle módu osoba/firma) — appka ho
     // tady už znovu nepřepisuje.
