@@ -1011,28 +1011,20 @@
              ClickPark, viz currentAddEventChoiceKey v JS). Appka data ze
              ClickPark e-mailu čte přes bookmarklet (viz
              clickpark-bookmarklet.js), který je zkopíruje do schránky
-             jako JSON — appka po kliknutí na "Vložit z ClickParku" tenhle
-             JSON rozparsuje a naplní RZ/tovární značku/barvu/datum/čas/
-             místo/číslo pokuty (případně i fotku) najednou, ať appka
-             ušetří ruční přepisování z e-mailu. -->
+             jako JSON — appka je vkládá přes vícestavové tlačítko úplně
+             dole v dialogu (první krok appka tam přejmenovala z "MPM" na
+             "Vložit", viz prikazEventBtnState/applyClickParkPaste v JS)
+             — appka tu nechala jen samotná pole, která appka vyplní. -->
         <div id="prikazClickParkFieldsWrap" style="display:none;">
           <div class="prikaz-row2">
-            <div class="field">
-              <label>&nbsp;</label>
-              <button type="button" class="prikaz-scan-btn" id="prikazClickParkPasteBtn" style="width:100%; justify-content:center;">
-                <span class="cam-icon">📋</span> <span id="prikazClickParkPasteLabel">Vložit z ClickParku</span>
-              </button>
+            <div class="field" id="prikazMistoPrestupkuField">
+              <label for="prikazMistoPrestupku">Místo přestupku</label>
+              <input type="text" id="prikazMistoPrestupku" autocomplete="off" placeholder="ulice (appka doplní z e-mailu, nebo napiš ručně)">
+              <a href="#" id="prikazMistoMapLink" target="_blank" rel="noopener" style="display:none; font-size:11.5px; margin-top:4px;">📍 Otevřít na mapě</a>
             </div>
             <div class="field">
               <label for="prikazClickParkCislo">Číslo pokuty (ClickPark)</label>
               <input type="text" id="prikazClickParkCislo" autocomplete="off" placeholder="nepovinné">
-            </div>
-          </div>
-          <div class="prikaz-row2">
-            <div class="field" id="prikazMistoPrestupkuField" style="grid-column: 1 / -1;">
-              <label for="prikazMistoPrestupku">Místo přestupku</label>
-              <input type="text" id="prikazMistoPrestupku" autocomplete="off" placeholder="ulice (appka doplní z e-mailu, nebo napiš ručně)">
-              <a href="#" id="prikazMistoMapLink" target="_blank" rel="noopener" style="display:none; font-size:11.5px; margin-top:4px;">📍 Otevřít na mapě</a>
             </div>
           </div>
         </div>
@@ -7696,27 +7688,27 @@
   // nejdřív zkusí JSON.parse a pokud pozná jiný appky vlastní JSON
   // (typicky MPM export z tlačítka "MPM"), rovnou to řekne místo
   // tichého selhání — stejný vzor appka používá i u "Vlož provozovatele"
-  // (parseProvozovatelText výš).
+  // (parseProvozovatelText výš). Appka vrací true/false (úspěch) —
+  // o stav vícestavového tlačítka (prikazEventBtnState) se stará až
+  // volající (viz prikazEventActionBtn click handler níž).
   async function applyClickParkPaste(){
-    const btn = document.getElementById('prikazClickParkPasteBtn');
-    const label = document.getElementById('prikazClickParkPasteLabel');
     let raw;
     try{
       raw = await navigator.clipboard.readText();
     }catch(e){
       alert('Nepodařilo se přečíst schránku prohlížeče. Zkontroluj oprávnění ke schránce pro tuhle stránku a zkus to znovu.');
-      return;
+      return false;
     }
     let d;
     try{
       d = JSON.parse(raw);
     }catch(e){
       alert('Ve schránce není platný JSON z appky. Nejdřív na ClickPark e-mailu spusť bookmarklet "ClickPark to RZ Scanner" (zkopíruje data do schránky), pak se sem vrať a zkus Vložit znovu.');
-      return;
+      return false;
     }
     if(!d || d.source !== 'clickpark'){
       alert('Ve schránce je jiný appky vlastní JSON (ne z ClickPark bookmarkletu) — appka ho nevkládá, ať nepřepíše pole nesmyslným obsahem. Zkontroluj, že jsi spustil(a) bookmarklet na ClickPark e-mailu.');
-      return;
+      return false;
     }
     function set(id, v){ const el = document.getElementById(id); if(el && v){ el.value = v; } }
     set('prikazSpz', d.rz);
@@ -7746,10 +7738,8 @@
       prikazNewEventFiles.push({ data: d.photoData, mime: d.photoMime || 'image/jpeg', name: 'clickpark_' + (d.id || 'foto') + '.jpg' });
       updatePrikazAddDocsLabel();
     }
-    label.textContent = 'Vloženo ✓';
-    btn.classList.add('copied');
     updatePrikazEventFieldValidation();
-    updatePrikazEventActionBtn();
+    return true;
   }
 
   // Appka přiložené soubory (ještě neuložené, appka je drží jen
@@ -8027,9 +8017,16 @@
     if(!btn) return;
     pickAddEventChoice(btn.dataset.choice);
   });
+  // "Placenky" appka teď rovnou zakládá "Parkoviště s parkovacím
+  // poplatkem" — dokud appka měla pod Placenkami jen tuhle jednu
+  // položku, mezikrok s podnabídkou (addEventPlacenkyOverlay) appku jen
+  // zdržoval navíc (viz Lukášovy screenshoty). Přibude-li appce časem
+  // další typ Placenky, appka se sem klidně vrátí a mezikrok zase
+  // odkryje (addEventPlacenkyOverlay/addEventPlacenkyChoices appka
+  // v HTML nechává netknuté, jen appka je teď obchází).
   document.getElementById('addEventPlacenkyBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
-    document.getElementById('addEventPlacenkyOverlay').classList.add('open');
+    pickAddEventChoice('Parkoviste');
   });
   document.getElementById('addEventPlacenkyBackBtn').addEventListener('click', ()=>{
     document.getElementById('addEventPlacenkyOverlay').classList.remove('open');
@@ -8040,7 +8037,6 @@
     if(!btn) return;
     pickAddEventChoice(btn.dataset.choice);
   });
-  document.getElementById('prikazClickParkPasteBtn').addEventListener('click', applyClickParkPaste);
   document.getElementById('addEventSpeedBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
     document.getElementById('addEventSpeedOverlay').classList.add('open');
@@ -9231,15 +9227,23 @@
   // true jen když appka dialog otevřela z "Přidat událost" (nový záznam
   // bez SPZ/data/času z terénu) — viz openPrikazModal a pickAddEventChoice.
   let prikazIsNewEvent = false;
+  // true u volby "Parkoviště s parkovacím poplatkem" (ClickPark) — appka
+  // ho nastavuje openPrikazModal hned na začátku (potřebuje ho i pro
+  // titulek dialogu), a appka ho pak čte i mimo tu funkci
+  // (updatePrikazEventActionBtn, prikazEventActionBtn click handler).
+  let prikazIsClickParkEvent = false;
   // Lat/lng appka drží stranou od formulářových polí (žádný input pro ně
   // není — appka je jen appka potřebuje pro odkaz "Otevřít na mapě" a pro
   // uložení do record.lat/record.lng) — appka je naplní až po úspěšném
-  // "Vložit z ClickParku" (viz prikazClickParkPasteBtn níž).
+  // vložení z ClickParku (viz applyClickParkPaste níž).
   let prikazClickParkLat = null;
   let prikazClickParkLng = null;
-  // Stav vícestavového tlačítka u "Přidat událost" — 'mpm' (zkopírovat
-  // do MPM) -> 'paste' (vložit provozovatele ze schránky) -> 'confirm'
-  // (Potvrdit a uložit, jakmile je vyplněný termín dostavení). Viz
+  // Stav vícestavového tlačítka u "Přidat událost" — appka u ClickParku
+  // (prikazIsClickParkEvent) přidává první krok navíc: 'clickpark'
+  // (vložit data z ClickPark e-mailu ze schránky, viz applyClickParkPaste)
+  // -> 'mpm' (zkopírovat do MPM) -> 'paste' (vložit provozovatele ze
+  // schránky) -> 'confirm' (Potvrdit a uložit, jakmile je vyplněný
+  // termín dostavení). Bez ClickParku appka rovnou začíná na 'mpm'. Viz
   // updatePrikazEventActionBtn a jeho click handler níž.
   let prikazEventBtnState = 'mpm';
   // Appka ho krátce nastaví na true kolem programového přeskoku fokusu
@@ -9360,7 +9364,13 @@
     if(!btn || !prikazUsesEventActionBtn()) return;
     if(prikazEventTerminReady()) prikazEventBtnState = 'confirm';
     btn.classList.remove('copied', 'copy-err', 'mpm-busy');
-    if(prikazEventBtnState === 'mpm'){
+    if(prikazEventBtnState === 'clickpark'){
+      // Vložení dat z ClickPark e-mailu nezávisí na validaci RZ/data/
+      // času (ty se teprve tímhle krokem doplní) — tlačítko je proto
+      // vždycky klikatelné.
+      btn.textContent = 'Vložit';
+      btn.disabled = false;
+    } else if(prikazEventBtnState === 'mpm'){
       btn.textContent = 'MPM';
       btn.disabled = !updatePrikazEventFieldValidation();
     } else if(prikazEventBtnState === 'paste'){
@@ -9376,8 +9386,19 @@
   function openPrikazModal(mode, isNewEvent){
     prikazMode = mode || 'prikaz';
     prikazIsNewEvent = !!isNewEvent;
+    // appka pozná ClickPark ("Parkoviště s parkovacím poplatkem") buď
+    // podle currentAddEventChoiceKey (hned po výběru v menu "Přidat
+    // událost"), nebo — když dialog otevírá znovu později na už
+    // založeném záznamu — podle uložené kvalifikace (mpmUdalostId 51989
+    // má jen tenhle typ události, viz ADD_EVENT_OFFENSES.Parkoviste
+    // výš). Appka si to pamatuje v modulové proměnné
+    // prikazIsClickParkEvent, ať appka jde použít i mimo tuhle funkci
+    // (viz updatePrikazEventActionBtn a click handler níž).
+    prikazIsClickParkEvent = prikazIsNewEvent && (currentAddEventChoiceKey === 'Parkoviste' || (currentDetailRecord && currentDetailRecord.mpmUdalostId === '51989'));
     const titleEl = document.getElementById('prikazDialogTitle');
-    const baseTitle = PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz;
+    // appka u ClickParku titulek zobrazí "Placené parkoviště" místo
+    // obecného "Výzva k podání vysvětlení".
+    const baseTitle = prikazIsClickParkEvent ? 'Placené parkoviště' : (PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz);
     // U příkazu appka přidá druhý řádek se zvoleným způsobem platby (viz
     // prikazPlatbaOverlay) — jinde titulek zůstává jednořádkový jako dřív.
     titleEl.innerHTML = (prikazMode === 'prikaz' && prikazPlatbaMetoda)
@@ -9395,24 +9416,16 @@
     document.getElementById('prikazEventFieldsWrap').style.display = prikazIsNewEvent ? '' : 'none';
     document.getElementById('prikazBox').classList.toggle('prikaz-box-wide', prikazIsNewEvent);
     const r = currentDetailRecord;
-    // ClickPark pole (Vložit z ClickParku / Místo přestupku / Číslo
-    // pokuty) appka zobrazuje jen u "Parkoviště s parkovacím poplatkem"
-    // — u ostatních voleb (MKDS/Rychlost) appka adresu má napevno
-    // v ADD_EVENT_OFFENSES, tam by pole jen zabíralo místo navíc.
-    // currentAddEventChoiceKey appka zná jen hned po výběru v menu
-    // "Přidat událost" — když appka dialog zrušíš a záznam otevřeš znovu
-    // později (např. z hlavního přehledu), appka se pozná i podle
-    // uložené kvalifikace (mpmUdalostId 51989 appka má jen tenhle typ
-    // události, viz ADD_EVENT_OFFENSES.Parkoviste výš). DŮLEŽITÉ: tenhle
-    // blok MUSÍ být až PO "const r = currentDetailRecord;" výš — dřív tu
-    // byl nad ním, což appce shazovalo úplně KAŽDÉ "Přidat událost"
-    // (i MKDS) na "Cannot access 'r' before initialization".
-    const isClickParkEvent = prikazIsNewEvent && (currentAddEventChoiceKey === 'Parkoviste' || (r && r.mpmUdalostId === '51989'));
-    document.getElementById('prikazClickParkFieldsWrap').style.display = isClickParkEvent ? '' : 'none';
-    if(isClickParkEvent){
+    // ClickPark pole (Místo přestupku / Číslo pokuty) appka zobrazuje jen
+    // u "Parkoviště s parkovacím poplatkem" (isClickParkEvent appka už
+    // spočítala výš jako prikazIsClickParkEvent, hned na začátku funkce
+    // — appka to potřebovala i pro titulek dialogu) — u ostatních voleb
+    // (MKDS/Rychlost) appka adresu má napevno v ADD_EVENT_OFFENSES, tam
+    // by pole jen zabíralo místo navíc.
+    document.getElementById('prikazClickParkFieldsWrap').style.display = prikazIsClickParkEvent ? '' : 'none';
+    if(prikazIsClickParkEvent){
       document.getElementById('prikazClickParkCislo').value = (r && r.clickParkCisloPokuty) || '';
       document.getElementById('prikazMistoPrestupku').value = (r && r.address) || '';
-      document.getElementById('prikazClickParkPasteLabel').textContent = 'Vložit z ClickParku';
       prikazClickParkLat = (r && typeof r.lat === 'number') ? r.lat : null;
       prikazClickParkLng = (r && typeof r.lng === 'number') ? r.lng : null;
       const mapLink = document.getElementById('prikazMistoMapLink');
@@ -9543,7 +9556,10 @@
     // Popisek pole "Číslo dokladu"/"Číslo jednací" appka nastaví
     // setPrikazProvozovatelMode výš (podle módu osoba/firma) — appka ho
     // tady už znovu nepřepisuje.
-    prikazEventBtnState = 'mpm';
+    // U ClickParku appka vícestavové tlačítko pouští od 'clickpark'
+    // (appka na něm nejdřív vloží data z e-mailu), jinde appka rovnou
+    // začíná na 'mpm' jako dřív.
+    prikazEventBtnState = prikazIsClickParkEvent ? 'clickpark' : 'mpm';
     prikazEventPasted = false;
     prikazMpmCisloJednaci = null;
     // Appka požadavek na "aspoň jednou Vyhledat DS" resetuje při každém
@@ -10367,6 +10383,19 @@
     if(!record) return;
     const btn = document.getElementById('prikazEventActionBtn');
 
+    if(prikazEventBtnState === 'clickpark'){
+      // Vložit data z ClickPark e-mailu ze schránky (viz applyClickParkPaste)
+      // — na úspěch appka rovnou posune tlačítko na další krok ('mpm'),
+      // na neúspěch appka zůstane na 'clickpark' (applyClickParkPaste
+      // sama appce ukáže, co se stalo, přes alert).
+      btn.disabled = true;
+      const ok = await applyClickParkPaste();
+      btn.disabled = false;
+      if(ok) prikazEventBtnState = 'mpm';
+      updatePrikazEventActionBtn();
+      return;
+    }
+
     if(prikazEventBtnState === 'mpm'){
       const complete = updatePrikazEventFieldValidation();
       if(!complete){
@@ -10529,7 +10558,7 @@
         // lat/lng appka uložila v applyClickParkPaste výš. Číslo pokuty
         // z ClickParku appka drží jen jako poznámku appce k záznamu
         // (appka ho zatím nikam do generovaného dokumentu nevkládá).
-        if(currentAddEventChoiceKey === 'Parkoviste'){
+        if(prikazIsClickParkEvent){
           const mistoNow = document.getElementById('prikazMistoPrestupku').value.trim();
           const cisloPokutyNow = document.getElementById('prikazClickParkCislo').value.trim();
           Object.assign(record, {
@@ -10589,7 +10618,7 @@
         const updatePayload = {
           plate: record.plate, date: record.date, time: record.time, brand: record.brand, color: record.color, mpmCisloJednaci: record.mpmCisloJednaci
         };
-        if(currentAddEventChoiceKey === 'Parkoviste'){
+        if(prikazIsClickParkEvent){
           Object.assign(updatePayload, {
             address: record.address, lat: record.lat, lng: record.lng, clickParkCisloPokuty: record.clickParkCisloPokuty
           });
