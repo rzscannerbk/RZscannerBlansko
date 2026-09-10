@@ -5393,7 +5393,11 @@
     footerBody += docxPara('Ing. Martin Lepka', { size: 20 });
     footerBody += docxPara('ředitel MP Blansko', { size: 20, spacingAfter: 400 });
     footerBody += docxPara('Přílohy:', { size: 20 });
-    footerBody += docxPara('- Výzva', { size: 20 });
+    // "- Výzva" appka do seznamu příloh napíše, jen když tu kopii
+    // tištěné výzvy vůbec přikládá — stejnou podmínku appka používá
+    // i u bloku Výzvy samotného o pár řádků níž (viz
+    // docxNarrowBoxTable).
+    if(record.source !== 'addEvent') footerBody += docxPara('- Výzva', { size: 20 });
     footerBody += docxPara('- Fotodokumentace', { size: 20 });
     footerBody += docxPara('- mapa místa přestupku', { size: 20 });
 
@@ -5418,6 +5422,15 @@
     // Obsah je záměrně stejný jako to, co appka posílá na tepelnou tiskárnu
     // (viz buildEposPrintXml výše) — jméno strážníka tu ale zůstává celé
     // (na tisku je jen služební číslo, viz officerPrintLabel).
+    //
+    // Appka tenhle blok vynechá u záznamů založených přes "Přidat
+    // událost" (record.source === 'addEvent', appka teď zavedená pro
+    // předdefinované MKDS/Placenky přestupky) — appka tam žádná fyzická
+    // výzva za sklo vozidla nikdy netisknout nešla (žádný strážník
+    // u vozidla fyzicky nestál, appka jen zpětně zapisuje kamerový
+    // záznam), takže by kopie "tištěné" výzvy v Oznámení neodpovídala
+    // realitě.
+    if(record.source !== 'addEvent'){
     const isBoticka = record.docType === 'boticka';
     body += docxPara('Výzva', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
     let inner = '';
@@ -5477,6 +5490,7 @@
     inner += docxPara('RZ Scanner © Šuraj', { size: 11, align: 'center' });
 
     body += docxNarrowBoxTable(58, inner);
+    }
 
     // Mapa místa přestupku — poslední stránka dokumentu (za fotkami a
     // Výzvou), jen když appka má souřadnice. Mapy.com Static Maps API
@@ -7561,7 +7575,13 @@
       color: null,
       docType: 'vyzva',
       mpmUdalostId: off.mpmId || null,
-      mpmUdalostText: off.mpmText || null
+      mpmUdalostText: off.mpmText || null,
+      // Appka si sem poznamená, že záznam vznikl přes "Přidat událost"
+      // (MKDS, případně budoucí Placenky) — u téhle cesty nikdy
+      // neexistuje fyzicky vytištěná výzva za sklo (žádný strážník
+      // u vozidla fyzicky nestál), takže podle tohohle příznaku appka
+      // v buildOznameniDocx schová stránku s "kopií tištěné výzvy".
+      source: 'addEvent'
     };
     await docRef.set(data);
     const snap = await docRef.get();
@@ -7759,7 +7779,7 @@
       ctx.fillStyle = '#fff';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-      const dataUrl = canvas.toDataURL('image/jpeg', quality || 0.72);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality || 1);
       pages.push(dataUrl.split(',')[1]);
     }
     return pages;
@@ -7824,7 +7844,7 @@
           // uvnitř), appka radši přiloží originální PDF beze změny, než
           // aby appka celý soubor zahodila.
           try{
-            const jpegPages = await renderPdfToJpegPages(file, 0.72, 1600);
+            const jpegPages = await renderPdfToJpegPages(file, 1, 1600);
             const baseName = file.name.replace(/\.pdf$/i, '');
             jpegPages.forEach((data, idx)=>{
               const suffix = jpegPages.length > 1 ? ('_str' + (idx + 1)) : '';
