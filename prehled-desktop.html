@@ -6205,6 +6205,24 @@
     document.getElementById('lightboxCounter').style.display = multi ? 'block' : 'none';
   }
 
+  // Appka otevřenou fotku/PDF pojmenuje "číslo přestupku - RZ - místo -
+  // datum a čas" (appka to sestaví z record, nežádoucí znaky pro
+  // souborový systém appka vyčistí přes sanitizeFilenamePart) — appka
+  // to dělá vytvořením File objektu (ne obyčejného Blob), protože jen
+  // tak prohlížeč u přímo otevřené blob: adresy převezme jméno do
+  // nabízeného názvu při systémovém "Uložit jako".
+  function sanitizeFilenamePart(s){
+    return (s || '').toString().trim().replace(/[\\/:*?"<>|]+/g, '-');
+  }
+  function buildPhotoDownloadFilename(record, mime, index){
+    const ext = mime === 'application/pdf' ? '.pdf' : '.jpg';
+    const datumCas = [record.date ? isoToCzDate(record.date) : '', record.time || ''].filter(Boolean).join(' ');
+    const parts = [record.noticeNumber, record.plate, record.address, datumCas].filter(Boolean);
+    let name = sanitizeFilenamePart(parts.join(' - ')) || 'prestupek';
+    if(index) name += ' (' + (index + 1) + ')';
+    return name + ext;
+  }
+
   async function openLightbox(record, thumbEl){
     if(thumbEl) thumbEl.classList.add('loading');
     try{
@@ -6219,8 +6237,9 @@
       // rozměru (max 88 % viewportu appky), který appce u některých
       // fotek/rozlišení lezl mimo obrazovku.
       const firstMime = (mimes && mimes[0]) || mime;
-      const blob = new Blob([base64ToUint8Array(photos[0])], { type: firstMime || 'image/jpeg' });
-      window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+      const filename = buildPhotoDownloadFilename(record, firstMime);
+      const file = new File([base64ToUint8Array(photos[0])], filename, { type: firstMime || 'image/jpeg' });
+      window.open(URL.createObjectURL(file), '_blank', 'noopener');
     }catch(e){
       if(thumbEl) thumbEl.classList.remove('loading');
       console.error('Fullscreen náhled se nepodařilo otevřít:', e);
@@ -7616,10 +7635,21 @@
 
     const info = document.createElement('div');
     info.className = 'photos-modal-info';
-    const name = document.createElement('div');
-    name.className = 'photos-modal-name';
-    name.textContent = f.name || ('soubor ' + (idx + 1));
-    info.appendChild(name);
+    // Jméno souboru appka nechává rovnou editovatelné (obyčejný text
+    // input, jen appka ho stylem schová do vzhledu popisku) — appka
+    // ho nikam natrvalo neukládá (appka u uložených fotek appka jména
+    // vůbec nedrží, jen appka u nich pak generuje "RZ_1.jpg" apod.),
+    // appka to appka bere jako pohodlí navíc při práci s víc soubory
+    // najednou v jedné appce session.
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'photos-modal-name-input';
+    nameInput.value = f.name || ('soubor ' + (idx + 1));
+    nameInput.addEventListener('change', ()=>{
+      f.name = nameInput.value.trim() || ('soubor ' + (idx + 1));
+      nameInput.value = f.name;
+    });
+    info.appendChild(nameInput);
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
@@ -8453,22 +8483,23 @@
     const itemMime = (mimes && mimes[0]) || mime;
     const isPdf = itemMime === 'application/pdf';
     const dataUrl = 'data:' + itemMime + ';base64,' + photos[0];
-    const ext = isPdf ? '.pdf' : '.jpg';
-    const filename = (record.plate || 'prestupek') + '_1' + ext;
+    const filename = buildPhotoDownloadFilename(record, itemMime, 0);
     const item = document.createElement('div');
     item.className = 'photo-item';
 
     if(isPdf){
       // PDF appka nezobrazí náhledem (jako <img> by to byla jen rozbitá
       // ikonka) — místo toho appka ukáže odkaz, co PDF otevře v nové
-      // záložce. Záměrně přes blob: URL, ne data: URL — Chrome umí
+      // záložce. Záměrně přes blob: URL (z File objektu appka
+      // pojmenovaného stejně jako Stáhnout PDF níž, viz
+      // buildPhotoDownloadFilename), ne data: URL — Chrome umí
       // "data:application/pdf;base64,..." otevřené přes target="_blank"
       // (nebo window.open) nechat vykreslit jako prázdnou stránku,
       // zatímco blob: URL svůj vestavěný PDF prohlížeč spolehlivě
       // spustí (appka na to narazila naživo — appka proto b64 převádí
       // na Blob přes existující base64ToUint8Array).
-      const pdfBlob = new Blob([base64ToUint8Array(photos[0])], { type: 'application/pdf' });
-      const pdfBlobUrl = URL.createObjectURL(pdfBlob);
+      const pdfFile = new File([base64ToUint8Array(photos[0])], filename, { type: 'application/pdf' });
+      const pdfBlobUrl = URL.createObjectURL(pdfFile);
       const link = document.createElement('a');
       link.href = pdfBlobUrl;
       link.target = '_blank';
@@ -8503,7 +8534,7 @@
     const itemMime = (mimes && mimes[idx]) || mime;
     const isPdf = itemMime === 'application/pdf';
     const dataUrl = 'data:' + itemMime + ';base64,' + photos[idx];
-    const filename = (record.plate || 'příloha') + '_' + (idx + 1) + (isPdf ? '.pdf' : '.jpg');
+    const filename = buildPhotoDownloadFilename(record, itemMime, idx);
 
     const row = document.createElement('div');
     row.className = 'photos-modal-item';
@@ -8522,10 +8553,12 @@
     }
     // Klik appka otevře přílohu v nové záložce, stejně jako appka to
     // dělá u náhledu v seznamu (viz openLightbox) — appka žádný in-page
-    // lightbox appka nemá důvod appka znovu zavádět.
+    // lightbox nemá důvod znovu zavádět. File objekt appka pojmenuje
+    // stejně jako openLightbox (viz buildPhotoDownloadFilename), ať
+    // appka "Uložit jako" nabídne stejný smysluplný název.
     thumbBtn.addEventListener('click', ()=>{
-      const blob = new Blob([base64ToUint8Array(photos[idx])], { type: itemMime || 'image/jpeg' });
-      window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+      const file = new File([base64ToUint8Array(photos[idx])], filename, { type: itemMime || 'image/jpeg' });
+      window.open(URL.createObjectURL(file), '_blank', 'noopener');
     });
 
     const info = document.createElement('div');
