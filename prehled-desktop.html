@@ -561,7 +561,7 @@
     display:flex; align-items:center; justify-content:center; gap:8px;
     width:100%; box-sizing:border-box; padding:18px 12px; border-radius:12px;
     background:var(--asphalt-4); border:1px solid var(--line); color:var(--text);
-    text-decoration:none; font-size:14px; font-weight:600;
+    text-decoration:none; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer;
   }
   .photo-item a.download-link, .photo-item button.download-link{
     display:block; width:100%; text-align:center; margin-top:6px; font-size:12px;
@@ -6207,10 +6207,7 @@
 
   // Appka otevřenou fotku/PDF pojmenuje "číslo přestupku - RZ - místo -
   // datum a čas" (appka to sestaví z record, nežádoucí znaky pro
-  // souborový systém appka vyčistí přes sanitizeFilenamePart) — appka
-  // to dělá vytvořením File objektu (ne obyčejného Blob), protože jen
-  // tak prohlížeč u přímo otevřené blob: adresy převezme jméno do
-  // nabízeného názvu při systémovém "Uložit jako".
+  // souborový systém appka vyčistí přes sanitizeFilenamePart).
   function sanitizeFilenamePart(s){
     return (s || '').toString().trim().replace(/[\\/:*?"<>|]+/g, '-');
   }
@@ -6223,23 +6220,59 @@
     return name + ext;
   }
 
+  // Appka zkoušela vnutit prohlížeči jméno přes File objekt u přímo
+  // otevřené blob: adresy — appka to naživo nefungovalo (Chrome
+  // appce u "Uložit jako" i tak nabídl jen náhodné UUID blobu, appka
+  // to ověřila přímo na obrazovce). Appka proto místo přímé navigace
+  // na blob otevře malou vlastní HTML stránku s náhledem a tlačítkem
+  // "Stáhnout" — to appka řeší přes <a download>, které appka jméno
+  // souboru garantovaně dodrží.
+  function openFileInNewTab(bytesU8, mime, filename){
+    const blob = new Blob([bytesU8], { type: mime || 'application/octet-stream' });
+    const blobUrl = URL.createObjectURL(blob);
+    const isPdf = mime === 'application/pdf';
+    const win = window.open('', '_blank', 'noopener');
+    if(!win){
+      // Appka nový tab prohlížeč zablokoval jako vyskakovací okno —
+      // appka aspoň zkusí otevřít přílohu přímo, ať ji strážník má
+      // šanci vidět (bez hezkého pojmenování, ale aspoň funkční).
+      window.open(blobUrl, '_blank', 'noopener');
+      return;
+    }
+    const safeName = escapeHtml(filename);
+    win.document.title = filename;
+    win.document.write(
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + safeName + '</title>' +
+      '<style>' +
+      'html,body{margin:0; height:100%; background:#0A0C10; font-family:Inter,system-ui,sans-serif;}' +
+      '.bar{position:sticky; top:0; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; background:#1D2129; border-bottom:1px solid #262B33;}' +
+      '.bar span{color:#ECEDEF; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}' +
+      '.bar a{flex:0 0 auto; color:#241a00; background:#FFB020; font-weight:700; text-decoration:none; font-size:13px; padding:7px 14px; border-radius:8px;}' +
+      '.wrap{display:flex; align-items:center; justify-content:center; padding:16px; min-height:calc(100% - 50px); box-sizing:border-box;}' +
+      'img{max-width:100%; max-height:85vh; display:block; border-radius:6px;}' +
+      'iframe{width:100%; height:calc(100vh - 82px); border:none; background:#fff;}' +
+      '</style></head><body>' +
+      '<div class="bar"><span>' + safeName + '</span><a href="' + blobUrl + '" download="' + safeName + '">⬇ Stáhnout</a></div>' +
+      (isPdf ? '<iframe src="' + blobUrl + '"></iframe>' : '<div class="wrap"><img src="' + blobUrl + '" alt=""></div>') +
+      '</body></html>'
+    );
+    win.document.close();
+  }
+
   async function openLightbox(record, thumbEl){
     if(thumbEl) thumbEl.classList.add('loading');
     try{
       const { photos, mime, mimes } = await ensurePhotosLoaded(record);
       if(thumbEl) thumbEl.classList.remove('loading');
       if(!photos.length) return;
-      // Appka fotku (i PDF) otevírá v samostatné záložce prohlížeče přes
-      // Blob URL — appka to dřív dělala jen pro PDF (in-page lightbox
-      // appka je nedokázala zobrazit), teď appka stejný, spolehlivější
-      // způsob používá i pro obrázky: v nové záložce appka dostane
-      // přesně tolik místa, kolik potřebuje, místo pevně omezeného
-      // rozměru (max 88 % viewportu appky), který appce u některých
-      // fotek/rozlišení lezl mimo obrazovku.
+      // Appka fotku (i PDF) otevírá v samostatné záložce appky (viz
+      // openFileInNewTab) — v nové záložce appka dostane přesně tolik
+      // místa, kolik potřebuje, místo pevně omezeného rozměru (max
+      // 88 % viewportu appky), který appce u některých fotek/rozlišení
+      // lezl mimo obrazovku.
       const firstMime = (mimes && mimes[0]) || mime;
       const filename = buildPhotoDownloadFilename(record, firstMime);
-      const file = new File([base64ToUint8Array(photos[0])], filename, { type: firstMime || 'image/jpeg' });
-      window.open(URL.createObjectURL(file), '_blank', 'noopener');
+      openFileInNewTab(base64ToUint8Array(photos[0]), firstMime || 'image/jpeg', filename);
     }catch(e){
       if(thumbEl) thumbEl.classList.remove('loading');
       console.error('Fullscreen náhled se nepodařilo otevřít:', e);
@@ -8489,23 +8522,17 @@
 
     if(isPdf){
       // PDF appka nezobrazí náhledem (jako <img> by to byla jen rozbitá
-      // ikonka) — místo toho appka ukáže odkaz, co PDF otevře v nové
-      // záložce. Záměrně přes blob: URL (z File objektu appka
-      // pojmenovaného stejně jako Stáhnout PDF níž, viz
-      // buildPhotoDownloadFilename), ne data: URL — Chrome umí
-      // "data:application/pdf;base64,..." otevřené přes target="_blank"
-      // (nebo window.open) nechat vykreslit jako prázdnou stránku,
-      // zatímco blob: URL svůj vestavěný PDF prohlížeč spolehlivě
-      // spustí (appka na to narazila naživo — appka proto b64 převádí
-      // na Blob přes existující base64ToUint8Array).
-      const pdfFile = new File([base64ToUint8Array(photos[0])], filename, { type: 'application/pdf' });
-      const pdfBlobUrl = URL.createObjectURL(pdfFile);
-      const link = document.createElement('a');
-      link.href = pdfBlobUrl;
-      link.target = '_blank';
-      link.rel = 'noopener';
+      // ikonka) — místo toho appka ukáže tlačítko, co PDF otevře stejně
+      // jako openLightbox (viz openFileInNewTab — appka tam appka File
+      // objekt appce jméno v "Uložit jako" nedal spolehlivě, appka to
+      // řeší přes vlastní stránku s tlačítkem Stáhnout).
+      const link = document.createElement('button');
+      link.type = 'button';
       link.className = 'photo-pdf-link';
       link.textContent = '📄 PDF dokument';
+      link.addEventListener('click', ()=>{
+        openFileInNewTab(base64ToUint8Array(photos[0]), 'application/pdf', filename);
+      });
       item.appendChild(link);
     } else {
       const img = document.createElement('img');
@@ -8551,14 +8578,12 @@
       img.style.cssText = 'width:100%; height:100%; object-fit:cover; border-radius:8px;';
       thumbBtn.appendChild(img);
     }
-    // Klik appka otevře přílohu v nové záložce, stejně jako appka to
-    // dělá u náhledu v seznamu (viz openLightbox) — appka žádný in-page
-    // lightbox nemá důvod znovu zavádět. File objekt appka pojmenuje
-    // stejně jako openLightbox (viz buildPhotoDownloadFilename), ať
-    // appka "Uložit jako" nabídne stejný smysluplný název.
+    // Klik appka otevře přílohu v nové záložce se stránkou appky, co
+    // má garantovaně správný název i u tlačítka Stáhnout (viz
+    // openFileInNewTab u openLightbox — File objekt appce samotné
+    // "Uložit jako" spolehlivé jméno nedal).
     thumbBtn.addEventListener('click', ()=>{
-      const file = new File([base64ToUint8Array(photos[idx])], filename, { type: itemMime || 'image/jpeg' });
-      window.open(URL.createObjectURL(file), '_blank', 'noopener');
+      openFileInNewTab(base64ToUint8Array(photos[idx]), itemMime || 'image/jpeg', filename);
     });
 
     const info = document.createElement('div');
