@@ -9456,13 +9456,23 @@
   // appce jako signál "hotovo" stačí, že appka má vyplněné Jméno
   // a Příjmení.
   function prikazEventTerminReady(){
-    // U ClickParku + Příkaz na místě je potřeba jak vybraný způsob
-    // platby, tak doopravdy provedený MPM export (klik na tlačítko
-    // "MPM", ne jen vyplněná pole) — bez obojího appka tlačítko na
-    // "Potvrdit a uložit" nepustí, ať appka nikdy neuloží záznam bez
-    // způsobu platby ani ho nepřeskočí rovnou k uložení, aniž by se
-    // dostal do MP Manageru (viz Lukášovo zadání).
-    if(prikazIsClickParkEvent && prikazMode === 'prikaz' && (!prikazPlatbaMetoda || !prikazClickParkMpmDone)) return false;
+    // U ClickParku + Příkaz na místě je navíc potřeba vybraný způsob
+    // platby a doopravdy provedený MPM export (klik na tlačítko "MPM",
+    // ne jen vyplněná pole) — bez obojího tlačítko na "Potvrdit
+    // a uložit" nepustí, ať se nikdy neuloží záznam bez způsobu platby
+    // ani se nepřeskočí rovnou k uložení, aniž by se dostal do MP
+    // Manageru (viz Lukášovo zadání).
+    //
+    // Zároveň se tu (na rozdíl od ostatních PŘESTUPCE toků) i tak čeká
+    // na "Vložit" (prikazEventPasted) — samotné jméno/příjmení nestačí,
+    // protože číslo jednací se dostane až lustrací v MP Manageru a musí
+    // se vrátit zpátky přes schránku (viz applyProvozovatelText, který
+    // u tohohle toku PŘESTUPCE pole nepřepisuje, jen si tiše vezme
+    // číslo jednací).
+    if(prikazIsClickParkEvent && prikazMode === 'prikaz'){
+      if(!prikazPlatbaMetoda || !prikazClickParkMpmDone) return false;
+      return prikazEventPasted;
+    }
     if(prikazPrestupceActive()){
       return !!(
         document.getElementById('prikazJmeno').value.trim() &&
@@ -9559,8 +9569,8 @@
       document.getElementById('prikazPlatbaHotoveChk').checked = false;
       document.getElementById('prikazPlatbaKartouChk').checked = false;
       document.getElementById('prikazPlatbaBpnChk').checked = false;
-      // MPM export appka na každém novém otevření dialogu vyžaduje
-      // znovu — viz prikazEventTerminReady a prikazClickParkMpmDone.
+      // MPM export se na každém novém otevření dialogu vyžaduje znovu
+      // — viz prikazEventTerminReady a prikazClickParkMpmDone.
       prikazClickParkMpmDone = false;
       refreshPrikazTitle();
     } else if(castkaEl.parentElement !== document.getElementById('prikazBox')){
@@ -10545,14 +10555,14 @@
   // rozlišit "ještě nevloženo" od "vloženo" ve stejném stavu 'paste' —
   // viz updatePrikazEventActionBtn).
   let prikazEventPasted = false;
-  // U ClickParku + Příkaz na místě appka vyžaduje, aby strážník MPM
-  // export doopravdy provedl (klikl a úspěšně se zkopírovalo), než
-  // appka dovolí "Potvrdit a uložit" — jinak by appka jméno/příjmení +
-  // způsob platby (obojí u PŘESTUPCE vyplněné rovnou v dialogu) vzala
-  // jako "hotovo" a tlačítko přeskočilo rovnou na finální uložení, aniž
-  // by appka záznam vůbec dostala do MP Manageru (viz Lukášovo hlášení
-  // — appka to dřív dělala). Nastavuje se v prikazEventActionBtn click
-  // handleru po úspěšném exportu, resetuje se v openPrikazModal.
+  // U ClickParku + Příkaz na místě je potřeba, aby strážník MPM export
+  // doopravdy provedl (klikl a úspěšně se zkopírovalo), než se dovolí
+  // "Potvrdit a uložit" — jinak by se jméno/příjmení + způsob platby
+  // (obojí u PŘESTUPCE vyplněné rovnou v dialogu) vzalo jako "hotovo"
+  // a tlačítko by přeskočilo rovnou na finální uložení, aniž by se
+  // záznam vůbec dostal do MP Manageru (viz Lukášovo hlášení — dřív se
+  // to tak dělo). Nastavuje se v prikazEventActionBtn click handleru po
+  // úspěšném exportu, resetuje se v openPrikazModal.
   let prikazClickParkMpmDone = false;
 
   // Appka do MPM (tlačítko "MPM", checkpoint appka volá dřív, než appka
@@ -10657,7 +10667,7 @@
       btn.textContent = ok ? 'Zkopírováno ✓' : 'Nezdařilo se';
       btn.classList.add(ok ? 'copied' : 'copy-err');
       if(ok){
-        // Viz prikazEventTerminReady — u ClickParku appka bez tohohle
+        // Viz prikazEventTerminReady — u ClickParku bez tohohle
         // příznaku terminReady vrátí false, dokud MPM export doopravdy
         // neproběhl, i kdyby už byla vyplněná všechna ostatní pole.
         prikazClickParkMpmDone = true;
@@ -10794,14 +10804,17 @@
           });
         }
       }
-      // Číslo jednací appka bere přednostně z viditelného pole (přemapované
-      // "Číslo dokladu" — appka ho tam sama vyplní z "Vlož provozovatele"
-      // / tlačítka "Vložit", ale strážník ho tam může i ručně opravit/
-      // dopsat), a jen pro jistotu spadne zpátky na tichou proměnnou,
-      // kdyby pole zůstalo prázdné (např. appka vložila text, aniž by
-      // přes něj prošla). Platí stejně pro novou událost i pro Výzvu na
-      // běžném záznamu.
-      const cisloJednaciNow = document.getElementById('prikazDoklad').value.trim();
+      // Popisek pole appka nastavuje na "Číslo dokladu" u PŘESTUPCE (appka
+      // tam fyzicky skenuje OP nově příchozí osoby) a na "Číslo jednací"
+      // jinde (appka ho tam sama vyplní z "Vlož provozovatele"/tlačítka
+      // "Vložit"). Číslo jednací appka proto z viditelného pole bere jen
+      // když pole doopravdy zobrazuje číslo jednací — u PŘESTUPCE (kde
+      // appka pole nechává jako Číslo dokladu, viz applyProvozovatelText
+      // výš, který u ClickParku appka pole ani nepřepisuje) by appka
+      // jinak omylem vzala číslo dokladu osoby za číslo jednací. Platí
+      // stejně pro novou událost i pro Výzvu na běžném záznamu.
+      const dokladJeCisloDokladu = document.getElementById('prikazDokladLabel').textContent === 'Číslo dokladu';
+      const cisloJednaciNow = dokladJeCisloDokladu ? '' : document.getElementById('prikazDoklad').value.trim();
       record.mpmCisloJednaci = cisloJednaciNow || prikazMpmCisloJednaci || record.mpmCisloJednaci || null;
 
       const jmeno = document.getElementById('prikazJmeno').value.trim();
@@ -10814,7 +10827,6 @@
       // ⇄ — viz setPrikazProvozovatelMode): tam appka pole opravdu
       // zobrazuje jako "Číslo dokladu", protože appka fyzicky skenuje
       // OP nově příchozí osoby, takže appka ho tam i uloží.
-      const dokladJeCisloDokladu = document.getElementById('prikazDokladLabel').textContent === 'Číslo dokladu';
       const doklad = document.getElementById('prikazDoklad').value.trim();
       const firma = document.getElementById('prikazFirma').value.trim();
       const ico = document.getElementById('prikazIco').value.trim();
@@ -10878,36 +10890,58 @@
           record._resolvedMime = newMimes[0] || 'image/jpeg';
           prikazNewEventFiles = [];
         }
-        // Dokument appka generuje podle způsobu — Výzva má navíc termín
-        // dostavení (Dostavit se dne appka zobrazuje jen u ní, viz
-        // showVyzvaTermin), Oznámení žádný termín nemá a exportOznameni
-        // ho ani nebere jako parametr.
-        const docLabel = prikazMode === 'oznameni' ? 'Oznámení' : 'Výzva';
-        const filename = buildDocFilename(docLabel, record, pachatel);
-        document.getElementById('prikazOverlay').classList.remove('open');
-        let opened;
-        if(prikazMode === 'oznameni'){
-          opened = await exportOznameni(record, pachatel, filename);
-        } else {
-          const vyzvaDatumyIso = getVyzvaDatumyIso();
-          const dostaveniTermin = vyzvaDatumyIso.length ? {
-            datumy: vyzvaDatumyIso.map(formatDateCz),
-            casOd: document.getElementById('prikazVyzvaCasOd').value || null,
-            casDo: document.getElementById('prikazVyzvaCasDo').value || null
-          } : null;
-          opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
-        }
-        if(opened){
-          await markResolved(record, prikazMode, pachatel ? { pachatel } : undefined);
-          // Appka u "Přidat událost" po úspěšném vygenerování dokumentu
-          // zavře i detail záznamu a zůstane v hlavním přehledu — na
-          // rozdíl od běžného Dořešit u existujícího záznamu appka tady
-          // nemá důvod zůstávat na detailu (žádné foto/další kroky
-          // appka teď nečeká). U Výzvy/Oznámení na běžném terénním
-          // záznamu appka naopak detail nechává otevřený, stejně jako
-          // u ostatních způsobů řešení (markResolved appka detail sama
-          // obnoví).
+        // Dokument se generuje jen u Výzvy/Oznámení — Příkaz na místě
+        // a Domluva se jen uloží (stejně jako existující tok
+        // u prikazConfirmBtn níž), žádný dokument negenerují. Dřív tahle
+        // větev vůbec nebyla (vždycky se generovala Výzva/Oznámení, i pro
+        // Příkaz/Domluvu z "Přidat událost") — u ClickParku to odhalil
+        // Lukáš, protože se u něj Příkaz na místě řeší přes tenhle
+        // vícestavový button, ne přes prikazConfirmBtn (ten platí jen
+        // pro Příkaz/Domluvu na existujícím záznamu, ne pro novou
+        // událost).
+        if(prikazMode === 'prikaz' || prikazMode === 'domluva'){
+          document.getElementById('prikazOverlay').classList.remove('open');
+          const extra = {};
+          if(prikazMode === 'prikaz'){
+            const castkaFinal = document.getElementById('prikazCastka').value.trim();
+            if(castkaFinal !== '' && !isNaN(Number(castkaFinal))) extra.castka = Number(castkaFinal);
+            if(prikazPlatbaMetoda) extra.platba = prikazPlatbaMetoda;
+          }
+          if(pachatel) extra.pachatel = pachatel;
+          await markResolved(record, prikazMode, Object.keys(extra).length ? extra : undefined);
           if(prikazIsNewEvent) closeDetailModal();
+        } else {
+          // Dokument appka generuje podle způsobu — Výzva má navíc termín
+          // dostavení (Dostavit se dne appka zobrazuje jen u ní, viz
+          // showVyzvaTermin), Oznámení žádný termín nemá a exportOznameni
+          // ho ani nebere jako parametr.
+          const docLabel = prikazMode === 'oznameni' ? 'Oznámení' : 'Výzva';
+          const filename = buildDocFilename(docLabel, record, pachatel);
+          document.getElementById('prikazOverlay').classList.remove('open');
+          let opened;
+          if(prikazMode === 'oznameni'){
+            opened = await exportOznameni(record, pachatel, filename);
+          } else {
+            const vyzvaDatumyIso = getVyzvaDatumyIso();
+            const dostaveniTermin = vyzvaDatumyIso.length ? {
+              datumy: vyzvaDatumyIso.map(formatDateCz),
+              casOd: document.getElementById('prikazVyzvaCasOd').value || null,
+              casDo: document.getElementById('prikazVyzvaCasDo').value || null
+            } : null;
+            opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
+          }
+          if(opened){
+            await markResolved(record, prikazMode, pachatel ? { pachatel } : undefined);
+            // Appka u "Přidat událost" po úspěšném vygenerování dokumentu
+            // zavře i detail záznamu a zůstane v hlavním přehledu — na
+            // rozdíl od běžného Dořešit u existujícího záznamu appka tady
+            // nemá důvod zůstávat na detailu (žádné foto/další kroky
+            // appka teď nečeká). U Výzvy/Oznámení na běžném terénním
+            // záznamu appka naopak detail nechává otevřený, stejně jako
+            // u ostatních způsobů řešení (markResolved appka detail sama
+            // obnoví).
+            if(prikazIsNewEvent) closeDetailModal();
+          }
         }
       }catch(e){
         console.error('Uložení dokumentu selhalo:', e);
@@ -11381,6 +11415,23 @@
     if(/^\s*[{[]/.test(raw)){
       alert('Ve schránce je teď appky vlastní JSON (appka ho tam dala tlačítkem "MPM" pro bookmarklet), ne text z lustrace z MP Manageru. Nejdřív v Manageru spusť bookmarklet "MP to RZ" (zkopíruje provozovatele do schránky), pak se vrať sem a zkus Vložit znovu.');
       return false;
+    }
+    // U ClickParku + PŘESTUPCE (typicky Příkaz na místě, viz
+    // prikazEventTerminReady) appka na rozdíl od běžného toku NEpřepisuje
+    // jméno/příjmení/adresu — přestupce je fyzicky přítomná osoba, kterou
+    // strážník do dialogu vyplnil sám, a "Vlož provozovatele" tu slouží
+    // jen k dotažení čísla jednacího z MP Manageru po uložení lustrace,
+    // ne k záměně přestupce za provozovatele vozidla. Zbytek funkce (níž)
+    // by jinak PŘESTUPCE natvrdo přepnul zpátky na PROVOZOVATEL
+    // a přepsal pole daty vlastníka vozidla.
+    if(prikazIsClickParkEvent && prikazPrestupceToggled){
+      const pLight = parseProvozovatelText(raw);
+      if(!pLight.cisloJednaci){
+        alert('Ve schránce nenajdu číslo jednací ("Událost: RRRR/číslo") — zkontroluj, že jsi v MP Manageru na uložené události spustil(a) bookmarklet "MP to RZ".');
+        return false;
+      }
+      prikazMpmCisloJednaci = pLight.cisloJednaci;
+      return true;
     }
     const p = parseProvozovatelText(raw);
     // U "Přidat událost" appka blok PROVOZOVATEL do teď měla schovaný
