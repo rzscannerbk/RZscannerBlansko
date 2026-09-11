@@ -9091,7 +9091,19 @@
   function openDetail(record){
     currentDetailRecord = record;
     document.getElementById('detailHeadInfo').innerHTML = buildDetailHeadHtml(record);
-    document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(record);
+    // Karta "VÝZVA"/"OZNÁMENÍ" (buildNoticeHtml) napodobuje fyzickou
+    // výzvu za sklo, kterou strážník v terénu vytiskne a nechá u vozidla
+    // — u záznamů založených přes "Přidat událost" (MKDS/Placenky,
+    // record.source === 'addEvent') se žádná fyzická výzva nikdy
+    // netiskla ani nevydávala, takže tahle karta v přehledu nemá smysl.
+    const noticeCardContainer = document.getElementById('noticeCardContainer');
+    if(record.source === 'addEvent'){
+      noticeCardContainer.innerHTML = '';
+      noticeCardContainer.style.display = 'none';
+    } else {
+      noticeCardContainer.style.display = '';
+      noticeCardContainer.innerHTML = buildNoticeHtml(record);
+    }
     renderResolutionHistory(record);
 
     // Reset tlačítka MPM na výchozí stav (kdyby na předchozím záznamu
