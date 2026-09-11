@@ -10535,13 +10535,19 @@
   });
 
   // Č.p. → Datum dostavení se (jen u Výzvy — jinde je pole skryté, takže
-  // se prostě zavře klávesnice a strážník si dialog jen vizuálně zkontroluje).
+  // se prostě zavře klávesnice a strážník si dialog jen vizuálně
+  // zkontroluje) — u ClickParku (Příkaz na místě/Domluva) se místo toho
+  // zaostří rovnou na akční tlačítko dole (Vložit/MPM/Potvrdit a uložit
+  // — podle toho, v jakém stavu zrovna je, viz updatePrikazEventActionBtn),
+  // ať strážník po adrese nemusí sahat po myši.
   advanceOnEnter(prikazCisloDomuInput);
   attachConfirmChip(prikazCisloDomuInput, prikazCisloDomuList, ()=>{
     if(prikazMode === 'vyzva') focusField(prikazVyzvaDatumInput);
+    else if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva')) focusField(document.getElementById('prikazEventActionBtn'));
   });
   prikazCisloDomuInput.addEventListener('blur', ()=>{
     if(prikazMode === 'vyzva' && prikazCisloDomuInput.value.trim()) focusField(prikazVyzvaDatumInput);
+    else if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva') && prikazCisloDomuInput.value.trim()) focusField(document.getElementById('prikazEventActionBtn'));
   });
 
   // Datum → Čas od → Čas do (Čas od/do mají už přednastavené 8:00/16:00 —
