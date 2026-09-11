@@ -1032,7 +1032,7 @@
                 <div id="photoGalleryFirst" class="photo-gallery-first"></div>
               </div>
               <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
-                <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
+                <button class="btn btn-ghost" id="photoToggleBtn">Spravovat fotky</button>
               </div>
               <div class="notice-photo-wrap" id="photoWrap">
                 <div id="photoGallery"></div>
@@ -8904,54 +8904,59 @@
   // pod sebe a natahovaly celé okno detailu mimo obrazovku, spodní
   // tlačítka mizela) — na zbytek příloh appka teď má samostatné okno,
   // viz openPhotosModal u tlačítka "Foto (N)".
+  // Dřív se sem vykreslila jen první fotka, zbytek byl vidět jen
+  // v samostatném okně "Foto (N)" — teď se rovnou vykreslí všechny,
+  // ať je v záložce Foto vidět celá dokumentace bez dalšího kliku.
   function renderPhotoGallery(record, photos, mime, mimes){
     const galleryFirst = document.getElementById('photoGalleryFirst');
     galleryFirst.innerHTML = '';
     if(!photos.length) return;
-    const itemMime = (mimes && mimes[0]) || mime;
-    const isPdf = itemMime === 'application/pdf';
-    const dataUrl = 'data:' + itemMime + ';base64,' + photos[0];
-    const filename = buildPhotoDownloadFilename(record, itemMime, 0);
-    const item = document.createElement('div');
-    item.className = 'photo-item';
+    photos.forEach((photoB64, idx) => {
+      const itemMime = (mimes && mimes[idx]) || mime;
+      const isPdf = itemMime === 'application/pdf';
+      const dataUrl = 'data:' + itemMime + ';base64,' + photoB64;
+      const filename = buildPhotoDownloadFilename(record, itemMime, idx);
+      const item = document.createElement('div');
+      item.className = 'photo-item';
 
-    if(isPdf){
-      // PDF appka nezobrazí náhledem (jako <img> by to byla jen rozbitá
-      // ikonka) — místo toho appka ukáže tlačítko, co PDF otevře přímo
-      // v nové záložce (viz openFileInNewTab a komentář u ní o tom,
-      // proč appka pojmenování náhledu vzdala — pro pojmenovaný soubor
-      // slouží tlačítko "Stáhnout PDF" o kus níž).
-      const link = document.createElement('button');
-      link.type = 'button';
-      link.className = 'photo-pdf-link';
-      link.textContent = '📄 PDF dokument';
-      link.addEventListener('click', ()=>{
-        openFileInNewTab(base64ToUint8Array(photos[0]), 'application/pdf');
-      });
-      item.appendChild(link);
-    } else {
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      img.alt = 'Fotodokumentace';
-      item.appendChild(img);
-    }
+      if(isPdf){
+        // PDF appka nezobrazí náhledem (jako <img> by to byla jen rozbitá
+        // ikonka) — místo toho appka ukáže tlačítko, co PDF otevře přímo
+        // v nové záložce (viz openFileInNewTab a komentář u ní o tom,
+        // proč appka pojmenování náhledu vzdala — pro pojmenovaný soubor
+        // slouží tlačítko "Stáhnout PDF" o kus níž).
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'photo-pdf-link';
+        link.textContent = '📄 PDF dokument';
+        link.addEventListener('click', ()=>{
+          openFileInNewTab(base64ToUint8Array(photoB64), 'application/pdf');
+        });
+        item.appendChild(link);
+      } else {
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.alt = 'Fotodokumentace';
+        item.appendChild(img);
+      }
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'download-link';
-    btn.textContent = isPdf ? 'Stáhnout PDF' : 'Stáhnout fotku';
-    btn.addEventListener('click', ()=> downloadPhoto(dataUrl, filename));
-    item.appendChild(btn);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'download-link';
+      btn.textContent = isPdf ? 'Stáhnout PDF' : 'Stáhnout fotku';
+      btn.addEventListener('click', ()=> downloadPhoto(dataUrl, filename));
+      item.appendChild(btn);
 
-    galleryFirst.appendChild(item);
+      galleryFirst.appendChild(item);
+    });
   }
 
   // ---------- Okno "Fotodokumentace" (všechny přílohy, s mazáním) ----------
-  // Appka sem odsunula všechny přílohy kromě první (viz komentář u
-  // renderPhotoGallery výš) — appka tady appka ukáže kompletní seznam
-  // v samostatném okně s pevnou výškou a scrollováním (viz .related-box
-  // CSS appka nechává max-height:78vh), takže appka detail záznamu
-  // appka pod sebou nenafoukne, ať appka příloh je kolik chce.
+  // Inline galerie v záložce Foto (renderPhotoGallery výš) teď ukazuje
+  // všechny fotky rovnou — tohle okno slouží hlavně k mazání jednotlivých
+  // příloh (tlačítko "Spravovat fotky"), v pevné výšce se scrollováním
+  // (viz .related-box CSS s max-height:78vh), ať detail záznamu pod
+  // sebou nenafoukne, i kdyby příloh bylo hodně.
   function renderPhotosModalItem(record, photos, mimes, mime, idx){
     const itemMime = (mimes && mimes[idx]) || mime;
     const isPdf = itemMime === 'application/pdf';
@@ -9061,7 +9066,7 @@
       const photoToggleBtn = document.getElementById('photoToggleBtn');
       const photoToggleRow = document.getElementById('photoToggleRow');
       if(photos.length){
-        photoToggleBtn.textContent = 'Foto' + (photos.length > 1 ? ' (' + photos.length + ')' : '');
+        photoToggleBtn.textContent = 'Spravovat fotky (' + photos.length + ')';
       } else {
         photoToggleRow.style.display = 'none';
         document.getElementById('photosModalOverlay').classList.remove('open');
@@ -9326,8 +9331,11 @@
       html += detailInfoField('Číslo dokladu', p.cisloDokladu);
     }
     const bydliste = [p.ulice, p.cisloDomu].filter(Boolean).join(' ');
-    if(bydliste || p.mesto){
-      html += detailInfoField(isFirma ? 'Sídlo' : 'Bydliště', [bydliste, p.mesto].filter(Boolean).join(', '));
+    const bydlisteFull = [bydliste, p.mesto].filter(Boolean).join(', ');
+    if(bydlisteFull){
+      const mapUrl = 'https://mapy.cz/zakladni?q=' + encodeURIComponent(bydlisteFull);
+      html += '<div class="detail-info-field"><label>' + escapeHtml(isFirma ? 'Sídlo' : 'Bydliště') + '</label>' +
+        '<div class="v link" onclick="window.open(\'' + mapUrl + '\',\'_blank\')">' + escapeHtml(bydlisteFull) + '</div></div>';
     }
     html += '</div></div>';
     return html;
@@ -9387,7 +9395,7 @@
     document.getElementById('photoGallery').innerHTML = '';
     document.getElementById('photoGalleryFirst').innerHTML = '';
     photoWrap.classList.remove('open');
-    photoToggleBtn.textContent = 'Foto';
+    photoToggleBtn.textContent = 'Spravovat fotky';
     photoToggleBtn.disabled = false;
 
     // Older records still keep photos inline on the main document; newer
@@ -9402,7 +9410,7 @@
       // starého formátu) — obnovíme je z cache místo opětovného fetchování
       // a místo prázdné galerie po návratu do detailu.
       renderPhotoGallery(record, record._resolvedPhotos, record._resolvedMime || 'image/jpeg', record._resolvedMimes);
-      photoToggleBtn.textContent = 'Foto' + (record._resolvedPhotos.length > 1 ? ' (' + record._resolvedPhotos.length + ')' : '');
+      photoToggleBtn.textContent = 'Spravovat fotky (' + record._resolvedPhotos.length + ')';
       photoToggleRow.style.display = 'block';
       photoWrap.classList.add('open');
       updateDetailRail(record);
@@ -9410,7 +9418,7 @@
       record._resolvedPhotos = legacyPhotos;
       record._resolvedMime = record.photoMime || 'image/jpeg';
       renderPhotoGallery(record, legacyPhotos, record._resolvedMime);
-      photoToggleBtn.textContent = 'Foto' + (legacyPhotos.length > 1 ? ' (' + legacyPhotos.length + ')' : '');
+      photoToggleBtn.textContent = 'Spravovat fotky (' + legacyPhotos.length + ')';
       photoToggleRow.style.display = 'block';
       photoWrap.classList.add('open');
       updateDetailRail(record);
@@ -12296,12 +12304,12 @@
       record._resolvedMime = mime;
       record._resolvedMimes = mimes;
       renderPhotoGallery(record, photos, mime, mimes);
-      photoToggleBtn.textContent = 'Foto' + (photos.length > 1 ? ' (' + photos.length + ')' : '');
+      photoToggleBtn.textContent = 'Spravovat fotky (' + photos.length + ')';
       photoToggleBtn.disabled = false;
       photoWrap.classList.add('open');
     }catch(e){
       console.error('Načtení fotek selhalo:', e);
-      photoToggleBtn.textContent = 'Foto (chyba)';
+      photoToggleBtn.textContent = 'Fotky (chyba)';
       photoToggleBtn.disabled = false;
     }
   }
