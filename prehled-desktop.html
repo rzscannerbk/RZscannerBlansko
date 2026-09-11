@@ -689,8 +689,24 @@
   .prikaz-datepicker-panel.upward{top:auto; bottom:100%; margin-top:0; margin-bottom:6px;}
   /* Když by panel vpravo od levého okraje pole (výchozí left:0) utekl
      mimo obrazovku, zarovná se místo toho k pravému okraji pole (viz
-     initDatePicker/initMultiDatePicker výš). */
+     initDatePicker výš — initMultiDatePicker/"Dostavit se dne" už tohle
+     neřeší, běží jako centrované modální okno, viz .in-modal níž). */
   .prikaz-datepicker-panel.align-right{left:auto; right:0;}
+  /* "Dostavit se dne" (initMultiDatePicker) běží jako centrované
+     modální okno místo panelu visícího pod polem — .in-modal proto
+     ruší absolutní pozicování, overlay (#prikazVyzvaDatumOverlay) se
+     stará o vycentrování a tmavé pozadí sama, stejně jako u ostatních
+     .confirm-overlay v aplikaci. */
+  .prikaz-datepicker-panel.in-modal{
+    display:block; position:static; left:auto; top:auto; right:auto; bottom:auto;
+    margin:0; max-width:92vw;
+  }
+  /* Bez tohohle by overlay s kalendářem měl stejný z-index jako hlavní
+     dialog (#prikazOverlay, oba .confirm-overlay = 70) a protože je
+     v HTML dřív, prohlížeč by ho kreslil POD dialogem, ne nad ním —
+     vyšší z-index ho drží vždycky navrchu. */
+  #prikazVyzvaDatumOverlay{z-index:80;}
+  #prikazVyzvaDatumOverlay{z-index:80;}
   .prikaz-datepicker-head{display:flex; gap:6px; margin-bottom:8px;}
   .prikaz-datepicker-head select{
     flex:1; min-width:0; background:var(--asphalt-2); border:1px solid var(--line); border-radius:8px;
@@ -1046,6 +1062,17 @@
     </div>
   </div>
 
+  <!-- Kalendář "Dostavit se dne" dřív visel jako panel pod polem
+       (position:absolute) — u úzkých i širokých dialogů opakovaně
+       utíkal mimo dialog (zkoušelo se to opravit přepočtem okrajů,
+       viz historie úprav, ale spolehlivě to nefungovalo). Teď je to
+       samostatné modální okno uprostřed obrazovky (stejný vzor jako
+       ostatní .confirm-overlay v aplikaci) — žádné počítání okrajů
+       netřeba, protože se vždycky jen vycentruje. -->
+  <div class="confirm-overlay" id="prikazVyzvaDatumOverlay">
+    <div class="prikaz-datepicker-panel in-modal multi" id="prikazVyzvaDatumPanel"></div>
+  </div>
+
   <div class="confirm-overlay" id="prikazOverlay">
     <div class="prikaz-box" id="prikazBox">
       <h3 id="prikazDialogTitle">Příkaz na místě</h3>
@@ -1252,7 +1279,6 @@
       <div class="field prikaz-datepicker-wrap" id="prikazVyzvaDatumField" style="display:none;">
         <label for="prikazVyzvaDatum">Dostavit se dne</label>
         <input type="text" id="prikazVyzvaDatum" class="js-date-field" readonly autocomplete="off" placeholder="DD.MM.RRRR">
-        <div class="prikaz-datepicker-panel" id="prikazVyzvaDatumPanel"></div>
       </div>
       <div class="prikaz-row2" id="prikazVyzvaCasField" style="display:none;">
         <div class="field">
@@ -10225,7 +10251,13 @@
       panel.querySelector('.dp-done').addEventListener('click', close);
     }
 
-    function onOutside(e){ if(!panel.contains(e.target) && e.target !== input) close(); }
+    // Panel se teď otevírá jako centrované modální okno (viz
+    // #prikazVyzvaDatumOverlay v HTML) místo dřívějšího visení pod
+    // polem — kliknutí "vně" se pozná jako klik přímo na overlay
+    // (tmavé pozadí), ne na panel samotný, protože overlay pokrývá
+    // celou obrazovku a panel je jeho vystředěné dítě.
+    const overlay = panel.closest('.confirm-overlay') || panel.parentElement;
+    function onOutside(e){ if(e.target === overlay) close(); }
     function open(){
       loadSelected();
       // Appka dva zobrazené měsíce vychází buď z prvního už vybraného
@@ -10242,27 +10274,15 @@
       }
       render();
       panel.classList.add('multi');
-      const spaceBelow = window.innerHeight - input.getBoundingClientRect().bottom;
-      panel.classList.toggle('upward', spaceBelow < 420);
-      panel.classList.add('open');
-      // Vodorovné přetečení se řeší stejně jako svislé (spaceBelow)
-      // výš — panel je široký (dva měsíce vedle sebe) a defaultně visí
-      // doleva od pole (left:0); když pole sedí blízko pravého okraje
-      // dialogu (typicky u ClickParku, kde je pole v pravém sloupci),
-      // panel by jinak vyjel ven z dialogu — proto se po otevření
-      // zkusí, jestli by se vešel (viz prikazDatepickerFitsRight výš,
-      // porovnává i proti okraji samotného dialogu, ne jen okna
-      // prohlížeče), a když ne, zarovná se místo toho doprava (k pravému
-      // okraji pole, viz .align-right v CSS).
-      panel.classList.toggle('align-right', !prikazDatepickerFitsRight(panel));
+      overlay.classList.add('open');
       setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
     }
     function close(){
-      panel.classList.remove('open');
+      overlay.classList.remove('open');
       document.removeEventListener('mousedown', onOutside);
     }
     input.addEventListener('click', () => {
-      if(panel.classList.contains('open')) close(); else open();
+      if(overlay.classList.contains('open')) close(); else open();
     });
     // Appka si tu drží i stejné jméno metod jako initDatePicker
     // (_openDatePicker/_setDatePickerIso), ať appka jinde (focusField,
