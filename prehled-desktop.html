@@ -1180,10 +1180,10 @@
            zaškrtnuté (viz listenery u prikazPlatbaHotoveChk/KartouChk/
            BpnChk níž). -->
       <div id="prikazClickParkPrikazFieldsWrap" style="display:none;">
-        <div class="field">
+        <div class="field" id="prikazPlatbaField">
           <label>Způsob platby</label>
           <div class="prikaz-platba-checks">
-            <label class="prikaz-platba-check"><input type="checkbox" id="prikazPlatbaHotoveChk" checked> Hotově</label>
+            <label class="prikaz-platba-check"><input type="checkbox" id="prikazPlatbaHotoveChk"> Hotově</label>
             <label class="prikaz-platba-check"><input type="checkbox" id="prikazPlatbaKartouChk"> Kartou</label>
             <label class="prikaz-platba-check"><input type="checkbox" id="prikazPlatbaBpnChk"> BPN</label>
           </div>
@@ -5041,21 +5041,32 @@
     if(isBoticka) authorizationIds.push('40009');
 
     const solutionIds = ['51772'];
-    // Způsob řešení (Rej) v MP Manageru appka doplní podle toho, jak byl
+    // Způsob řešení (Rej) v MP Manageru se doplňuje podle toho, jak byl
     // přestupek doopravdy vyřešený v RZ Scanneru — ID zjištěná přímo
     // z formuláře MP Manageru (viz "Přístup na služby" strom u tlačítka
-    // Vybrat u pole "Způsob řešení"). Appka appka u každého způsobu
-    // řešení počítá s polem ID (ne jedním) — appka to nechává jako
-    // pole, i když teď má každý způsob jen jednu položku, ať appka jde
-    // v budoucnu snadno přidat další (KPPP appka schválně nepřidává,
-    // appka řeší jen dopravní přestupky, kde appce stačí ODSA).
+    // Vybrat u pole "Způsob řešení"). Appka u každého způsobu řešení
+    // počítá s polem ID (ne jedním) — nechává to jako pole, i když teď
+    // má každý způsob jen jednu položku, ať jde v budoucnu snadno
+    // přidat další (KPPP se schválně nepřidává, řeší se jen dopravní
+    // přestupky, kde stačí ODSA).
     const MPM_SOLUTION_ID_BY_METHOD = {
       prikaz: ['51761'],   // Bloková pokuta (PB)
       vyzva: ['51773'],    // Zaslána výzva k podání vysvětlení
       oznameni: ['52146'], // ODSA
       domluva: ['51760']   // Domluva
     };
-    const methodSolutionIds = MPM_SOLUTION_ID_BY_METHOD[record.resolvedMethod];
+    // TODO: až přijde od Lukáše ID pro "Bloková pokuta nezaplacená
+    // (PBN)" ze stromu "Způsob řešení" v MP Manageru (stejným postupem,
+    // jakým se získalo ID pro Parkoviste/51989 — klik na položku, najít
+    // onclick s tUdalostN), doplní se sem. Do té doby se u BPN i nadále
+    // zaškrtává obyčejné "Bloková pokuta (PB)" — je to stejná citace
+    // jako u Hotově/Kartou, jen ještě chybí to speciální "nezaplacená"
+    // rozlišení.
+    const MPM_SOLUTION_ID_PBN = null;
+    let methodSolutionIds = MPM_SOLUTION_ID_BY_METHOD[record.resolvedMethod];
+    if(record.resolvedMethod === 'prikaz' && record.platba === 'BPN' && MPM_SOLUTION_ID_PBN){
+      methodSolutionIds = [MPM_SOLUTION_ID_PBN];
+    }
     if(methodSolutionIds){
       solutionIds.push(...methodSolutionIds);
     } else if(!isBoticka){
@@ -9406,6 +9417,14 @@
     document.getElementById('prikazSpzField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpz'));
     document.getElementById('prikazSpachaniDatumField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpachaniDatum'));
     document.getElementById('prikazSpachaniCasField').classList.toggle('prikaz-field-missing', missing.includes('prikazSpachaniCas'));
+    // Způsob platby appka u ClickParku + Příkaz na místě zvýrazní
+    // stejným červeným rámečkem — je to povinné pole, ale mimo
+    // "prikazEventMissingFields" appka ho nedává, protože appka
+    // neblokuje MPM/paste kroky (jen finální uložení, viz
+    // prikazEventTerminReady výš).
+    if(prikazIsClickParkEvent && prikazMode === 'prikaz'){
+      document.getElementById('prikazPlatbaField').classList.toggle('prikaz-field-missing', !prikazPlatbaMetoda);
+    }
     return missing.length === 0;
   }
 
@@ -9442,6 +9461,11 @@
   // appce jako signál "hotovo" stačí, že appka má vyplněné Jméno
   // a Příjmení.
   function prikazEventTerminReady(){
+    // U ClickParku + Příkaz na místě appka způsob platby vyžaduje jako
+    // podmínku navíc — bez vybraného checkboxu appka tlačítko na
+    // "Potvrdit a uložit" nepustí, ať appka nikdy neuloží záznam bez
+    // způsobu platby (viz Lukášovo zadání — povinná položka).
+    if(prikazIsClickParkEvent && prikazMode === 'prikaz' && !prikazPlatbaMetoda) return false;
     if(prikazPrestupceActive()){
       return !!(
         document.getElementById('prikazJmeno').value.trim() &&
@@ -9530,11 +9554,12 @@
     const castkaEl = document.getElementById('prikazCastkaField');
     if(wantClickParkPrikaz){
       document.getElementById('prikazClickParkPrikazFieldsWrap').insertBefore(castkaEl, document.getElementById('prikazClickParkPrikazFieldsWrap').firstChild);
-      // Výchozí způsob platby se nastaví na "Hotově" — tenhle tok
-      // prikazPlatbaOverlay úplně obchází (viz addEventPlacenkyPrikazBtn
-      // v JS), takže platbu není odkud jinud převzít.
-      prikazPlatbaMetoda = 'Hotově';
-      document.getElementById('prikazPlatbaHotoveChk').checked = true;
+      // Způsob platby appka nechává povinný a bez výchozí volby — dokud
+      // strážník nevybere sám, žádný checkbox není zaškrtnutý a uložení
+      // je zablokované (viz prikazEventTerminReady a
+      // updatePrikazEventFieldValidation níž).
+      prikazPlatbaMetoda = null;
+      document.getElementById('prikazPlatbaHotoveChk').checked = false;
       document.getElementById('prikazPlatbaKartouChk').checked = false;
       document.getElementById('prikazPlatbaBpnChk').checked = false;
       refreshPrikazTitle();
@@ -9779,6 +9804,8 @@
         e.target.checked = true;
       }
       refreshPrikazTitle();
+      updatePrikazEventFieldValidation();
+      updatePrikazEventActionBtn();
     });
   });
 
@@ -10544,6 +10571,17 @@
     } : null;
     const overrides = { resolvedMethod: prikazMode };
     if(pachatelNow) overrides.pachatel = pachatelNow;
+    // U Příkazu na místě record.castka/record.platba appka ještě nemá
+    // uložené (appka je zapisuje až finální "Potvrdit a uložit") — pro
+    // export appka je proto bere přímo z formuláře: částku z pole
+    // #prikazCastka, způsob platby z prikazPlatbaMetoda (u ClickParku
+    // appka ho plní checkboxy výš, u ostatních toků appka ho plní
+    // prikazPlatbaOverlay).
+    if(prikazMode === 'prikaz'){
+      const castkaRaw = document.getElementById('prikazCastka').value.trim();
+      overrides.castka = castkaRaw ? Number(castkaRaw) : null;
+      overrides.platba = prikazPlatbaMetoda || null;
+    }
     return Object.assign({}, record, overrides);
   }
 
