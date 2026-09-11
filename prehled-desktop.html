@@ -9497,10 +9497,10 @@
   // appce jako signál "hotovo" stačí, že appka má vyplněné Jméno
   // a Příjmení.
   function prikazEventTerminReady(){
-    // U ClickParku + Příkaz na místě/Domluva je potřeba doopravdy
-    // provedený MPM export (klik na tlačítko "MPM", ne jen vyplněná
-    // pole) a — jen u Příkazu — i vybraný způsob platby; bez toho
-    // tlačítko na "Potvrdit a uložit" nepustí, ať se nikdy neuloží
+    // U ClickParku + Příkaz na místě/Domluva/Oznámení je potřeba
+    // doopravdy provedený MPM export (klik na tlačítko "MPM", ne jen
+    // vyplněná pole) a — jen u Příkazu — i vybraný způsob platby; bez
+    // toho tlačítko na "Potvrdit a uložit" nepustí, ať se nikdy neuloží
     // záznam bez způsobu platby ani se nepřeskočí rovnou k uložení,
     // aniž by se dostal do MP Manageru (viz Lukášovo zadání).
     //
@@ -9509,8 +9509,12 @@
     // protože číslo jednací se dostane až lustrací/uložením v MP
     // Manageru a musí se vrátit zpátky přes schránku (viz
     // applyProvozovatelText, který u tohohle toku PŘESTUPCE pole
-    // nepřepisuje, jen si tiše vezme číslo jednací).
-    if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva')){
+    // nepřepisuje, jen si tiše vezme číslo jednací). Oznámení tu dřív
+    // nebylo — s vyplněným PŘESTUPCE (Jméno+Příjmení hned splňovaly
+    // prikazPrestupceActive níž) tak přeskakovalo rovnou na "Potvrdit
+    // a uložit", aniž by MPM a Vložit vůbec proběhly (viz Lukášovo
+    // hlášení — tlačítko "Vložit" se pak vůbec neukázalo).
+    if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva' || prikazMode === 'oznameni')){
       if(prikazMode === 'prikaz' && !prikazPlatbaMetoda) return false;
       if(!prikazClickParkMpmDone) return false;
       return prikazEventPasted;
