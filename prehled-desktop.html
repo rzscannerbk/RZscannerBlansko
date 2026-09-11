@@ -5393,7 +5393,7 @@
     return { ref: m[1], sankce: m[2] || null, law: m[3] };
   }
 
-  async function buildOznameniDocx(record, photosB64, pachatel){
+  async function buildOznameniDocx(record, photosB64, pachatel, isPrestupceDoc){
     // Do hlavičky/podpisu dokumentu appka dává strážníka, který přestupek
     // PRÁVĚ dořešuje (přihlášený na tomhle zařízení), ne toho, kdo ho
     // kdysi založil (record.officerName) — resolvedByOfficer je pojistka
@@ -5435,15 +5435,23 @@
     const introCite = parsedCitation
       ? (parsedCitation.sankce || parsedCitation.ref) + ' zákona č. ' + parsedCitation.law
       : offenseCitation;
+    // Koncovka věty se liší podle toho, jestli je pachatel PŘESTUPCE
+    // (řidič fyzicky přítomný/známý — adresát dopisu je přímo on, žádná
+    // zmínka o provozovateli) nebo PROVOZOVATEL (řidič zůstal
+    // neustanovený, dopis jde vlastníkovi vozidla a žádá se o
+    // součinnost). Zbytek věty zůstává stejný.
+    const introEnding = isPrestupceDoc
+      ? 'kterého se dopustil níže uvedený řidič vozidla níže uvedené registrační značky.'
+      : 'kterého se dopustil dosud neustanovený řidič vozidla níže uvedené RZ a tovární značky, jehož jste provozovatelem.';
     const intro = parsedCitation
       ? ('Podle § 10 odst. 2 zákona č. 553/1991 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
          'Vám oznamuji podezření ze spáchání přestupku podle ' + introCite + ', porušením ' + parsedCitation.ref +
          ' téhož zákona' + (offenseLabelLower ? ' (' + offenseLabelLower + ')' : '') +
-         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené RZ a tovární značky, jehož jste provozovatelem.')
+         ', ' + introEnding)
       : ('Podle § 10 odst. 2 zákona č. 553/1991 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
          'Vám oznamuji podezření ze spáchání přestupku podle ' + introCite +
          (offenseLabelLower ? ' (' + offenseLabelLower + ')' : '') +
-         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené RZ a tovární značky, jehož jste provozovatelem.');
+         ', ' + introEnding);
     body += docxPara(intro, { size: 20, spacingAfter: 200 });
 
     body += docxLabelValuePara('Registrační značka:', record.plate || '', { size: 20, spacingAfter: 200, valueBold: true });
@@ -5494,7 +5502,7 @@
     // přání) — zbytek věty běžným řezem.
     let skutekRuns = docxRun('Dne ', { size: 20 }) +
       docxRun(formatDateCz(record.date) + ' v ' + (record.time || '—'), { size: 20, bold: true }) +
-      docxRun(' hodin se dosud neustanovený řidič vozidla registrační značky ', { size: 20 }) +
+      docxRun(' hodin se ' + (isPrestupceDoc ? 'výše uvedený' : 'dosud neustanovený') + ' řidič vozidla registrační značky ', { size: 20 }) +
       docxRun(record.plate || '', { size: 20, bold: true }) +
       docxRun(' v ulici ' + (record.address || ''), { size: 20 });
     if(gpsRunXml){
@@ -5505,8 +5513,13 @@
       docxRun(', čímž naplnil znaky přestupku podle ' + skutekSankceCite + '.', { size: 20 });
     body += '<w:p><w:pPr><w:spacing w:before="0" w:after="200"/></w:pPr>' + skutekRuns + '</w:p>';
 
-
-    body += docxPara('Lustrací byl(a) jako provozovatel výše uvedeného vozidla zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
+    // "Lustrací byl(a) jako provozovatel zjištěn(a)..." dává smysl jen
+    // u PROVOZOVATELE (řidič se hledal přes majitele vozidla) — u
+    // PŘESTUPCE žádná lustrace provozovatele neproběhla (řidič je rovnou
+    // totožný s výše uvedeným), takže se tahle věta úplně vynechává.
+    if(!isPrestupceDoc){
+      body += docxPara('Lustrací byl(a) jako provozovatel výše uvedeného vozidla zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
+    }
 
     // Podpisový blok + přílohy appka dává do patičky STRÁNKY 1 (Word
     // "different first page footer": w:titlePg + footerReference
@@ -5973,7 +5986,7 @@
       const photosForDocx = photosMimes
         ? photosB64.filter((b64, idx) => (photosMimes[idx] || 'image/jpeg').startsWith('image/'))
         : (photosB64 || []);
-      const blob = await buildOznameniDocx(record, photosForDocx, pachatel);
+      const blob = await buildOznameniDocx(record, photosForDocx, pachatel, !!record.oznameniAsPrestupce);
       const filename = filenameOverride || ('Oznameni_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx');
       try{
         const file = new File([blob], filename, { type: blob.type });
@@ -9337,6 +9350,11 @@
     if(extra && extra.castka != null) updateData.castka = extra.castka;
     if(extra && extra.platba) updateData.platba = extra.platba;
     if(extra && extra.pachatel) updateData.pachatel = extra.pachatel;
+    // Oznámení má jiný text podle toho, jestli je pachatel PŘESTUPCE —
+    // příznak se nastaví v prikazEventActionBtn/prikazConfirmBtn výš,
+    // tady se jen posílá dál do Firestore, aby i re-download z detailu
+    // vygeneroval stejnou verzi dokumentu.
+    if(extra && extra.oznameniAsPrestupce != null) updateData.oznameniAsPrestupce = extra.oznameniAsPrestupce;
     await db.collection('prestupky').doc(record.id).update(updateData);
     record.resolved = true;
     record.resolvedMethod = method;
@@ -9346,6 +9364,7 @@
     if(extra && extra.castka != null) record.castka = extra.castka;
     if(extra && extra.platba) record.platba = extra.platba;
     if(extra && extra.pachatel) record.pachatel = extra.pachatel;
+    if(extra && extra.oznameniAsPrestupce != null) record.oznameniAsPrestupce = extra.oznameniAsPrestupce;
     updateResolveBtn(record);
     if(currentDetailRecord && currentDetailRecord.id === record.id) renderResolutionHistory(record);
     refreshView();
@@ -10650,6 +10669,10 @@
     const bits = [];
     if(record.noticeNumber) bits.push(record.noticeNumber);
     if(record.plate) bits.push(record.plate);
+    // "přestupce" se do názvu vloží jen u Oznámení vygenerovaného
+    // v režimu PŘESTUPCE (viz record.oznameniAsPrestupce, nastavuje se
+    // při uložení).
+    if(prefix === 'Oznámení' && record.oznameniAsPrestupce) bits.push('přestupce');
     if(pachatel && (pachatel.prijmeni || pachatel.firma)) bits.push(pachatel.prijmeni || pachatel.firma);
     const name = prefix + ' ' + rrMmDd + (bits.length ? ' - ' + bits.join(' - ') : '');
     return name.replace(/[\\/:*?"<>|]/g, '') + '.docx';
@@ -11032,6 +11055,11 @@
           // showVyzvaTermin), Oznámení žádný termín nemá a exportOznameni
           // ho ani nebere jako parametr.
           const docLabel = prikazMode === 'oznameni' ? 'Oznámení' : 'Výzva';
+          // Oznámení má jiný text (a jiný název souboru s "přestupce",
+          // viz buildDocFilename) podle toho, jestli je pachatel
+          // PŘESTUPCE — spočítá se tady jednou a uloží se na record, ať
+          // to sedí i pro pozdější znovustažení z detailu.
+          if(prikazMode === 'oznameni') record.oznameniAsPrestupce = prikazPrestupceActive();
           const filename = buildDocFilename(docLabel, record, pachatel);
           document.getElementById('prikazOverlay').classList.remove('open');
           let opened;
@@ -11047,7 +11075,9 @@
             opened = await exportVyzva(record, pachatel, filename, dostaveniTermin);
           }
           if(opened){
-            await markResolved(record, prikazMode, pachatel ? { pachatel } : undefined);
+            const resolveExtra = pachatel ? { pachatel } : {};
+            if(prikazMode === 'oznameni') resolveExtra.oznameniAsPrestupce = record.oznameniAsPrestupce;
+            await markResolved(record, prikazMode, Object.keys(resolveExtra).length ? resolveExtra : undefined);
             // Appka u "Přidat událost" po úspěšném vygenerování dokumentu
             // zavře i detail záznamu a zůstane v hlavním přehledu — na
             // rozdíl od běžného Dořešit u existujícího záznamu appka tady
@@ -11226,9 +11256,14 @@
         if(opened) await markResolved(record, 'vyzva', pachatel ? { pachatel } : undefined);
       } else if(prikazMode === 'oznameni'){
         document.getElementById('prikazOverlay').classList.remove('open');
+        record.oznameniAsPrestupce = prikazPrestupceActive();
         const filename = buildDocFilename('Oznámení', record, pachatel);
         const opened = await exportOznameni(record, pachatel, filename);
-        if(opened) await markResolved(record, 'oznameni', pachatel ? { pachatel } : undefined);
+        if(opened){
+          const resolveExtra = pachatel ? { pachatel } : {};
+          resolveExtra.oznameniAsPrestupce = record.oznameniAsPrestupce;
+          await markResolved(record, 'oznameni', resolveExtra);
+        }
       } else if(prikazMode === 'domluva'){
         // Domluva appce žádný dokument negeneruje (na rozdíl od
         // Výzvy/Oznámení) — appka jen uloží pachatele/provozovatele
