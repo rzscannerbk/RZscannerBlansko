@@ -439,13 +439,15 @@
     display:flex; flex-direction:row; align-items:flex-start; justify-content:center;
     gap:26px; flex-wrap:wrap; width:100%;
   }
-  #noticeCardContainer{flex:1 1 340px; max-width:400px;}
+  /* Náhled tištěného lístečku (karta "OZNÁMENÍ"/"VÝZVA" na sklo) teď
+     sedí v záložce Foto spolu s fotkami — zobrazuje se nad nimi jako
+     samostatný blok, ne vedle fotky ve dvou sloupcích jako dřív. */
+  #noticeCardContainer{max-width:400px; margin:0 auto 18px;}
   .photo-gallery-first{flex:1 1 340px; max-width:460px;}
-  /* Fullscreen zvětšuje jen dvojici Výzva/Oznámení + fotka vedle sebe (na
-     celou šířku obrazovky) — hlavička, patička a log historie řešení si
-     drží stejnou velikost textu jako mimo fullscreen (tahle pravidla
-     cílí jen na noticeCardContainer/photo-gallery-first). */
-  .detail-modal.fullscreen #noticeCardContainer,
+  /* Fullscreen zvětší náhled lístečku i fotky na celou šířku obrazovky
+     — hlavička, patička a log historie řešení si drží stejnou velikost
+     textu jako mimo fullscreen. */
+  .detail-modal.fullscreen #noticeCardContainer{max-width:none; zoom:1.5;}
   .detail-modal.fullscreen .photo-gallery-first{
     max-width:none; flex:1 1 0; zoom:1.5;
   }
@@ -1011,11 +1013,11 @@
             <button class="detail-tab" data-tab="osoba" type="button">Osoba</button>
             <button class="detail-tab" data-tab="reseni" type="button">Řešení</button>
             <button class="detail-tab" data-tab="foto" type="button">Foto</button>
+            <button class="detail-tab" data-tab="kopie" id="detailTabKopie" type="button" style="display:none;">Kopie výzvy/oznámení</button>
           </div>
           <div class="detail-tab-content" id="detailPreviewWrap">
             <div class="detail-tab-panel active" data-tab-panel="prehled">
               <div id="detailPrestupekContent"></div>
-              <div id="noticeCardContainer"></div>
             </div>
             <div class="detail-tab-panel" data-tab-panel="osoba">
               <div id="detailOsobaContent"></div>
@@ -1043,6 +1045,9 @@
                   <button class="btn" id="docxOpenBtn" disabled>Otevřít</button>
                 </div>
               </div>
+            </div>
+            <div class="detail-tab-panel" data-tab-panel="kopie">
+              <div id="noticeCardContainer"></div>
             </div>
           </div>
         </div>
@@ -9355,14 +9360,16 @@
     // výzvu za sklo, kterou strážník v terénu vytiskne a nechá u vozidla
     // — u záznamů založených přes "Přidat událost" (MKDS/Placenky,
     // record.source === 'addEvent') se žádná fyzická výzva nikdy
-    // netiskla ani nevydávala, takže tahle karta v přehledu nemá smysl.
+    // netiskla ani nevydávala, takže tahle karta (a s ní celá záložka
+    // "Kopie výzvy/oznámení") nemá smysl a schová se.
     const noticeCardContainer = document.getElementById('noticeCardContainer');
+    const detailTabKopie = document.getElementById('detailTabKopie');
     if(record.source === 'addEvent'){
       noticeCardContainer.innerHTML = '';
-      noticeCardContainer.style.display = 'none';
+      detailTabKopie.style.display = 'none';
     } else {
-      noticeCardContainer.style.display = '';
       noticeCardContainer.innerHTML = buildNoticeHtml(record);
+      detailTabKopie.style.display = '';
     }
     renderResolutionHistory(record);
 
