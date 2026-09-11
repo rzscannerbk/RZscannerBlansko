@@ -346,6 +346,74 @@
     max-width:none; width:100vw; max-height:none; height:100vh; border-radius:0;
   }
   .detail-modal-overlay.fullscreen{padding:0;}
+  /* Levý panel (SPZ, stav, náhled foto, rychlá fakta, tlačítka) je
+     stejný pro všechny záložky vpravo — je to trvalý souhrn, ne obsah
+     jedné konkrétní záložky. */
+  .detail-body-split{flex:1; display:flex; overflow:hidden; min-height:0;}
+  .detail-rail{
+    flex:0 0 250px; width:250px; border-right:1px solid var(--line);
+    padding:20px 18px; display:flex; flex-direction:column; gap:12px;
+    overflow-y:auto;
+  }
+  .detail-rail-plate{
+    background:var(--asphalt-3); border:1px solid var(--amber); border-radius:10px;
+    text-align:center; padding:10px; font-size:19px; font-weight:800; letter-spacing:.03em;
+    font-family:'Roboto Mono',monospace; color:var(--text);
+  }
+  .detail-rail-badge{
+    text-align:center; font-size:11px; font-weight:700; padding:6px 0; border-radius:8px;
+    font-family:'Roboto Mono',monospace; text-transform:uppercase; letter-spacing:.04em;
+  }
+  .detail-rail-badge.is-resolved{background:rgba(51,211,153,.15); color:var(--good);}
+  .detail-rail-badge.is-unresolved{background:rgba(255,96,88,.12); color:var(--bad);}
+  .detail-rail-thumb{
+    width:100%; aspect-ratio:4/3; border-radius:10px; overflow:hidden;
+    background:var(--asphalt-3); display:flex; align-items:center; justify-content:center;
+    color:var(--faint); font-size:11px; cursor:pointer;
+  }
+  .detail-rail-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .detail-rail-facts{font-size:12px;}
+  .detail-rail-facts .row{
+    display:flex; justify-content:space-between; gap:8px; padding:4px 0;
+    border-bottom:1px solid var(--asphalt-3); color:var(--muted);
+  }
+  .detail-rail-facts .row:last-child{border-bottom:none;}
+  .detail-rail-facts .row span:last-child{color:var(--text); text-align:right;}
+  .detail-rail-actions{display:flex; flex-direction:column; gap:6px; margin-top:auto; padding-top:8px;}
+  .detail-rail-actions .btn{width:100%;}
+  .detail-rail-doclinks{display:flex; gap:6px;}
+  .detail-rail-doclinks .doc-link-btn{flex:1;}
+  .detail-main{flex:1; display:flex; flex-direction:column; min-width:0; overflow:hidden;}
+  .detail-tabs{display:flex; gap:4px; padding:14px 22px 0; border-bottom:1px solid var(--line); flex:0 0 auto;}
+  .detail-tab{
+    background:none; border:1px solid transparent; color:var(--muted);
+    font-family:'Roboto Mono',monospace; font-size:11px; text-transform:uppercase;
+    letter-spacing:.05em; padding:8px 14px; border-radius:8px 8px 0 0; cursor:pointer;
+    margin-bottom:-1px;
+  }
+  .detail-tab.active{
+    color:var(--amber); background:var(--asphalt-3); border-color:var(--line);
+    border-bottom-color:var(--asphalt-3);
+  }
+  .detail-tab-content{flex:1; overflow-y:auto; padding:22px 26px; display:flex; flex-direction:column; gap:18px;}
+  .detail-tab-panel{display:none;}
+  .detail-tab-panel.active{display:block;}
+  .detail-info-section{margin-bottom:22px;}
+  .detail-info-section:last-child{margin-bottom:0;}
+  .detail-info-section h4{
+    font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--amber);
+    font-family:'Roboto Mono',monospace; margin-bottom:10px;
+  }
+  .detail-info-fields{display:flex; flex-wrap:wrap; gap:10px 24px;}
+  .detail-info-field{min-width:160px;}
+  .detail-info-field label{
+    display:block; font-size:10px; text-transform:uppercase; color:var(--faint);
+    font-family:'Roboto Mono',monospace; margin-bottom:3px;
+  }
+  .detail-info-field .v{font-size:14px; color:var(--text);}
+  .detail-info-field .v.amber{color:var(--amber);}
+  .detail-info-field .v.link{color:var(--amber); cursor:pointer; text-decoration:underline; text-decoration-style:dotted;}
+  .detail-info-empty{color:var(--faint); font-size:13px;}
   .panel-head{position:relative; display:flex; align-items:center; justify-content:center; padding:16px 48px; border-bottom:1px solid var(--line); flex:0 0 auto; gap:14px;}
   .panel-head .id{font-size:12px; color:var(--faint);}
   .detail-head-info{display:flex; flex-direction:column; align-items:center; gap:5px; min-width:0; text-align:center;}
@@ -918,37 +986,66 @@
           <button id="detailCloseBtn" aria-label="Zavřít">✕</button>
         </div>
       </div>
-      <div id="detailPreviewWrap">
-        <div class="detail-top-row" id="detailTopRow">
-          <div id="noticeCardContainer"></div>
-          <div id="photoGalleryFirst" class="photo-gallery-first"></div>
-        </div>
-        <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
-          <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
-        </div>
-        <div class="notice-photo-wrap" id="photoWrap">
-          <div id="photoGallery"></div>
-          <div class="docx-preview" id="docxPreview">
-            <div class="docx-preview-icon">📄</div>
-            <div class="docx-preview-info">
-              <div class="docx-preview-title">Oznámení (.docx)</div>
-              <div class="docx-preview-status" id="docxPreviewStatus">Připravuji náhled…</div>
+      <div class="detail-body-split">
+        <div class="detail-rail">
+          <div class="detail-rail-plate" id="detailRailPlate">—</div>
+          <div class="detail-rail-badge" id="detailRailBadge"></div>
+          <div class="detail-rail-thumb" id="detailRailThumb"></div>
+          <div class="detail-rail-facts" id="detailRailFacts"></div>
+          <div class="detail-rail-actions">
+            <button class="btn btn-ghost" id="mpmExportBtn" title="Zkopírovat údaje pro MP Manager">MPM</button>
+            <button class="btn btn-primary" id="resolveMenuBtn">Dořešit</button>
+            <div class="detail-rail-doclinks">
+              <button class="doc-link-btn" id="docLinkVyzva" style="display:none;" title="Znovu stáhnout Výzvu">
+                <span class="doc-link-icon">📄</span><span class="doc-link-label">Výzva</span>
+              </button>
+              <button class="doc-link-btn" id="docLinkOznameni" style="display:none;" title="Znovu stáhnout Oznámení">
+                <span class="doc-link-icon">📄</span><span class="doc-link-label">Oznámení</span>
+              </button>
             </div>
-            <button class="btn" id="docxOpenBtn" disabled>Otevřít</button>
           </div>
         </div>
-        <div class="submit-note" id="detailNote"></div>
-      </div>
-      <div class="resolution-history" id="resolutionHistory"></div>
-      <div class="panel-actions">
-        <button class="doc-link-btn" id="docLinkVyzva" style="display:none;" title="Znovu stáhnout Výzvu">
-          <span class="doc-link-icon">📄</span><span class="doc-link-label">Výzva</span>
-        </button>
-        <button class="doc-link-btn" id="docLinkOznameni" style="display:none;" title="Znovu stáhnout Oznámení">
-          <span class="doc-link-icon">📄</span><span class="doc-link-label">Oznámení</span>
-        </button>
-        <button class="btn btn-ghost" id="mpmExportBtn" title="Zkopírovat údaje pro MP Manager">MPM</button>
-        <button class="btn btn-primary" id="resolveMenuBtn">Dořešit</button>
+        <div class="detail-main">
+          <div class="detail-tabs" id="detailTabs">
+            <button class="detail-tab active" data-tab="prehled" type="button">Přehled</button>
+            <button class="detail-tab" data-tab="osoba" type="button">Osoba</button>
+            <button class="detail-tab" data-tab="reseni" type="button">Řešení</button>
+            <button class="detail-tab" data-tab="foto" type="button">Foto</button>
+          </div>
+          <div class="detail-tab-content" id="detailPreviewWrap">
+            <div class="detail-tab-panel active" data-tab-panel="prehled">
+              <div id="detailPrestupekContent"></div>
+              <div id="noticeCardContainer"></div>
+            </div>
+            <div class="detail-tab-panel" data-tab-panel="osoba">
+              <div id="detailOsobaContent"></div>
+            </div>
+            <div class="detail-tab-panel" data-tab-panel="reseni">
+              <div id="detailReseniContent"></div>
+              <div class="resolution-history" id="resolutionHistory"></div>
+              <div class="submit-note" id="detailNote"></div>
+            </div>
+            <div class="detail-tab-panel" data-tab-panel="foto">
+              <div class="detail-top-row" id="detailTopRow">
+                <div id="photoGalleryFirst" class="photo-gallery-first"></div>
+              </div>
+              <div class="photo-toggle-row" id="photoToggleRow" style="display:none;">
+                <button class="btn btn-ghost" id="photoToggleBtn">Foto</button>
+              </div>
+              <div class="notice-photo-wrap" id="photoWrap">
+                <div id="photoGallery"></div>
+                <div class="docx-preview" id="docxPreview">
+                  <div class="docx-preview-icon">📄</div>
+                  <div class="docx-preview-info">
+                    <div class="docx-preview-title">Oznámení (.docx)</div>
+                    <div class="docx-preview-status" id="docxPreviewStatus">Připravuji náhled…</div>
+                  </div>
+                  <button class="btn" id="docxOpenBtn" disabled>Otevřít</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -5184,7 +5281,7 @@
 
   function docxRun(text, opts){
     opts = opts || {};
-    let props = '<w:sz w:val="' + (opts.size || 20) + '"/>';
+    let props = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="' + (opts.size || 22) + '"/>';
     if(opts.bold) props += '<w:b/>';
     if(opts.italic) props += '<w:i/>';
     if(opts.underline) props += '<w:u w:val="single"/>';
@@ -5196,7 +5293,7 @@
   // typ 'hyperlink' + targetMode 'External').
   function docxHyperlinkRun(relId, text, opts){
     opts = opts || {};
-    let props = '<w:color w:val="0563C1"/><w:u w:val="single"/><w:sz w:val="' + (opts.size || 20) + '"/>';
+    let props = '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:color w:val="0563C1"/><w:u w:val="single"/><w:sz w:val="' + (opts.size || 22) + '"/>';
     if(opts.bold) props += '<w:b/>';
     return '<w:hyperlink r:id="rId' + relId + '"><w:r><w:rPr>' + props + '</w:rPr><w:t xml:space="preserve">' + xmlEscape(text) + '</w:t></w:r></w:hyperlink>';
   }
@@ -5223,7 +5320,7 @@
     if(opts.pageBreakBefore) pPr += '<w:pageBreakBefore/>';
     pPr += '<w:spacing w:before="' + (opts.spacingBefore != null ? opts.spacingBefore : 0) +
            '" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 0) + '"/>';
-    const runs = segments.map(seg => docxRun(seg.text, { size: opts.size || 20, bold: !!seg.bold })).join('');
+    const runs = segments.map(seg => docxRun(seg.text, { size: opts.size || 22, bold: !!seg.bold })).join('');
     return '<w:p><w:pPr>' + pPr + '</w:pPr>' + runs + '</w:p>';
   }
 
@@ -5236,9 +5333,9 @@
     const pPr = '<w:tabs><w:tab w:val="left" w:pos="' + tabPos + '"/></w:tabs>' +
       '<w:spacing w:before="' + (opts.spacingBefore != null ? opts.spacingBefore : 0) +
       '" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 0) + '"/>';
-    const labelRun = docxRun(label, { size: opts.size || 20 });
-    const tabRun = '<w:r><w:rPr><w:sz w:val="' + (opts.size || 20) + '"/></w:rPr><w:tab/></w:r>';
-    const valueRun = docxRun(value, { size: opts.size || 20, bold: opts.valueBold });
+    const labelRun = docxRun(label, { size: opts.size || 22 });
+    const tabRun = '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="' + (opts.size || 22) + '"/></w:rPr><w:tab/></w:r>';
+    const valueRun = docxRun(value, { size: opts.size || 22, bold: opts.valueBold });
     return '<w:p><w:pPr>' + pPr + '</w:pPr>' + labelRun + tabRun + valueRun + '</w:p>';
   }
 
@@ -5393,6 +5490,24 @@
     return { ref: m[1], sankce: m[2] || null, law: m[3] };
   }
 
+  // Standardní záhlaví (hlavička "Městská policie Blansko" + adresa,
+  // s vodorovnou linkou pod adresou) — podle vzoru, který Lukáš dodal
+  // 11.9.2026 (vzor.rtf). Používá se jako skutečná stránková hlavička
+  // Wordu (word/header1.xml), ne text v těle dokumentu, takže se
+  // opakuje na každé stránce. Sdílené mezi Oznámením a Výzvou.
+  function buildLetterheadHeaderXml(){
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr>' +
+      '<w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:b/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr>' +
+      '<w:t>Městská policie Blansko</w:t></w:r></w:p>' +
+      '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="120"/>' +
+      '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="000000"/></w:pBdr></w:pPr>' +
+      '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr>' +
+      '<w:t>Sadová 149/2, 678 01 Blansko</w:t></w:r></w:p>' +
+      '</w:hdr>';
+  }
+
   async function buildOznameniDocx(record, photosB64, pachatel, isPrestupceDoc){
     // Do hlavičky/podpisu dokumentu appka dává strážníka, který přestupek
     // PRÁVĚ dořešuje (přihlášený na tomhle zařízení), ne toho, kdo ho
@@ -5420,8 +5535,8 @@
         'Datum: ' + todayCz()
       ]
     );
-    body += docxPara('', { size: 20 });
-    body += docxPara('Oznámení přestupku', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
+    body += docxPara('', { size: 22 });
+    body += docxPara('Oznámení přestupku', { bold: true, size: 31, align: 'center', spacingAfter: 200 });
 
     // Základní ustanovení (např. § 4 písm. c)) a sankční ustanovení
     // (§ 125c...) appka potřebuje zvlášť (na dvou různých místech textu,
@@ -5452,25 +5567,25 @@
          'Vám oznamuji podezření ze spáchání přestupku podle ' + introCite +
          (offenseLabelLower ? ' (' + offenseLabelLower + ')' : '') +
          ', ' + introEnding);
-    body += docxPara(intro, { size: 20, spacingAfter: 200 });
+    body += docxPara(intro, { size: 22, spacingAfter: 200 });
 
-    body += docxLabelValuePara('Registrační značka:', record.plate || '', { size: 20, spacingAfter: 200, valueBold: true });
+    body += docxLabelValuePara('Registrační značka:', record.plate || '', { size: 22, spacingAfter: 200, valueBold: true });
     if(record.brand || record.color){
-      body += docxLabelValuePara('Tovární značka, barva:', [record.brand, record.color].filter(Boolean).join(', '), { size: 20, spacingAfter: 200, valueBold: true });
+      body += docxLabelValuePara('Tovární značka, barva:', [record.brand, record.color].filter(Boolean).join(', '), { size: 22, spacingAfter: 200, valueBold: true });
     }
     // Jméno/datum narození se vyplní, pokud je má appka z dialogu
     // "Pachatel" (ručně zadané nebo ze skenu OP).
     const pachatelJmeno = pachatel ? [pachatel.prijmeni, pachatel.jmeno].filter(Boolean).join(' ') : '';
-    body += docxLabelValuePara('Příjmení a jméno:', pachatelJmeno, { size: 20, spacingAfter: 200, valueBold: true });
-    body += docxLabelValuePara('Datum narození:', (pachatel && pachatel.datumNarozeni) || '', { size: 20, spacingAfter: 200, valueBold: true });
+    body += docxLabelValuePara('Příjmení a jméno:', pachatelJmeno, { size: 22, spacingAfter: 200, valueBold: true });
+    body += docxLabelValuePara('Datum narození:', (pachatel && pachatel.datumNarozeni) || '', { size: 22, spacingAfter: 200, valueBold: true });
     // Číslo OP appka do Oznámení záměrně nedává (na výslovné přání).
     // Bydliště na dvou řádcích (ulice+č.p. / PSČ+obec — pachatel.mesto už
     // je appkou uložené jako spojené "PSČ, Obec"), obojí tučně.
     const bydlisteUlice = pachatelBydlisteRadek1(pachatel);
-    body += docxLabelValuePara('Bydliště:', bydlisteUlice, { size: 20, spacingAfter: 0, valueBold: true });
-    body += docxLabelValuePara('', (pachatel && pachatel.mesto) || '', { size: 20, spacingAfter: 200, valueBold: true });
+    body += docxLabelValuePara('Bydliště:', bydlisteUlice, { size: 22, spacingAfter: 0, valueBold: true });
+    body += docxLabelValuePara('', (pachatel && pachatel.mesto) || '', { size: 22, spacingAfter: 200, valueBold: true });
 
-    body += docxPara('Popis skutku:', { bold: true, size: 20, spacingAfter: 100 });
+    body += docxPara('Popis skutku:', { bold: true, size: 22, spacingAfter: 100 });
     // GPS appka dává jako prokliknutelný odkaz na mapy.com (oficiální,
     // bezklíčové URL — viz https://mapy.com/fnc/v1/showmap) — relId se
     // registruje do stejného relEntries pole jako fotky, jen s typem
@@ -5482,7 +5597,7 @@
       const gpsText = 'GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6);
       const mapyUrl = 'https://mapy.com/fnc/v1/showmap?center=' + Number(record.lng) + ',' + Number(record.lat) + '&marker=true&zoom=17';
       relEntries.push({ id: relId, target: mapyUrl, type: 'hyperlink', targetMode: 'External' });
-      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 20 });
+      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 22 });
       relId++;
     }
     // Skutek appka staví zrcadlově k úvodnímu odstavci — tam měla "téhož
@@ -5500,17 +5615,17 @@
     const offenseVerbText = record.offenseVerb || offenseLabelLower;
     // Datum+čas, SPZ a právní kvalifikace appka dává tučně (na výslovné
     // přání) — zbytek věty běžným řezem.
-    let skutekRuns = docxRun('Dne ', { size: 20 }) +
-      docxRun(formatDateCz(record.date) + ' v ' + (record.time || '—'), { size: 20, bold: true }) +
-      docxRun(' hodin se ' + (isPrestupceDoc ? 'výše uvedený' : 'dosud neustanovený') + ' řidič vozidla registrační značky ', { size: 20 }) +
-      docxRun(record.plate || '', { size: 20, bold: true }) +
-      docxRun(' v ulici ' + (record.address || ''), { size: 20 });
+    let skutekRuns = docxRun('Dne ', { size: 22 }) +
+      docxRun(formatDateCz(record.date) + ' v ' + (record.time || '—'), { size: 22, bold: true }) +
+      docxRun(' hodin se ' + (isPrestupceDoc ? 'výše uvedený' : 'dosud neustanovený') + ' řidič vozidla registrační značky ', { size: 22 }) +
+      docxRun(record.plate || '', { size: 22, bold: true }) +
+      docxRun(' v ulici ' + (record.address || ''), { size: 22 });
     if(gpsRunXml){
-      skutekRuns += docxRun(' (', { size: 20 }) + gpsRunXml + docxRun(')', { size: 20 });
+      skutekRuns += docxRun(' (', { size: 22 }) + gpsRunXml + docxRun(')', { size: 22 });
     }
-    skutekRuns += docxRun(' dopustil jednání v rozporu s ' + skutekBaseCite + ' tím, že ', { size: 20 }) +
-      docxRun(offenseVerbText, { size: 20, bold: true }) +
-      docxRun(', čímž naplnil znaky přestupku podle ' + skutekSankceCite + '.', { size: 20 });
+    skutekRuns += docxRun(' dopustil jednání v rozporu s ' + skutekBaseCite + ' tím, že ', { size: 22 }) +
+      docxRun(offenseVerbText, { size: 22, bold: true }) +
+      docxRun(', čímž naplnil znaky přestupku podle ' + skutekSankceCite + '.', { size: 22 });
     body += '<w:p><w:pPr><w:spacing w:before="0" w:after="200"/></w:pPr>' + skutekRuns + '</w:p>';
 
     // "Lustrací byl(a) jako provozovatel zjištěn(a)..." dává smysl jen
@@ -5518,7 +5633,7 @@
     // PŘESTUPCE žádná lustrace provozovatele neproběhla (řidič je rovnou
     // totožný s výše uvedeným), takže se tahle věta úplně vynechává.
     if(!isPrestupceDoc){
-      body += docxPara('Lustrací byl(a) jako provozovatel výše uvedeného vozidla zjištěn(a) výše jmenovaný(á).', { size: 20, spacingAfter: 400 });
+      body += docxPara('Lustrací byl(a) jako provozovatel výše uvedeného vozidla zjištěn(a) výše jmenovaný(á).', { size: 22, spacingAfter: 400 });
     }
 
     // Podpisový blok + přílohy appka dává do patičky STRÁNKY 1 (Word
@@ -5531,20 +5646,20 @@
     // zároveň se to nezopakuje na dalších stránkách (fotky/výzva/mapa),
     // protože appka pro ně žádnou "default" patičku nedefinuje.
     let footerBody = '';
-    footerBody += docxPara('Ing. Martin Lepka', { size: 20 });
-    footerBody += docxPara('ředitel MP Blansko', { size: 20, spacingAfter: 400 });
-    footerBody += docxPara('Přílohy:', { size: 20 });
+    footerBody += docxPara('Ing. Martin Lepka', { size: 22 });
+    footerBody += docxPara('ředitel MP Blansko', { size: 22, spacingAfter: 400 });
+    footerBody += docxPara('Přílohy:', { size: 22 });
     // "- Výzva" appka do seznamu příloh napíše, jen když tu kopii
     // tištěné výzvy vůbec přikládá — stejnou podmínku appka používá
     // i u bloku Výzvy samotného o pár řádků níž (viz
     // docxNarrowBoxTable).
-    if(record.source !== 'addEvent') footerBody += docxPara('- Výzva', { size: 20 });
-    footerBody += docxPara('- Fotodokumentace', { size: 20 });
-    footerBody += docxPara('- mapa místa přestupku', { size: 20 });
+    if(record.source !== 'addEvent') footerBody += docxPara('- Výzva', { size: 22 });
+    footerBody += docxPara('- Fotodokumentace', { size: 22 });
+    footerBody += docxPara('- mapa místa přestupku', { size: 22 });
 
     // Fotky — každá na vlastní A4 stránce v běžné velikosti.
     if(photosB64.length){
-      body += docxPara('Fotodokumentace', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
+      body += docxPara('Fotodokumentace', { bold: true, size: 26, align: 'center', spacingAfter: 200, pageBreakBefore: true });
       for(let i=0;i<photosB64.length;i++){
         const dims = await getImagePixelSize('data:image/jpeg;base64,' + photosB64[i]);
         const filename = 'image' + (i + 1) + '.jpeg';
@@ -5573,21 +5688,21 @@
     // realitě.
     if(record.source !== 'addEvent'){
     const isBoticka = record.docType === 'boticka';
-    body += docxPara('Výzva', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
+    body += docxPara('Výzva', { bold: true, size: 26, align: 'center', spacingAfter: 200, pageBreakBefore: true });
     let inner = '';
-    inner += docxPara(isBoticka ? 'OZNÁMENÍ' : 'VÝZVA', { bold: true, size: 22, align: 'center' });
-    inner += docxPara(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku', { size: 14, align: 'center' });
-    if(record.noticeNumber) inner += docxPara(record.noticeNumber, { size: 24, align: 'center', spacingAfter: 100 });
-    inner += docxPara(record.plate || '', { bold: true, size: 32, align: 'center' });
-    inner += docxPara('Datum: ' + formatDateCz(record.date) + '  Čas: ' + (record.time || '—'), { size: 14, align: 'center', spacingAfter: 100 });
+    inner += docxPara(isBoticka ? 'OZNÁMENÍ' : 'VÝZVA', { bold: true, size: 24, align: 'center' });
+    inner += docxPara(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku', { size: 15, align: 'center' });
+    if(record.noticeNumber) inner += docxPara(record.noticeNumber, { size: 26, align: 'center', spacingAfter: 100 });
+    inner += docxPara(record.plate || '', { bold: true, size: 35, align: 'center' });
+    inner += docxPara('Datum: ' + formatDateCz(record.date) + '  Čas: ' + (record.time || '—'), { size: 15, align: 'center', spacingAfter: 100 });
     if(record.address){
-      inner += docxPara('Místo přestupku', { bold: true, size: 13, align: 'center' });
-      inner += docxPara(record.address, { size: 14, align: 'center', spacingAfter: 100 });
+      inner += docxPara('Místo přestupku', { bold: true, size: 14, align: 'center' });
+      inner += docxPara(record.address, { size: 15, align: 'center', spacingAfter: 100 });
     }
     if(offenseLabel){
-      inner += docxPara('Právní kvalifikace', { bold: true, size: 13, align: 'center' });
-      inner += docxPara(offenseLabel, { size: 14, align: 'center' });
-      if(offenseCitation) inner += docxPara(offenseCitation, { size: 11, align: 'center', spacingAfter: 100 });
+      inner += docxPara('Právní kvalifikace', { bold: true, size: 14, align: 'center' });
+      inner += docxPara(offenseLabel, { size: 15, align: 'center' });
+      if(offenseCitation) inner += docxPara(offenseCitation, { size: 12, align: 'center', spacingAfter: 100 });
     }
 
     if(isBoticka){
@@ -5595,40 +5710,40 @@
         'Oznamuji Vám, že na výše uvedeném vozidle byl umístěn technický prostředek k zabránění ' +
         'odjezdu vozidla (TPZOV) dle § 17a zákona č. 553/1991 Sb., o obecní policii, a to z důvodu ' +
         'porušení pravidel uvedených výše.',
-        { size: 14, align: 'center', spacingAfter: 100 }
+        { size: 15, align: 'center', spacingAfter: 100 }
       );
-      inner += docxPara('pořízena fotodokumentace', { bold: true, size: 14, align: 'center', spacingAfter: 100 });
-      inner += docxPara('POUČENÍ', { bold: true, size: 13, align: 'center' });
+      inner += docxPara('pořízena fotodokumentace', { bold: true, size: 15, align: 'center', spacingAfter: 100 });
+      inner += docxPara('POUČENÍ', { bold: true, size: 14, align: 'center' });
       inner += docxPara(
         'Technický prostředek bude odstraněn po projednání přestupku, nebo po zjištění totožnosti ' +
         'osoby, která vozidlo na místě ponechala, nebo po provedení nezbytných úkonů ke zjištění ' +
         'totožnosti této osoby.',
-        { size: 14, align: 'center', spacingAfter: 100 }
+        { size: 15, align: 'center', spacingAfter: 100 }
       );
     } else {
       inner += docxPara(
         'Dostavte se proto ve vlastním zájmu, a to neprodleně na Městskou policii Blansko, Sadová 2. ' +
         'Tuto výzvu vezměte s sebou.',
-        { size: 14, align: 'center', spacingAfter: 100 }
+        { size: 15, align: 'center', spacingAfter: 100 }
       );
-      inner += docxPara('pořízena fotodokumentace', { bold: true, size: 14, align: 'center', spacingAfter: 100 });
-      inner += docxPara('POUČENÍ', { bold: true, size: 13, align: 'center' });
+      inner += docxPara('pořízena fotodokumentace', { bold: true, size: 15, align: 'center', spacingAfter: 100 });
+      inner += docxPara('POUČENÍ', { bold: true, size: 14, align: 'center' });
       inner += docxPara(
         'Dle § 11/odst. 1 a 2, zák. 553/1991 Sb., o obecní policii je osoba povinna výzvě vyhovět. ' +
         'Nedostavíte-li se bez dostatečné omluvy, můžete být dle § 11/odst. 8 výše uvedeného zákona ' +
         'předveden(a) nebo může být přestupek oznámen příslušnému správnímu orgánu k projednání.',
-        { size: 14, align: 'center', spacingAfter: 100 }
+        { size: 15, align: 'center', spacingAfter: 100 }
       );
     }
 
     if(officerForDoc){
-      inner += docxPara('str. ' + officerForDoc, { bold: true, size: 14, align: 'center' });
+      inner += docxPara('str. ' + officerForDoc, { bold: true, size: 15, align: 'center' });
     }
-    inner += docxPara('Městská policie Blansko', { bold: true, size: 14, align: 'center' });
-    inner += docxPara('Sadová 149/2, 678 01 Blansko', { size: 13, align: 'center' });
-    inner += docxPara('Tel.: 775 859 486, 516 418 418', { size: 13, align: 'center', spacingAfter: 100 });
-    inner += docxPara('vygenerováno aplikací', { size: 11, align: 'center' });
-    inner += docxPara('RZ Scanner © Šuraj', { size: 11, align: 'center' });
+    inner += docxPara('Městská policie Blansko', { bold: true, size: 15, align: 'center' });
+    inner += docxPara('Sadová 149/2, 678 01 Blansko', { size: 14, align: 'center' });
+    inner += docxPara('Tel.: 775 859 486, 516 418 418', { size: 14, align: 'center', spacingAfter: 100 });
+    inner += docxPara('vygenerováno aplikací', { size: 12, align: 'center' });
+    inner += docxPara('RZ Scanner © Šuraj', { size: 12, align: 'center' });
 
     body += docxNarrowBoxTable(58, inner);
     }
@@ -5659,7 +5774,7 @@
           mediaFiles.push({ name: mapFilename, bytes: mapBytes });
           relEntries.push({ id: relId, target: 'media/' + mapFilename });
           const mapDims = await getImagePixelSize('data:' + contentType + ';base64,' + uint8ArrayToBase64(mapBytes));
-          body += docxPara('Mapa místa přestupku', { bold: true, size: 24, align: 'center', spacingAfter: 200, pageBreakBefore: true });
+          body += docxPara('Mapa místa přestupku', { bold: true, size: 26, align: 'center', spacingAfter: 200, pageBreakBefore: true });
           body += docxImageParagraph(relId, mapDims.w, mapDims.h, 170, 240, docId, false);
           relId++; docId++;
         } else {
@@ -5676,14 +5791,18 @@
       'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
       'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
       '<w:body>' + body +
-      '<w:sectPr><w:footerReference w:type="first" r:id="rIdFooter1"/><w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:sectPr><w:headerReference w:type="first" r:id="rIdHeaderFirst"/>' +
+      '<w:headerReference w:type="default" r:id="rIdHeaderDefault"/>' +
+      '<w:footerReference w:type="first" r:id="rIdFooter1"/><w:pgSz w:w="11906" w:h="16838"/>' +
       '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>' +
       '<w:titlePg/>' +
       '</w:sectPr></w:body></w:document>';
 
     // Patička jen pro stránku 1 (w:titlePg výše zapíná odlišnou "first
     // page" patičku — appka žádnou "default" patičku pro další stránky
-    // nedefinuje, takže se tam nic neopakuje).
+    // nedefinuje, takže se tam nic neopakuje). Hlavička (letterhead)
+    // se naopak opakovat má na každé stránce — proto má "first" i
+    // "default" typ headerReference ukázaný na stejný header1.xml.
     const footerXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
       footerBody +
@@ -5697,6 +5816,7 @@
       '<Default Extension="png" ContentType="image/png"/>' +
       '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
       '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' +
+      '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' +
       '</Types>';
 
     const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
@@ -5707,6 +5827,8 @@
     const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
       '<Relationship Id="rIdFooter1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' +
+      '<Relationship Id="rIdHeaderFirst" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' +
+      '<Relationship Id="rIdHeaderDefault" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' +
       relEntries.map(e => e.type === 'hyperlink'
         ? '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + xmlEscape(e.target) + '" TargetMode="External"/>'
         : '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="' + e.target + '"/>'
@@ -5718,6 +5840,7 @@
     zip.file('_rels/.rels', rootRels);
     zip.file('word/document.xml', documentXml);
     zip.file('word/footer1.xml', footerXml);
+    zip.file('word/header1.xml', buildLetterheadHeaderXml());
     zip.file('word/_rels/document.xml.rels', docRels);
     mediaFiles.forEach(m => zip.file('word/media/' + m.name, m.bytes));
 
@@ -5842,7 +5965,7 @@
       const gpsText = 'GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6);
       const mapyUrl = 'https://mapy.com/fnc/v1/showmap?center=' + Number(record.lng) + ',' + Number(record.lat) + '&marker=true&zoom=17';
       relEntries.push({ id: relId, target: mapyUrl, type: 'hyperlink', targetMode: 'External' });
-      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 20 });
+      gpsRunXml = docxHyperlinkRun(relId, gpsText, { size: 22 });
       relId++;
     }
 
@@ -5859,8 +5982,8 @@
       ],
       true
     );
-    body += docxPara('', { size: 20 });
-    body += docxPara('VÝZVA', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
+    body += docxPara('', { size: 22 });
+    body += docxPara('VÝZVA', { bold: true, size: 31, align: 'center', spacingAfter: 200 });
 
     // Stejná stavba věty jako u Oznámení (viz skutekRuns v
     // buildOznameniDocx) — datum+čas dostavení, popis skutku (slovesný
@@ -5875,41 +5998,41 @@
     // dopis posílá) totiž nemusí být totožný s řidičem, kterého appka
     // hledá (proto "dosud neustanovený řidič" dál ve větě); appka ho
     // jen žádá, ať dotyčného řidiče na uvedený termín zajistí/pošle.
-    let vyzvaRuns = docxRun('Žádáme Vás, aby se dne ', { size: 20 }) +
-      docxRun(dostaveniDatumCasText, { size: 20, bold: true }) +
+    let vyzvaRuns = docxRun('Žádáme Vás, aby se dne ', { size: 22 }) +
+      docxRun(dostaveniDatumCasText, { size: 22, bold: true }) +
       docxRun(' dostavil na Městskou policii Blansko, Sadová č. 2, řidič níže uvedeného vozidla k podání vysvětlení podle § 11 odst. 1 zákona č. 553/1991 Sb., ' +
         'o obecní policii, ve znění pozdějších předpisů, ve věci objasnění skutečností důležitých pro odhalení pachatele ' +
         'přestupku podle ' + skutekBaseCite + ', kterého se dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') +
-        ' hodin dopustil dosud neustanovený řidič vozidla ', { size: 20 }) +
-      docxRun(vehicleBoldPart, { size: 20, bold: true }) +
-      docxRun(' v ' + loc.city + (loc.locationPhrase ? ', ' + loc.locationPhrase : ''), { size: 20 });
+        ' hodin dopustil dosud neustanovený řidič vozidla ', { size: 22 }) +
+      docxRun(vehicleBoldPart, { size: 22, bold: true }) +
+      docxRun(' v ' + loc.city + (loc.locationPhrase ? ', ' + loc.locationPhrase : ''), { size: 22 });
     if(gpsRunXml){
-      vyzvaRuns += docxRun(' (', { size: 20 }) + gpsRunXml + docxRun(')', { size: 20 });
+      vyzvaRuns += docxRun(' (', { size: 22 }) + gpsRunXml + docxRun(')', { size: 22 });
     }
-    vyzvaRuns += docxRun(' tím, že ', { size: 20 }) +
-      docxRun(offenseVerbText, { size: 20, bold: true }) +
-      docxRun(', čímž naplnil znaky přestupku podle ' + skutekSankceCite + '.', { size: 20 });
+    vyzvaRuns += docxRun(' tím, že ', { size: 22 }) +
+      docxRun(offenseVerbText, { size: 22, bold: true }) +
+      docxRun(', čímž naplnil znaky přestupku podle ' + skutekSankceCite + '.', { size: 22 });
     body += '<w:p><w:pPr><w:spacing w:before="0" w:after="300"/></w:pPr>' + vyzvaRuns + '</w:p>';
 
-    body += docxPara('Přineste s sebou tyto doklady:', { size: 20, spacingAfter: 60 });
-    body += docxPara('- tuto výzvu', { size: 20 });
-    body += docxPara('- doklad totožnosti', { size: 20, spacingAfter: 300 });
+    body += docxPara('Přineste s sebou tyto doklady:', { size: 22, spacingAfter: 60 });
+    body += docxPara('- tuto výzvu', { size: 22 });
+    body += docxPara('- doklad totožnosti', { size: 22, spacingAfter: 300 });
 
     body += docxPara(
       'Nedostavíte-li se bez dostatečné omluvy nebo bez závažného důvodu, můžete být dle § 11 odst. 9 zák. č. 553/91 Sb., ' +
       'o obecní policii, ve znění pozdějších předpisů, předveden(a).',
-      { size: 20, spacingAfter: 400 }
+      { size: 22, spacingAfter: 400 }
     );
 
-    body += docxPara('Ing. Martin Lepka', { size: 20, spacingBefore: 600 });
-    body += docxPara('ředitel MP Blansko', { size: 20 });
+    body += docxPara('Ing. Martin Lepka', { size: 22, spacingBefore: 600 });
+    body += docxPara('ředitel MP Blansko', { size: 22 });
 
     const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
       'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" ' +
       'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
       '<w:body>' + body +
-      '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>' +
+      '<w:sectPr><w:headerReference w:type="default" r:id="rIdHeaderDefault"/><w:pgSz w:w="11906" w:h="16838"/>' +
       '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/>' +
       '</w:sectPr></w:body></w:document>';
 
@@ -5918,6 +6041,7 @@
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
       '<Default Extension="xml" ContentType="application/xml"/>' +
       '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' +
       '</Types>';
 
     const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
@@ -5927,6 +6051,7 @@
 
     const docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rIdHeaderDefault" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' +
       relEntries.map(e => '<Relationship Id="rId' + e.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="' + xmlEscape(e.target) + '" TargetMode="External"/>').join('') +
       '</Relationships>';
 
@@ -5934,6 +6059,7 @@
     zip.file('[Content_Types].xml', contentTypes);
     zip.file('_rels/.rels', rootRels);
     zip.file('word/document.xml', documentXml);
+    zip.file('word/header1.xml', buildLetterheadHeaderXml());
     zip.file('word/_rels/document.xml.rels', docRels);
 
     return zip.generateAsync({
@@ -9088,9 +9214,143 @@
   });
 
 
+  // Vyplní levý panel detailu (SPZ, stav, náhled foto, rychlá fakta) —
+  // volá se z openDetail a znovu po dotažení fotek, ať se náhled doplní,
+  // jakmile jsou k dispozici.
+  function updateDetailRail(record){
+    document.getElementById('detailRailPlate').textContent = record.plate || 'NEZNÁMÁ SPZ';
+
+    const badge = document.getElementById('detailRailBadge');
+    if(record.resolved){
+      badge.textContent = UNDO_METHOD_LABEL[record.resolvedMethod] || 'Dořešeno';
+      badge.className = 'detail-rail-badge is-resolved';
+    } else {
+      badge.textContent = 'Nevyřešeno';
+      badge.className = 'detail-rail-badge is-unresolved';
+    }
+
+    const thumb = document.getElementById('detailRailThumb');
+    const photos = record._resolvedPhotos;
+    if(photos && photos.length){
+      const mime = (record._resolvedMimes && record._resolvedMimes[0]) || record._resolvedMime || 'image/jpeg';
+      thumb.innerHTML = '<img src="data:' + mime + ';base64,' + photos[0] + '" alt="Náhled fotodokumentace">';
+    } else {
+      thumb.textContent = '📷';
+    }
+    thumb.onclick = function(){ setDetailTab('foto'); };
+
+    let zdroj = 'Terén';
+    if(record.source === 'addEvent'){
+      zdroj = (record.mpmUdalostId === '51989') ? 'Placenky · ClickPark' : 'Přidat událost';
+    }
+    const rows = [
+      ['Založeno', formatCreatedAt(record.createdAt) || '—'],
+      ['Strážník', record.officerName || '—'],
+      ['Zdroj', zdroj]
+    ];
+    document.getElementById('detailRailFacts').innerHTML = rows.map(r =>
+      '<div class="row"><span>' + escapeHtml(r[0]) + '</span><span>' + escapeHtml(r[1]) + '</span></div>'
+    ).join('');
+  }
+
+  // Přepne viditelnou záložku vpravo v detailu (Přehled/Osoba/Řešení/
+  // Foto) — levý panel zůstává stejný, mění se jen obsah pravé strany.
+  function setDetailTab(tab){
+    document.querySelectorAll('.detail-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
+    });
+    document.querySelectorAll('.detail-tab-panel').forEach(panel => {
+      panel.classList.toggle('active', panel.getAttribute('data-tab-panel') === tab);
+    });
+    document.getElementById('detailPreviewWrap').scrollTop = 0;
+  }
+
+  document.getElementById('detailTabs').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.detail-tab');
+    if(btn) setDetailTab(btn.getAttribute('data-tab'));
+  });
+
+  // Jedno pole popisek+hodnota pro záložky Osoba/Řešení — prázdnou
+  // hodnotu rovnou vynechá, ať se v layoutu neobjevují prázdné rámečky.
+  function detailInfoField(label, value, cls){
+    if(value == null || value === '') return '';
+    return '<div class="detail-info-field"><label>' + escapeHtml(label) + '</label><div class="v' +
+      (cls ? ' ' + cls : '') + '">' + escapeHtml(String(value)) + '</div></div>';
+  }
+
+  function buildDetailPrestupekHtml(record){
+    let html = '<div class="detail-info-section"><h4>Přestupek</h4><div class="detail-info-fields">';
+    html += detailInfoField('Datum spáchání', formatDateCz(record.date));
+    html += detailInfoField('Čas spáchání', record.time);
+    if(record.address){
+      const mapUrl = (record.lat != null && record.lng != null)
+        ? ('https://mapy.com/fnc/v1/showmap?center=' + record.lng + ',' + record.lat + '&marker=true&zoom=17')
+        : null;
+      html += '<div class="detail-info-field"><label>Místo</label><div class="v' + (mapUrl ? ' link' : '') + '"' +
+        (mapUrl ? ' onclick="window.open(\'' + mapUrl + '\',\'_blank\')"' : '') + '>' + escapeHtml(record.address) + '</div></div>';
+    }
+    if(record.lat != null && record.lng != null){
+      html += detailInfoField('GPS', record.lat.toFixed(4) + ', ' + record.lng.toFixed(4));
+    }
+    html += detailInfoField('Kvalifikace', record.offenseLabel);
+    html += detailInfoField('Citace', record.offenseCitation);
+    html += detailInfoField('Číslo pokuty (ClickPark)', record.clickParkCisloPokuty);
+    html += '</div></div>';
+    html += '<div class="detail-info-section"><h4>Vozidlo</h4><div class="detail-info-fields">';
+    html += detailInfoField('RZ', record.plate);
+    html += detailInfoField('Tovární značka', record.brand);
+    html += detailInfoField('Barva', record.color);
+    html += '</div></div>';
+    return html;
+  }
+
+  function buildDetailOsobaHtml(record){
+    const p = record.pachatel;
+    if(!p || !(p.jmeno || p.prijmeni || p.firma)){
+      return '<div class="detail-info-empty">U tohohle záznamu zatím není uložená žádná osoba ani firma.</div>';
+    }
+    const isFirma = !!p.firma;
+    let html = '<div class="detail-info-section"><h4>' + (isFirma ? 'Provozovatel — firma' : 'Osoba') + '</h4><div class="detail-info-fields">';
+    if(isFirma){
+      html += detailInfoField('Název firmy', p.firma);
+      html += detailInfoField('IČO', p.ico);
+      html += detailInfoField('Datová schránka', p.datovaSchranka);
+    } else {
+      html += detailInfoField('Jméno a příjmení', [p.jmeno, p.prijmeni].filter(Boolean).join(' '));
+      html += detailInfoField('Datum narození', p.datumNarozeni);
+      html += detailInfoField('Číslo dokladu', p.cisloDokladu);
+    }
+    const bydliste = [p.ulice, p.cisloDomu].filter(Boolean).join(' ');
+    if(bydliste || p.mesto){
+      html += detailInfoField(isFirma ? 'Sídlo' : 'Bydliště', [bydliste, p.mesto].filter(Boolean).join(', '));
+    }
+    html += '</div></div>';
+    return html;
+  }
+
+  function buildDetailReseniHtml(record){
+    let html = '<div class="detail-info-section"><h4>Řešení</h4><div class="detail-info-fields">';
+    html += detailInfoField('Způsob', record.resolved ? (UNDO_METHOD_LABEL[record.resolvedMethod] || record.resolvedMethod) : 'Nevyřešeno');
+    if(record.resolved){
+      html += detailInfoField('Vyřešil', record.resolvedByOfficer || record.officerName);
+      html += detailInfoField('Kdy', formatResolvedDateTime(record.resolvedAt));
+    }
+    if(record.castka != null) html += detailInfoField('Částka', record.castka + ' Kč');
+    if(record.platba) html += detailInfoField('Způsob platby', record.platba);
+    html += detailInfoField('Č. j. RZ Scanner', record.noticeNumber);
+    html += detailInfoField('Č. j. MP Manager', record.mpmCisloJednaci);
+    html += '</div></div>';
+    return html;
+  }
+
   function openDetail(record){
     currentDetailRecord = record;
     document.getElementById('detailHeadInfo').innerHTML = buildDetailHeadHtml(record);
+    updateDetailRail(record);
+    document.getElementById('detailPrestupekContent').innerHTML = buildDetailPrestupekHtml(record);
+    document.getElementById('detailOsobaContent').innerHTML = buildDetailOsobaHtml(record);
+    document.getElementById('detailReseniContent').innerHTML = buildDetailReseniHtml(record);
+    setDetailTab('prehled');
     // Karta "VÝZVA"/"OZNÁMENÍ" (buildNoticeHtml) napodobuje fyzickou
     // výzvu za sklo, kterou strážník v terénu vytiskne a nechá u vozidla
     // — u záznamů založených přes "Přidat událost" (MKDS/Placenky,
@@ -9138,6 +9398,7 @@
       photoToggleBtn.textContent = 'Foto' + (record._resolvedPhotos.length > 1 ? ' (' + record._resolvedPhotos.length + ')' : '');
       photoToggleRow.style.display = 'block';
       photoWrap.classList.add('open');
+      updateDetailRail(record);
     } else if(legacyPhotos.length){
       record._resolvedPhotos = legacyPhotos;
       record._resolvedMime = record.photoMime || 'image/jpeg';
@@ -9145,12 +9406,14 @@
       photoToggleBtn.textContent = 'Foto' + (legacyPhotos.length > 1 ? ' (' + legacyPhotos.length + ')' : '');
       photoToggleRow.style.display = 'block';
       photoWrap.classList.add('open');
+      updateDetailRail(record);
     } else if(record.hasPhotos){
       // Appka teď fotky rovnou dotáhne a zobrazí, místo aby čekala na
       // klepnutí na "Foto" — stačí tedy jen zavolat stejnou logiku, kterou
-      // by jinak spustil klik na tlačítko.
+      // by jinak spustil klik na tlačítko. Levý panel se s náhledem
+      // dožene, jakmile fotky doopravdy dorazí.
       photoToggleRow.style.display = 'block';
-      loadAndShowPhotos(record);
+      loadAndShowPhotos(record).then(()=> updateDetailRail(record));
     } else {
       photoToggleRow.style.display = 'none';
     }
