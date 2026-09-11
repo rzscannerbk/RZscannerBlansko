@@ -1785,7 +1785,7 @@
     playNotifySound();
     const toast = document.createElement('div');
     toast.className = 'new-record-toast';
-    toast.innerHTML = '<b>' + escapeHtml(record.plate || 'Nový přestupek') + '</b>' +
+    toast.innerHTML = '<b>' + escapeHtml(record.plate ? formatPlate(record.plate) : 'Nový přestupek') + '</b>' +
       (record.address ? ' · ' + escapeHtml(record.address) : '');
     document.body.appendChild(toast);
     requestAnimationFrame(()=> toast.classList.add('show'));
@@ -1800,6 +1800,20 @@
     const d = ts.toDate();
     const pad = n => String(n).padStart(2,'0');
     return pad(d.getDate()) + '.' + pad(d.getMonth()+1) + '.' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  // Zobrazovací formát RZ — první tři znaky, mezera, zbytek (4 nebo
+  // 5 znaků), např. "2H43771" → "2H4 3771", "1BZ6191" → "1BZ 6191".
+  // Nejdřív smaže případné existující mezery a pak vloží přesně jednu
+  // na správné místo, takže funguje bez ohledu na to, jestli je uložená
+  // hodnota s mezerou nebo bez. Volá se jen při zobrazení/exportu
+  // (přehled, detail, docx, tisk, MP Manager) — uložená hodnota v
+  // záznamu zůstává, jak byla zadaná.
+  function formatPlate(plate){
+    if(!plate) return plate || '';
+    const compact = String(plate).replace(/\s+/g, '');
+    if(compact.length <= 3) return compact;
+    return compact.slice(0, 3) + ' ' + compact.slice(3);
   }
 
   function formatDateCz(iso){
@@ -1911,7 +1925,7 @@
         <div class="notice-subtitle${isBoticka ? ' notice-subtitle-boticka' : ''}">${isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku'}</div>
         ${numberBlock}
         <div class="notice-label">Registrační značka</div>
-        <div class="notice-platebox">${escapeHtml(record.plate || '')}</div>
+        <div class="notice-platebox">${escapeHtml(formatPlate(record.plate) || '')}</div>
         ${vehicleBlock}
         <div class="notice-datetime">Datum: ${escapeHtml(formatDateCz(record.date))}&nbsp;&nbsp;&nbsp;Čas: ${escapeHtml(record.time || '—')}</div>
         ${addressBlock}
@@ -5143,7 +5157,7 @@
     const { town, street } = parseAddressForMPM(record.address);
     const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
     const descLines = [];
-    descLines.push('Vozidlo RZ ' + (record.plate || '?') + (vehicleBits ? ' (' + vehicleBits + ')' : ''));
+    descLines.push('Vozidlo RZ ' + (record.plate ? formatPlate(record.plate) : '?') + (vehicleBits ? ' (' + vehicleBits + ')' : ''));
     descLines.push('Datum a čas přestupku: ' + isoToCzDate(record.date) + ' ' + (record.time || ''));
     if(record.offenseLabel){
       descLines.push('Přestupek: ' + record.offenseLabel + (record.offenseCitation ? ' — ' + record.offenseCitation : ''));
@@ -5574,7 +5588,7 @@
          ', ' + introEnding);
     body += docxPara(intro, { size: 22, spacingAfter: 200 });
 
-    body += docxLabelValuePara('Registrační značka:', record.plate || '', { size: 22, spacingAfter: 200, valueBold: true });
+    body += docxLabelValuePara('Registrační značka:', formatPlate(record.plate) || '', { size: 22, spacingAfter: 200, valueBold: true });
     if(record.brand || record.color){
       body += docxLabelValuePara('Tovární značka, barva:', [record.brand, record.color].filter(Boolean).join(', '), { size: 22, spacingAfter: 200, valueBold: true });
     }
@@ -5623,7 +5637,7 @@
     let skutekRuns = docxRun('Dne ', { size: 22 }) +
       docxRun(formatDateCz(record.date) + ' v ' + (record.time || '—'), { size: 22, bold: true }) +
       docxRun(' hodin se ' + (isPrestupceDoc ? 'výše uvedený' : 'dosud neustanovený') + ' řidič vozidla registrační značky ', { size: 22 }) +
-      docxRun(record.plate || '', { size: 22, bold: true }) +
+      docxRun(formatPlate(record.plate) || '', { size: 22, bold: true }) +
       docxRun(' v ulici ' + (record.address || ''), { size: 22 });
     if(gpsRunXml){
       skutekRuns += docxRun(' (', { size: 22 }) + gpsRunXml + docxRun(')', { size: 22 });
@@ -5698,7 +5712,7 @@
     inner += docxPara(isBoticka ? 'OZNÁMENÍ' : 'VÝZVA', { bold: true, size: 24, align: 'center' });
     inner += docxPara(isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku', { size: 15, align: 'center' });
     if(record.noticeNumber) inner += docxPara(record.noticeNumber, { size: 26, align: 'center', spacingAfter: 100 });
-    inner += docxPara(record.plate || '', { bold: true, size: 35, align: 'center' });
+    inner += docxPara(formatPlate(record.plate) || '', { bold: true, size: 35, align: 'center' });
     inner += docxPara('Datum: ' + formatDateCz(record.date) + '  Čas: ' + (record.time || '—'), { size: 15, align: 'center', spacingAfter: 100 });
     if(record.address){
       inner += docxPara('Místo přestupku', { bold: true, size: 14, align: 'center' });
@@ -5997,7 +6011,7 @@
     // i jinde — viz "Tovární značka, barva" v Oznámení) — obě jsou
     // nepovinné, appka je do věty přidá, jen když jsou vyplněné.
     const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
-    const vehicleBoldPart = (vehicleBits ? (vehicleBits + ', ') : '') + 'RZ ' + (record.plate || '');
+    const vehicleBoldPart = (vehicleBits ? (vehicleBits + ', ') : '') + 'RZ ' + (formatPlate(record.plate) || '');
     // Věta záměrně žádá o dostavení "řidiče níže uvedeného vozidla", ne
     // přímo adresáta dopisu ("Vás") — adresát (provozovatel, appka mu
     // dopis posílá) totiž nemusí být totožný s řidičem, kterého appka
@@ -6232,7 +6246,7 @@
       x += textEl(record.noticeNumber + '\n', { align: 'center', em: true, width: 2, height: 2 });
     }
     x += textEl('\nREGISTRAČNÍ ZNAČKA\n', { align: 'center' });
-    x += textEl((record.plate || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
+    x += textEl((formatPlate(record.plate) || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
     if(record.brand || record.color){
       x += textEl([record.brand, record.color].filter(Boolean).join(', ') + '\n', { align: 'center' });
     }
@@ -6831,7 +6845,7 @@
   document.getElementById('adminEditDeleteBtn').addEventListener('click', async ()=>{
     const record = adminEditRecord;
     if(!record) return;
-    if(!confirm('Opravdu trvale smazat přestupek ' + (record.plate || '') + ' (' + (record.noticeNumber || record.id) + ')? Tuhle akci appka nejde vzít zpět.')) return;
+    if(!confirm('Opravdu trvale smazat přestupek ' + (formatPlate(record.plate) || '') + ' (' + (record.noticeNumber || record.id) + ')? Tuhle akci appka nejde vzít zpět.')) return;
     const delBtn = document.getElementById('adminEditDeleteBtn');
     delBtn.disabled = true;
     delBtn.textContent = 'Mažu…';
@@ -7147,7 +7161,7 @@
       plateCol.className = 'record-plate-col';
       const plate = document.createElement('span');
       plate.className = 'record-plate mono';
-      plate.textContent = r.plate || 'NEZNÁMÁ SPZ';
+      plate.textContent = r.plate ? formatPlate(r.plate) : 'NEZNÁMÁ SPZ';
       if(r.plate){
         plate.title = 'Kliknutím zkopírovat SPZ';
         plate.style.cursor = 'pointer';
@@ -7676,7 +7690,7 @@
           : '';
         html += '<button type="button" class="shift-list-row" data-record-id="' + escapeAttr(r.id || '') + '">' +
           '<span class="created">' + escapeHtml(createdStr || '—') + '</span>' +
-          '<span class="plate">' + escapeHtml(r.plate || '—') + '</span>' +
+          '<span class="plate">' + escapeHtml(r.plate ? formatPlate(r.plate) : '—') + '</span>' +
           '<span class="addr">' + escapeHtml(r.address || (isBoticka ? 'Botička' : '')) + '</span>' +
           '<span class="resolved">' + escapeHtml(resolvedStr) + '</span>' +
           '<span class="castka">' + escapeHtml(castkaStr) + '</span>' +
@@ -9137,7 +9151,7 @@
     if(record.noticeNumber) line1.push('<span class="detail-head-meta mono">' + escapeHtml(record.noticeNumber) + '</span>');
     line1.push(
       record.plate
-        ? detailHeadClickable('plate', record.plate, record.plate, 'detail-head-plate mono')
+        ? detailHeadClickable('plate', record.plate, formatPlate(record.plate), 'detail-head-plate mono')
         : '<span class="detail-head-plate mono">NEZNÁMÁ SPZ</span>'
     );
     if(record.address) line1.push(detailHeadClickable('address', record.address, record.address));
@@ -9194,7 +9208,7 @@
     } else {
       listEl.innerHTML = matches.map(r=>{
         const dateTime = [r.date ? formatDateCz(r.date) : null, r.time || null].filter(Boolean).join(' ');
-        const top = [r.plate || 'NEZNÁMÁ SPZ', r.noticeNumber || ''].filter(Boolean).join(' · ');
+        const top = [r.plate ? formatPlate(r.plate) : 'NEZNÁMÁ SPZ', r.noticeNumber || ''].filter(Boolean).join(' · ');
         const bottom = [dateTime, r.address || '', r.offenseLabel || ''].filter(Boolean).join(' · ');
         return '<div class="related-item" data-record-id="' + escapeAttr(r.id) + '">' +
           '<div class="ri-top">' + escapeHtml(top) + '</div>' +
@@ -9228,7 +9242,7 @@
   // volá se z openDetail a znovu po dotažení fotek, ať se náhled doplní,
   // jakmile jsou k dispozici.
   function updateDetailRail(record){
-    document.getElementById('detailRailPlate').textContent = record.plate || 'NEZNÁMÁ SPZ';
+    document.getElementById('detailRailPlate').textContent = record.plate ? formatPlate(record.plate) : 'NEZNÁMÁ SPZ';
 
     const badge = document.getElementById('detailRailBadge');
     if(record.resolved){
@@ -9307,7 +9321,7 @@
     html += detailInfoField('Číslo pokuty (ClickPark)', record.clickParkCisloPokuty);
     html += '</div></div>';
     html += '<div class="detail-info-section"><h4>Vozidlo</h4><div class="detail-info-fields">';
-    html += detailInfoField('RZ', record.plate);
+    html += detailInfoField('RZ', formatPlate(record.plate));
     html += detailInfoField('Tovární značka', record.brand);
     html += detailInfoField('Barva', record.color);
     html += '</div></div>';
@@ -9973,7 +9987,7 @@
     const showRecordSummary = !prikazIsNewEvent && prikazUsesEventActionBtn();
     document.getElementById('prikazRecordSummary').style.display = showRecordSummary ? '' : 'none';
     if(showRecordSummary && r){
-      document.getElementById('prikazSummaryPlate').textContent = r.plate || '—';
+      document.getElementById('prikazSummaryPlate').textContent = r.plate ? formatPlate(r.plate) : '—';
       document.getElementById('prikazSummaryAddress').textContent = r.address || '—';
       const datumCas = (r.date ? isoToCzDate(r.date) : '—') + (r.time ? ' ' + r.time : '');
       document.getElementById('prikazSummaryDatetime').textContent = datumCas;
@@ -12130,7 +12144,7 @@
     undoRecord = record;
     clearTimeout(undoTimer);
     const toast = document.getElementById('undoToast');
-    document.getElementById('undoToastText').textContent = (UNDO_METHOD_LABEL[method] || 'Dořešeno') + ' — ' + (record.plate || '');
+    document.getElementById('undoToastText').textContent = (UNDO_METHOD_LABEL[method] || 'Dořešeno') + ' — ' + (formatPlate(record.plate) || '');
     toast.classList.add('open');
     undoTimer = setTimeout(()=>{
       toast.classList.remove('open');
