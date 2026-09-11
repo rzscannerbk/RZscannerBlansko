@@ -1161,11 +1161,12 @@
           </div>
         </div>
         <div class="prikaz-row2">
-          <div class="field">
+          <div class="field prikaz-suggest-wrap">
             <label for="prikazNarozeni">Datum narození</label>
             <input type="text" id="prikazNarozeni" inputmode="numeric" autocomplete="off" placeholder="DD.MM.RRRR">
+            <div class="prikaz-suggest-list" id="prikazNarozeniSuggest"></div>
           </div>
-          <div class="field prikaz-suggest-wrap">
+          <div class="field prikaz-suggest-wrap" id="prikazDokladField">
             <label for="prikazDoklad" id="prikazDokladLabel">Číslo dokladu</label>
             <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
             <div class="prikaz-suggest-list" id="prikazDokladSuggest"></div>
@@ -9944,22 +9945,38 @@
   const CAR_BRANDS = ['Škoda','Volkswagen','Audi','BMW','Mercedes-Benz','Opel','Ford','Peugeot','Citroën','Renault','Dacia','Fiat','Seat','Cupra','Volvo','Hyundai','Kia','Toyota','Honda','Nissan','Mazda','Suzuki','Mitsubishi','Subaru','Land Rover','Jaguar','Mini','Porsche','Lexus','Alfa Romeo','Lancia','Chevrolet','Jeep','Chrysler','Smart','DS','MG','SsangYong','Tesla','Jiná'];
   const CAR_COLORS = ['Bílá','Stříbrná','Šedá','Tmavě šedá','Černá','Modrá','Světle modrá','Tmavě modrá','Tyrkysová','Zelená','Tmavě zelená','Žlutá','Zlatá','Bronzová','Oranžová','Hnědá','Béžová','Červená','Tmavě červená','Růžová','Fialová'];
 
-  function attachStaticSuggest(input, listEl, options){
+  // Hodnoty se berou z record.pachatel napříč všemi záznamy, které už
+  // jsou v paměti (allRecords — má je hlavní přehled, netáhne se pro
+  // tohle nic navíc z Firestore) — vrátí unikátní hodnoty v pořadí, jak
+  // se v allRecords objevují (nejnovější záznamy jsou v poli první).
+  function prikazPachatelHistoryValues(field){
+    const seen = new Set();
+    const out = [];
+    allRecords.forEach(r=>{
+      const v = r.pachatel && r.pachatel[field];
+      if(v && !seen.has(v)){ seen.add(v); out.push(v); }
+    });
+    return out;
+  }
+
+  function attachStaticSuggest(input, listEl, options, onPick){
     function show(){
       const q = input.value.trim().toLowerCase();
-      const pool = q ? options.filter(o => o.toLowerCase().includes(q)) : options.slice(0, 5);
-      renderSuggestList(listEl, pool.map(name => ({ name })), (item)=>{
+      const pool = typeof options === 'function' ? options() : options;
+      const filtered = q ? pool.filter(o => o.toLowerCase().includes(q)) : pool.slice(0, 5);
+      renderSuggestList(listEl, filtered.map(name => ({ name })), (item)=>{
         input.value = item.name;
         listEl.classList.remove('open');
+        if(onPick) onPick();
       });
     }
-    // Appka nabídku otevírá jen na 'focus' u PRÁZDNÉHO pole — appka
-    // "5 nejpoužívanějších" appka nabízí jako pomůcku, dokud pole nic
-    // nemá. Jakmile má appka pole hodnotu, focus samotný appka
-    // znovu neotvírá (typicky se to stávalo, když se appka vrátila do
-    // téhle záložky prohlížeče po použití bookmarkletu v MP Manageru —
-    // pole zůstalo zaostřené a nabídka appce vyskočila přes už vyplněné
-    // pole níž). Psaní appka pořád normálně filtruje přes 'input'.
+    // Nabídku se otevírá jen na 'focus' u PRÁZDNÉHO pole — "5
+    // nejpoužívanějších" appka nabízí jako pomůcku, dokud pole nic nemá.
+    // Jakmile má pole hodnotu, focus samotný nabídku znovu neotvírá
+    // (typicky se to stávalo, když se stránka vrátila do popředí po
+    // použití bookmarkletu v MP Manageru — pole zůstalo zaostřené
+    // a nabídka vyskočila přes už vyplněné pole níž). Psaní pořád
+    // normálně filtruje přes 'input'.
     input.addEventListener('focus', ()=>{ if(!input.value.trim()) show(); });
     input.addEventListener('input', show);
     input.addEventListener('blur', ()=>{ setTimeout(()=> listEl.classList.remove('open'), 150); });
@@ -10355,18 +10372,27 @@
   }
 
   // Jméno → Příjmení → Datum narození → Číslo dokladu → Adresa (obec).
+  // Jméno/Příjmení/Datum narození appka teď u dřív použitých hodnot
+  // nabízí skutečnou našeptávanou nabídku (viz
+  // prikazPachatelHistoryValues níž) místo dřívějšího jen-potvrzovacího
+  // "chipu" — Doklad appka nechává beze změny (attachConfirmChip),
+  // protože historie čísel dokladů appce smysl nedává.
   advanceOnEnter(prikazJmenoInput);
-  attachConfirmChip(prikazJmenoInput, prikazJmenoList, ()=> focusField(prikazPrijmeniInput));
+  attachStaticSuggest(prikazJmenoInput, prikazJmenoList, ()=> prikazPachatelHistoryValues('jmeno'), ()=> focusField(prikazPrijmeniInput));
   prikazJmenoInput.addEventListener('blur', ()=>{
     if(prikazJmenoInput.value.trim()) focusField(prikazPrijmeniInput);
   });
   advanceOnEnter(prikazPrijmeniInput);
-  attachConfirmChip(prikazPrijmeniInput, prikazPrijmeniList, ()=> focusField(prikazNarozeniInput));
+  attachStaticSuggest(prikazPrijmeniInput, prikazPrijmeniList, ()=> prikazPachatelHistoryValues('prijmeni'), ()=> focusField(prikazNarozeniInput));
   prikazPrijmeniInput.addEventListener('blur', ()=>{
     if(prikazPrijmeniInput.value.trim()) focusField(prikazNarozeniInput);
   });
-  // Datum narození je appkou vykreslený kalendář (viz initDatePicker výš)
-  // — výběr dne vyvolá 'change', a appka jede dál na Číslo dokladu.
+  advanceOnEnter(prikazNarozeniInput);
+  attachStaticSuggest(prikazNarozeniInput, document.getElementById('prikazNarozeniSuggest'), ()=> prikazPachatelHistoryValues('datumNarozeni'), ()=> focusField(prikazDokladInput));
+  // Datum narození je obyčejné textové pole (formát DD.MM.RRRR, ručně
+  // napsaný nebo vybraný z nabídky výš) — 'change' se u textového pole
+  // spouští při odchodu z pole se změněnou hodnotou, a to appka bere
+  // jako signál jet dál na Číslo dokladu.
   prikazNarozeniInput.addEventListener('change', ()=>{
     if(prikazNarozeniInput.value) focusField(prikazDokladInput);
   });
@@ -11399,7 +11425,17 @@
     const isPrestupce = prikazPrestupceActive();
     document.getElementById('prikazPachatelLabel').textContent =
       (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : (prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL'));
-    document.getElementById('prikazAdresaWrap').style.display = isPrestupce ? 'none' : '';
+    // U ClickParku ("Parkoviště s parkovacím poplatkem") se u Příkazu na
+    // místě a Domluvy dělá výjimka z PŘESTUPCE zjednodušení výš: adresu
+    // (Obec/PSČ/Ulice/Č.p., se stejným našeptávačem přes Mapy.com, jaký
+    // se používá jinde) tady chceme mít i u PŘESTUPCE, a naopak se tu
+    // Číslo dokladu vůbec neukazuje (nahrazuje ho adresa) — u ostatních
+    // PŘESTUPCE toků zůstává beze změny (adresa schovaná, Číslo dokladu
+    // vidět), protože Doklad se tam skutečně posílá do MP Manageru
+    // (tKontaktPapers).
+    const wantClickParkAddress = prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva');
+    document.getElementById('prikazAdresaWrap').style.display = (isPrestupce && !wantClickParkAddress) ? 'none' : '';
+    document.getElementById('prikazDokladField').style.display = wantClickParkAddress ? 'none' : '';
     document.getElementById('prikazDokladLabel').textContent = isPrestupce ? 'Číslo dokladu' : (prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu');
   }
 
