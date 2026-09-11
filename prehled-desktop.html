@@ -5020,21 +5020,24 @@
       descLines.push('GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6));
     }
 
-    // Začátek události appka posílá jako datum/čas, kdy byl přestupek
-    // doopravdy spáchán (record.date/record.time — appka je má
-    // z terénu nebo appka je appka ručně vyplnila u "Přidat událost"),
-    // NE kdy appka záznam v Scanneru založila (record.createdAt by u
-    // "Přidat událost"/dodatečně zapsaných přestupků bylo klidně
-    // o dny pozdějc než skutečný přestupek). Konec události appka bere
-    // jako datum/čas posledního řešení/editace (record.resolvedAt —
-    // markResolved ho posouvá na nejnovější změnu), dokud přestupek
-    // není vyřešený, appka pro Konec použije totéž jako Začátek, ať
-    // pole nezůstane prázdné. Kdyby record.date/record.time chybělo
-    // (neměl by nastat, ale appka radši nenechá pole úplně prázdné),
-    // appka spadne zpátky na createdAt jako dřív.
+    // Začátek události se posílá jako datum/čas, kdy byl přestupek
+    // doopravdy spáchán (record.date/record.time — má se z terénu nebo
+    // se ručně vyplní u "Přidat událost"), NE kdy se záznam v Scanneru
+    // založil (record.createdAt by u "Přidat událost"/dodatečně
+    // zapsaných přestupků bylo klidně o dny pozdějc než skutečný
+    // přestupek). Konec události se bere jako aktuální datum/čas —
+    // přesně chvíle, kdy MPM export doopravdy proběhne (na Lukášovo
+    // přání se do MP Manageru posílá, kdy se kopírování skutečně
+    // stalo, ne datum přestupku ani nic jiného) — s výjimkou už jednou
+    // vyřešeného záznamu, kde se Konec bere jako datum/čas posledního
+    // řešení (record.resolvedAt — markResolved ho posouvá na
+    // nejnovější změnu), aby opětovné kopírování po vyřešení Konec
+    // zpětně neposouvalo. Kdyby record.date/record.time chybělo (nemělo
+    // by nastat, ale pole radši nezůstane úplně prázdné), Začátek
+    // spadne zpátky na createdAt jako dřív.
     const offenseDateTime = { date: isoToCzDate(record.date), time: record.time || '' };
     const eventStart = (offenseDateTime.date && offenseDateTime.time) ? offenseDateTime : timestampToMpmDateTime(record.createdAt);
-    const eventEnd = record.resolved ? timestampToMpmDateTime(record.resolvedAt) : eventStart;
+    const eventEnd = record.resolved ? timestampToMpmDateTime(record.resolvedAt) : timestampToMpmDateTime(new Date());
     const isBoticka = record.docType === 'boticka';
 
     const authorizationIds = ['40001', '40003'];
@@ -9456,21 +9459,22 @@
   // appce jako signál "hotovo" stačí, že appka má vyplněné Jméno
   // a Příjmení.
   function prikazEventTerminReady(){
-    // U ClickParku + Příkaz na místě je navíc potřeba vybraný způsob
-    // platby a doopravdy provedený MPM export (klik na tlačítko "MPM",
-    // ne jen vyplněná pole) — bez obojího tlačítko na "Potvrdit
-    // a uložit" nepustí, ať se nikdy neuloží záznam bez způsobu platby
-    // ani se nepřeskočí rovnou k uložení, aniž by se dostal do MP
-    // Manageru (viz Lukášovo zadání).
+    // U ClickParku + Příkaz na místě/Domluva je potřeba doopravdy
+    // provedený MPM export (klik na tlačítko "MPM", ne jen vyplněná
+    // pole) a — jen u Příkazu — i vybraný způsob platby; bez toho
+    // tlačítko na "Potvrdit a uložit" nepustí, ať se nikdy neuloží
+    // záznam bez způsobu platby ani se nepřeskočí rovnou k uložení,
+    // aniž by se dostal do MP Manageru (viz Lukášovo zadání).
     //
     // Zároveň se tu (na rozdíl od ostatních PŘESTUPCE toků) i tak čeká
     // na "Vložit" (prikazEventPasted) — samotné jméno/příjmení nestačí,
-    // protože číslo jednací se dostane až lustrací v MP Manageru a musí
-    // se vrátit zpátky přes schránku (viz applyProvozovatelText, který
-    // u tohohle toku PŘESTUPCE pole nepřepisuje, jen si tiše vezme
-    // číslo jednací).
-    if(prikazIsClickParkEvent && prikazMode === 'prikaz'){
-      if(!prikazPlatbaMetoda || !prikazClickParkMpmDone) return false;
+    // protože číslo jednací se dostane až lustrací/uložením v MP
+    // Manageru a musí se vrátit zpátky přes schránku (viz
+    // applyProvozovatelText, který u tohohle toku PŘESTUPCE pole
+    // nepřepisuje, jen si tiše vezme číslo jednací).
+    if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva')){
+      if(prikazMode === 'prikaz' && !prikazPlatbaMetoda) return false;
+      if(!prikazClickParkMpmDone) return false;
       return prikazEventPasted;
     }
     if(prikazPrestupceActive()){
@@ -9559,6 +9563,11 @@
     const wantClickParkPrikaz = prikazIsClickParkEvent && prikazMode === 'prikaz';
     document.getElementById('prikazClickParkPrikazFieldsWrap').style.display = wantClickParkPrikaz ? '' : 'none';
     const castkaEl = document.getElementById('prikazCastkaField');
+    // MPM export se na každém novém otevření dialogu vyžaduje znovu —
+    // platí pro všechny ClickPark režimy s prikazEventActionBtn
+    // (Příkaz na místě i Domluva), ne jen pro Příkaz — viz
+    // prikazEventTerminReady a prikazClickParkMpmDone.
+    if(prikazIsClickParkEvent) prikazClickParkMpmDone = false;
     if(wantClickParkPrikaz){
       document.getElementById('prikazClickParkPrikazFieldsWrap').insertBefore(castkaEl, document.getElementById('prikazClickParkPrikazFieldsWrap').firstChild);
       // Způsob platby appka nechává povinný a bez výchozí volby — dokud
@@ -9569,9 +9578,6 @@
       document.getElementById('prikazPlatbaHotoveChk').checked = false;
       document.getElementById('prikazPlatbaKartouChk').checked = false;
       document.getElementById('prikazPlatbaBpnChk').checked = false;
-      // MPM export se na každém novém otevření dialogu vyžaduje znovu
-      // — viz prikazEventTerminReady a prikazClickParkMpmDone.
-      prikazClickParkMpmDone = false;
       refreshPrikazTitle();
     } else if(castkaEl.parentElement !== document.getElementById('prikazBox')){
       document.getElementById('prikazBox').insertBefore(castkaEl, document.getElementById('prikazEventFieldsWrap'));
