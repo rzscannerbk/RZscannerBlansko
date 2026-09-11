@@ -5055,14 +5055,9 @@
       oznameni: ['52146'], // ODSA
       domluva: ['51760']   // Domluva
     };
-    // TODO: až přijde od Lukáše ID pro "Bloková pokuta nezaplacená
-    // (PBN)" ze stromu "Způsob řešení" v MP Manageru (stejným postupem,
-    // jakým se získalo ID pro Parkoviste/51989 — klik na položku, najít
-    // onclick s tUdalostN), doplní se sem. Do té doby se u BPN i nadále
-    // zaškrtává obyčejné "Bloková pokuta (PB)" — je to stejná citace
-    // jako u Hotově/Kartou, jen ještě chybí to speciální "nezaplacená"
-    // rozlišení.
-    const MPM_SOLUTION_ID_PBN = null;
+    // ID pro "Bloková pokuta nezaplacená (PBN)" ověřené přímo z MP
+    // Manageru (DevTools screenshot od Lukáše, 11. 9. 2026): mpmId 51762.
+    const MPM_SOLUTION_ID_PBN = '51762';
     let methodSolutionIds = MPM_SOLUTION_ID_BY_METHOD[record.resolvedMethod];
     if(record.resolvedMethod === 'prikaz' && record.platba === 'BPN' && MPM_SOLUTION_ID_PBN){
       methodSolutionIds = [MPM_SOLUTION_ID_PBN];
@@ -9461,11 +9456,13 @@
   // appce jako signál "hotovo" stačí, že appka má vyplněné Jméno
   // a Příjmení.
   function prikazEventTerminReady(){
-    // U ClickParku + Příkaz na místě appka způsob platby vyžaduje jako
-    // podmínku navíc — bez vybraného checkboxu appka tlačítko na
+    // U ClickParku + Příkaz na místě je potřeba jak vybraný způsob
+    // platby, tak doopravdy provedený MPM export (klik na tlačítko
+    // "MPM", ne jen vyplněná pole) — bez obojího appka tlačítko na
     // "Potvrdit a uložit" nepustí, ať appka nikdy neuloží záznam bez
-    // způsobu platby (viz Lukášovo zadání — povinná položka).
-    if(prikazIsClickParkEvent && prikazMode === 'prikaz' && !prikazPlatbaMetoda) return false;
+    // způsobu platby ani ho nepřeskočí rovnou k uložení, aniž by se
+    // dostal do MP Manageru (viz Lukášovo zadání).
+    if(prikazIsClickParkEvent && prikazMode === 'prikaz' && (!prikazPlatbaMetoda || !prikazClickParkMpmDone)) return false;
     if(prikazPrestupceActive()){
       return !!(
         document.getElementById('prikazJmeno').value.trim() &&
@@ -9562,6 +9559,9 @@
       document.getElementById('prikazPlatbaHotoveChk').checked = false;
       document.getElementById('prikazPlatbaKartouChk').checked = false;
       document.getElementById('prikazPlatbaBpnChk').checked = false;
+      // MPM export appka na každém novém otevření dialogu vyžaduje
+      // znovu — viz prikazEventTerminReady a prikazClickParkMpmDone.
+      prikazClickParkMpmDone = false;
       refreshPrikazTitle();
     } else if(castkaEl.parentElement !== document.getElementById('prikazBox')){
       document.getElementById('prikazBox').insertBefore(castkaEl, document.getElementById('prikazEventFieldsWrap'));
@@ -9800,6 +9800,11 @@
           if(otherId !== id) document.getElementById(otherId).checked = false;
         });
         prikazPlatbaMetoda = label;
+        // Změna způsobu platby vyžaduje nový MPM export (aby se
+        // aktuální platba doopravdy dostala do zkopírovaných dat) —
+        // proto se i případný dřívější úspěšný export vrátí zpátky na
+        // "nehotovo", viz prikazClickParkMpmDone a prikazEventTerminReady.
+        prikazClickParkMpmDone = false;
       } else {
         e.target.checked = true;
       }
@@ -10540,6 +10545,15 @@
   // rozlišit "ještě nevloženo" od "vloženo" ve stejném stavu 'paste' —
   // viz updatePrikazEventActionBtn).
   let prikazEventPasted = false;
+  // U ClickParku + Příkaz na místě appka vyžaduje, aby strážník MPM
+  // export doopravdy provedl (klikl a úspěšně se zkopírovalo), než
+  // appka dovolí "Potvrdit a uložit" — jinak by appka jméno/příjmení +
+  // způsob platby (obojí u PŘESTUPCE vyplněné rovnou v dialogu) vzala
+  // jako "hotovo" a tlačítko přeskočilo rovnou na finální uložení, aniž
+  // by appka záznam vůbec dostala do MP Manageru (viz Lukášovo hlášení
+  // — appka to dřív dělala). Nastavuje se v prikazEventActionBtn click
+  // handleru po úspěšném exportu, resetuje se v openPrikazModal.
+  let prikazClickParkMpmDone = false;
 
   // Appka do MPM (tlačítko "MPM", checkpoint appka volá dřív, než appka
   // rozepsané pole vůbec uloží přes "Potvrdit a uložit") potřebuje
@@ -10643,6 +10657,10 @@
       btn.textContent = ok ? 'Zkopírováno ✓' : 'Nezdařilo se';
       btn.classList.add(ok ? 'copied' : 'copy-err');
       if(ok){
+        // Viz prikazEventTerminReady — u ClickParku appka bez tohohle
+        // příznaku terminReady vrátí false, dokud MPM export doopravdy
+        // neproběhl, i kdyby už byla vyplněná všechna ostatní pole.
+        prikazClickParkMpmDone = true;
         setTimeout(()=>{
           // Mezitím appka mohla už mít termín kompletní (viz
           // updatePrikazEventActionBtn, který stav přepne na 'confirm'
