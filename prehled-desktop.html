@@ -11537,15 +11537,13 @@
       alert('Ve schránce je teď appky vlastní JSON (appka ho tam dala tlačítkem "MPM" pro bookmarklet), ne text z lustrace z MP Manageru. Nejdřív v Manageru spusť bookmarklet "MP to RZ" (zkopíruje provozovatele do schránky), pak se vrať sem a zkus Vložit znovu.');
       return false;
     }
-    // U ClickParku + PŘESTUPCE (typicky Příkaz na místě, viz
-    // prikazEventTerminReady) appka na rozdíl od běžného toku NEpřepisuje
-    // jméno/příjmení/adresu — přestupce je fyzicky přítomná osoba, kterou
-    // strážník do dialogu vyplnil sám, a "Vlož provozovatele" tu slouží
-    // jen k dotažení čísla jednacího z MP Manageru po uložení lustrace,
-    // ne k záměně přestupce za provozovatele vozidla. Zbytek funkce (níž)
-    // by jinak PŘESTUPCE natvrdo přepnul zpátky na PROVOZOVATEL
-    // a přepsal pole daty vlastníka vozidla.
-    if(prikazIsClickParkEvent && prikazPrestupceToggled){
+    // U ClickParku "Vlož provozovatele" rozhoduje, jestli má strážník
+    // vyplněné jméno nebo příjmení přestupce. Pokud ano, bere se z textu
+    // jen číslo jednací (osoba je známá, pole se nemají přepisovat).
+    // Pokud ne, pokračuje se normálním tokem níž a doplní se provozovatel
+    // nebo firma z MP Manageru.
+    const prikazMaJmenoPrijmeni = !!(document.getElementById('prikazJmeno').value.trim() || document.getElementById('prikazPrijmeni').value.trim());
+    if(prikazIsClickParkEvent && prikazPrestupceToggled && prikazMaJmenoPrijmeni){
       const pLight = parseProvozovatelText(raw);
       if(!pLight.cisloJednaci){
         alert('Ve schránce nenajdu číslo jednací ("Událost: RRRR/číslo") — zkontroluj, že jsi v MP Manageru na uložené události spustil(a) bookmarklet "MP to RZ".');
