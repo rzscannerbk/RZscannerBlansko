@@ -10706,6 +10706,17 @@
       overrides.castka = castkaRaw ? Number(castkaRaw) : null;
       overrides.platba = prikazPlatbaMetoda || null;
     }
+    // Stejný problém platí i pro adresu/GPS u ClickParku — record.address/
+    // lat/lng se do teď taky ukládají až finálním "Potvrdit a uložit",
+    // ne v kroku MPM, takže se pro export berou přímo z formuláře
+    // (#prikazMistoPrestupku + prikazClickParkLat/Lng, naplní je
+    // "Vložit z ClickParku"/applyClickParkPaste výš).
+    if(prikazIsClickParkEvent){
+      const mistoRaw = document.getElementById('prikazMistoPrestupku').value.trim();
+      overrides.address = mistoRaw || null;
+      overrides.lat = (typeof prikazClickParkLat === 'number') ? prikazClickParkLat : null;
+      overrides.lng = (typeof prikazClickParkLng === 'number') ? prikazClickParkLng : null;
+    }
     return Object.assign({}, record, overrides);
   }
 
