@@ -10591,18 +10591,19 @@
 
   // Č.p. → Datum dostavení se (jen u Výzvy — jinde je pole skryté, takže
   // se prostě zavře klávesnice a strážník si dialog jen vizuálně
-  // zkontroluje) — u ClickParku (Příkaz na místě/Domluva) se místo toho
-  // zaostří rovnou na akční tlačítko dole (Vložit/MPM/Potvrdit a uložit
-  // — podle toho, v jakém stavu zrovna je, viz updatePrikazEventActionBtn),
-  // ať strážník po adrese nemusí sahat po myši.
+  // zkontroluje) — u ClickParku (Příkaz na místě/Domluva/Oznámení) se
+  // místo toho zaostří rovnou na akční tlačítko dole (Vložit/MPM/Potvrdit
+  // a uložit — podle toho, v jakém stavu zrovna je, viz
+  // updatePrikazEventActionBtn), ať strážník po adrese nemusí sahat po
+  // myši.
   advanceOnEnter(prikazCisloDomuInput);
   attachConfirmChip(prikazCisloDomuInput, prikazCisloDomuList, ()=>{
     if(prikazMode === 'vyzva') focusField(prikazVyzvaDatumInput);
-    else if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva')) focusField(document.getElementById('prikazEventActionBtn'));
+    else if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva' || prikazMode === 'oznameni')) focusField(document.getElementById('prikazEventActionBtn'));
   });
   prikazCisloDomuInput.addEventListener('blur', ()=>{
     if(prikazMode === 'vyzva' && prikazCisloDomuInput.value.trim()) focusField(prikazVyzvaDatumInput);
-    else if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva') && prikazCisloDomuInput.value.trim()) focusField(document.getElementById('prikazEventActionBtn'));
+    else if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva' || prikazMode === 'oznameni') && prikazCisloDomuInput.value.trim()) focusField(document.getElementById('prikazEventActionBtn'));
   });
 
   // Datum → Čas od → Čas do (Čas od/do mají už přednastavené 8:00/16:00 —
@@ -11498,14 +11499,14 @@
     document.getElementById('prikazPachatelLabel').textContent =
       (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : (prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL'));
     // U ClickParku ("Parkoviště s parkovacím poplatkem") se u Příkazu na
-    // místě a Domluvy dělá výjimka z PŘESTUPCE zjednodušení výš: adresu
-    // (Obec/PSČ/Ulice/Č.p., se stejným našeptávačem přes Mapy.com, jaký
-    // se používá jinde) tady chceme mít i u PŘESTUPCE, a naopak se tu
-    // Číslo dokladu vůbec neukazuje (nahrazuje ho adresa) — u ostatních
-    // PŘESTUPCE toků zůstává beze změny (adresa schovaná, Číslo dokladu
-    // vidět), protože Doklad se tam skutečně posílá do MP Manageru
-    // (tKontaktPapers).
-    const wantClickParkAddress = prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva');
+    // místě, Domluvy a Oznámení dělá výjimka z PŘESTUPCE zjednodušení
+    // výš: adresu (Obec/PSČ/Ulice/Č.p., se stejným našeptávačem přes
+    // Mapy.com, jaký se používá jinde) tady chceme mít i u PŘESTUPCE, a
+    // naopak se tu Číslo dokladu vůbec neukazuje (nahrazuje ho adresa) —
+    // u ostatních PŘESTUPCE toků zůstává beze změny (adresa schovaná,
+    // Číslo dokladu vidět), protože Doklad se tam skutečně posílá do MP
+    // Manageru (tKontaktPapers).
+    const wantClickParkAddress = prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva' || prikazMode === 'oznameni');
     document.getElementById('prikazAdresaWrap').style.display = (isPrestupce && !wantClickParkAddress) ? 'none' : '';
     document.getElementById('prikazDokladField').style.display = wantClickParkAddress ? 'none' : '';
     document.getElementById('prikazDokladLabel').textContent = isPrestupce ? 'Číslo dokladu' : (prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu');
