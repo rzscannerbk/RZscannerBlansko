@@ -991,6 +991,26 @@
     </div>
   </div>
 
+  <!-- Po kliknutí na "Placenky" se rovnou nabídne způsob řešení
+       (stejná čtveřice Oznámení/Výzva/Příkaz na místě/Domluva, jakou
+       zná "Dořešit" u existujících záznamů, viz resolveMenuOverlay
+       výš) — ať se strážník rozhodne hned na začátku, ne až po
+       vyplnění celého formuláře. Jde o samostatný overlay s vlastními
+       ID (ne resolveMenuOverlay), protože ten počítá s už existujícím
+       currentDetailRecord a isNewEvent=false; tady se teprve zakládá
+       nový záznam (isNewEvent=true), viz pickAddEventChoice v JS. -->
+  <div class="confirm-overlay" id="addEventPlacenkyModeOverlay">
+    <div class="confirm-box">
+      <div class="confirm-btns confirm-btns-col">
+        <button class="confirm-btn confirm-no" id="addEventPlacenkyOznameniBtn">Oznámení</button>
+        <button class="confirm-btn confirm-no" id="addEventPlacenkyVyzvaBtn">Výzva</button>
+        <button class="confirm-btn confirm-yes" id="addEventPlacenkyPrikazBtn">Příkaz na místě</button>
+        <button class="confirm-btn confirm-no" id="addEventPlacenkyDomluvaBtn">Domluva</button>
+        <button class="confirm-cancel" id="addEventPlacenkyModeCancelBtn">Zrušit</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Přidat událost — podvýběr "Rychlost": stupně
        překročení podle § 124 odst. 15 písm. d) (K — appka to zatím
        nazývá "K", MP to smí řešit sama i pod 10 km/h, ale appka to
@@ -7654,23 +7674,28 @@
     return { id: docRef.id, ...snap.data() };
   }
 
-  // Appka si tady pamatuje, KTEROU volbou z "Přidat událost" byl aktuální
-  // nový záznam založený (Rožmitálova B28 / K / Parkoviste / …) — potřebuje
-  // to hlavně openPrikazModal, aby appka věděla, jestli má zobrazit
-  // ClickPark pole (prikazClickParkFieldsWrap), viz níž.
+  // Uchovává, KTEROU volbou z "Přidat událost" byl aktuální nový záznam
+  // založený (Rožmitálova B28 / K / Parkoviste / …) — potřebuje to hlavně
+  // openPrikazModal, aby vědělo, jestli má zobrazit ClickPark pole
+  // (prikazClickParkFieldsWrap), viz níž.
   let currentAddEventChoiceKey = null;
 
-  async function pickAddEventChoice(choiceKey){
+  // mode je volitelný (default 'vyzva') — MKDS a Rychlost ho nezadávají
+  // a chovají se jako dřív, u Placenek dovoluje vybrat Oznámení/Výzva/
+  // Příkaz na místě/Domluva (viz addEventPlacenkyModeOverlay).
+  async function pickAddEventChoice(choiceKey, mode){
+    mode = mode || 'vyzva';
     document.getElementById('addEventOverlay').classList.remove('open');
     document.getElementById('addEventMkdsOverlay').classList.remove('open');
     document.getElementById('addEventPlacenkyOverlay').classList.remove('open');
+    document.getElementById('addEventPlacenkyModeOverlay').classList.remove('open');
     document.getElementById('addEventSpeedOverlay').classList.remove('open');
     try{
       const record = await createAddEventRecord(choiceKey);
       if(!record) return;
       currentAddEventChoiceKey = choiceKey;
       openDetail(record);
-      openPrikazModal('vyzva', true);
+      openPrikazModal(mode, true);
     }catch(e){
       console.error('Založení nové události selhalo:', e);
       alert('Založení záznamu se nezdařilo (' + e.message + '). Zkus to prosím znovu.');
@@ -8042,16 +8067,15 @@
     if(!btn) return;
     pickAddEventChoice(btn.dataset.choice);
   });
-  // "Placenky" appka teď rovnou zakládá "Parkoviště s parkovacím
-  // poplatkem" — dokud appka měla pod Placenkami jen tuhle jednu
-  // položku, mezikrok s podnabídkou (addEventPlacenkyOverlay) appku jen
-  // zdržoval navíc (viz Lukášovy screenshoty). Přibude-li appce časem
-  // další typ Placenky, appka se sem klidně vrátí a mezikrok zase
-  // odkryje (addEventPlacenkyOverlay/addEventPlacenkyChoices appka
-  // v HTML nechává netknuté, jen appka je teď obchází).
+  // "Placenky" má (zatím) jen jednu položku ("Parkoviště s parkovacím
+  // poplatkem"), takže rovnou přeskočí mezikrok s podnabídkou
+  // (addEventPlacenkyOverlay/addEventPlacenkyChoices v HTML nechávám
+  // netknuté, jen se teď obchází) a otevře výběr způsobu řešení
+  // (Oznámení/Výzva/Příkaz na místě/Domluva) — viz
+  // addEventPlacenkyModeOverlay a jeho listenery níž.
   document.getElementById('addEventPlacenkyBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
-    pickAddEventChoice('Parkoviste');
+    document.getElementById('addEventPlacenkyModeOverlay').classList.add('open');
   });
   document.getElementById('addEventPlacenkyBackBtn').addEventListener('click', ()=>{
     document.getElementById('addEventPlacenkyOverlay').classList.remove('open');
@@ -8061,6 +8085,32 @@
     const btn = e.target.closest('button[data-choice]');
     if(!btn) return;
     pickAddEventChoice(btn.dataset.choice);
+  });
+  document.getElementById('addEventPlacenkyModeCancelBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventPlacenkyModeOverlay').classList.remove('open');
+  });
+  document.getElementById('addEventPlacenkyOznameniBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventPlacenkyModeOverlay').classList.remove('open');
+    pickAddEventChoice('Parkoviste', 'oznameni');
+  });
+  document.getElementById('addEventPlacenkyVyzvaBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventPlacenkyModeOverlay').classList.remove('open');
+    pickAddEventChoice('Parkoviste', 'vyzva');
+  });
+  document.getElementById('addEventPlacenkyDomluvaBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventPlacenkyModeOverlay').classList.remove('open');
+    pickAddEventChoice('Parkoviste', 'domluva');
+  });
+  // "Příkaz na místě" (u existujících záznamů, viz menuVyresenoBtn) se
+  // nejdřív ptá na způsob platby (Hotově/Kartou/BPN) přes
+  // prikazPlatbaOverlay — tenhle krok se tu znovu použije, jen se navíc
+  // do pendingNewEventChoiceKey poznamená, že po výběru platby se má
+  // založit NOVÝ záznam (ne otevřít dialog na existujícím), viz
+  // choosePlatba níž.
+  document.getElementById('addEventPlacenkyPrikazBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventPlacenkyModeOverlay').classList.remove('open');
+    pendingNewEventChoiceKey = 'Parkoviste';
+    document.getElementById('prikazPlatbaOverlay').classList.add('open');
   });
   document.getElementById('addEventSpeedBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
@@ -9411,19 +9461,25 @@
   function openPrikazModal(mode, isNewEvent){
     prikazMode = mode || 'prikaz';
     prikazIsNewEvent = !!isNewEvent;
-    // appka pozná ClickPark ("Parkoviště s parkovacím poplatkem") buď
+    // ClickPark ("Parkoviště s parkovacím poplatkem") se pozná buď
     // podle currentAddEventChoiceKey (hned po výběru v menu "Přidat
     // událost"), nebo — když dialog otevírá znovu později na už
     // založeném záznamu — podle uložené kvalifikace (mpmUdalostId 51989
     // má jen tenhle typ události, viz ADD_EVENT_OFFENSES.Parkoviste
-    // výš). Appka si to pamatuje v modulové proměnné
-    // prikazIsClickParkEvent, ať appka jde použít i mimo tuhle funkci
-    // (viz updatePrikazEventActionBtn a click handler níž).
+    // výš). Uloží se do modulové proměnné prikazIsClickParkEvent, ať
+    // jde použít i mimo tuhle funkci (viz updatePrikazEventActionBtn
+    // a click handler níž).
     prikazIsClickParkEvent = prikazIsNewEvent && (currentAddEventChoiceKey === 'Parkoviste' || (currentDetailRecord && currentDetailRecord.mpmUdalostId === '51989'));
     const titleEl = document.getElementById('prikazDialogTitle');
-    // appka u ClickParku titulek zobrazí "Placené parkoviště" místo
-    // obecného "Výzva k podání vysvětlení".
-    const baseTitle = prikazIsClickParkEvent ? 'Placené parkoviště' : (PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz);
+    // U ClickParku se místo obecného "Výzva k podání vysvětlení" atd.
+    // zobrazí "Placené parkoviště" — a u režimů jiných než Výzva se
+    // ještě doplní typ dokumentu za pomlčku (Placené parkoviště -
+    // DOMLUVA), ať je hned jasné, co strážník zvolil.
+    const CLICKPARK_MODE_SUFFIX = { oznameni: 'OZNÁMENÍ', vyzva: null, prikaz: 'PŘÍKAZ NA MÍSTĚ', domluva: 'DOMLUVA' };
+    const clickParkSuffix = CLICKPARK_MODE_SUFFIX[prikazMode];
+    const baseTitle = prikazIsClickParkEvent
+      ? ('Placené parkoviště' + (clickParkSuffix ? ' - ' + clickParkSuffix : ''))
+      : (PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz);
     // U příkazu appka přidá druhý řádek se zvoleným způsobem platby (viz
     // prikazPlatbaOverlay) — jinde titulek zůstává jednořádkový jako dřív.
     titleEl.innerHTML = (prikazMode === 'prikaz' && prikazPlatbaMetoda)
@@ -11546,11 +11602,16 @@
     openPrikazModal('vyzva');
   });
 
-  // "Příkaz na místě" appka nejdřív ptá na způsob platby (Hotově/Kartou/
+  // "Příkaz na místě" se nejdřív ptá na způsob platby (Hotově/Kartou/
   // BPN) — teprve po výběru se otevře dialog s údaji přestupce, stejně
   // jako dřív. Vybraná platba se posílá spolu s částkou (viz
   // prikazConfirmBtn níž).
   let prikazPlatbaMetoda = null;
+  // Když je vyplněné (nastaví ho addEventPlacenkyPrikazBtn výš), platba
+  // se vybírá pro NOVÝ záznam z "Přidat událost", ne pro už existující
+  // — choosePlatba pak místo openPrikazModal('prikaz') zavolá
+  // pickAddEventChoice, která nový záznam teprve založí.
+  let pendingNewEventChoiceKey = null;
   document.getElementById('menuVyresenoBtn').addEventListener('click', ()=>{
     const record = currentDetailRecord;
     if(!record) return;
@@ -11561,13 +11622,20 @@
   function choosePlatba(metoda){
     prikazPlatbaMetoda = metoda;
     document.getElementById('prikazPlatbaOverlay').classList.remove('open');
-    openPrikazModal('prikaz');
+    if(pendingNewEventChoiceKey){
+      const key = pendingNewEventChoiceKey;
+      pendingNewEventChoiceKey = null;
+      pickAddEventChoice(key, 'prikaz');
+    } else {
+      openPrikazModal('prikaz');
+    }
   }
   document.getElementById('platbaHotoveBtn').addEventListener('click', ()=> choosePlatba('Hotově'));
   document.getElementById('platbaKartouBtn').addEventListener('click', ()=> choosePlatba('Kartou'));
   document.getElementById('platbaBpnBtn').addEventListener('click', ()=> choosePlatba('BPN'));
   document.getElementById('platbaCancelBtn').addEventListener('click', ()=>{
     document.getElementById('prikazPlatbaOverlay').classList.remove('open');
+    pendingNewEventChoiceKey = null;
   });
 
   document.getElementById('menuDomluvaBtn').addEventListener('click', ()=>{
