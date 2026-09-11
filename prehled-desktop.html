@@ -687,6 +687,10 @@
   /* Když appka pod polem nemá dost místa (viz initDatePicker/open níž),
      otevře kalendář místo dolů nahoru nad pole. */
   .prikaz-datepicker-panel.upward{top:auto; bottom:100%; margin-top:0; margin-bottom:6px;}
+  /* Když by panel vpravo od levého okraje pole (výchozí left:0) utekl
+     mimo obrazovku, zarovná se místo toho k pravému okraji pole (viz
+     initDatePicker/initMultiDatePicker výš). */
+  .prikaz-datepicker-panel.align-right{left:auto; right:0;}
   .prikaz-datepicker-head{display:flex; gap:6px; margin-bottom:8px;}
   .prikaz-datepicker-head select{
     flex:1; min-width:0; background:var(--asphalt-2); border:1px solid var(--line); border-radius:8px;
@@ -10076,6 +10080,12 @@
       const spaceBelow = window.innerHeight - input.getBoundingClientRect().bottom;
       panel.classList.toggle('upward', spaceBelow < 320);
       panel.classList.add('open');
+      // Stejná pojistka proti vodorovnému přetečení jako u
+      // initMultiDatePicker níž — tenhle panel na 252 px je sice
+      // o dost užší, ale u pole blízko pravého okraje (ClickPark, pravý
+      // sloupec) by i tak mohl utéct mimo obrazovku.
+      const panelRect = panel.getBoundingClientRect();
+      panel.classList.toggle('align-right', panelRect.right > window.innerWidth - 12);
       setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
     }
     function close(){
@@ -10220,6 +10230,16 @@
       const spaceBelow = window.innerHeight - input.getBoundingClientRect().bottom;
       panel.classList.toggle('upward', spaceBelow < 420);
       panel.classList.add('open');
+      // Vodorovné přetečení se řeší stejně jako svislé (spaceBelow)
+      // výš — panel je široký (dva měsíce vedle sebe) a defaultně visí
+      // doleva od pole (left:0); když pole sedí blízko pravého okraje
+      // obrazovky (typicky u ClickParku, kde je pole v pravém sloupci),
+      // panel by jinak utíkal mimo viditelnou plochu — proto se po
+      // otevření (panel už má rozměry, jde je změřit) zkusí, jestli by
+      // se vešel, a když ne, zarovná se místo toho doprava (k pravému
+      // okraji pole, viz .align-right v CSS).
+      const panelRect = panel.getBoundingClientRect();
+      panel.classList.toggle('align-right', panelRect.right > window.innerWidth - 12);
       setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
     }
     function close(){
