@@ -7818,6 +7818,13 @@
       updatePrikazAddDocsLabel();
     }
     updatePrikazEventFieldValidation();
+    // Po úspěšném vložení se fokus posune na "Přidej fotodokumentaci"
+    // a rovnou otevře výběr souborů (nebo přehled už přidaných, pokud
+    // se fotka stáhla sama výš, viz prikazAddDocsBtn click handler)
+    // — kurzor jinak zůstává trčet na RZ poli, odkud se sem skočilo.
+    const addDocsBtn = document.getElementById('prikazAddDocsBtn');
+    addDocsBtn.focus();
+    addDocsBtn.click();
     return true;
   }
 
