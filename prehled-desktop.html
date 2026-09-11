@@ -9999,6 +9999,21 @@
   const DP_MONTHS_CS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
   const DP_DOW_CS = ['Po','Út','St','Čt','Pá','So','Ne'];
 
+  // Sdílená pojistka proti vodorovnému přetečení pro initDatePicker
+  // i initMultiDatePicker níž — panel visí doleva od pole (left:0)
+  // a u ClickParku (pravý sloupec dvousloupcového dialogu) by tak klidně
+  // mohl vyjet ven z dialogu, i když se ještě celý vejde do okna
+  // prohlížeče (proto se neporovnává jen proti window.innerWidth, ale
+  // i proti pravému okraji samotného dialogu #prikazBox — použije se ta
+  // přísnější, tedy menší, z obou hranic).
+  function prikazDatepickerFitsRight(panel){
+    const panelRect = panel.getBoundingClientRect();
+    const boxEl = document.getElementById('prikazBox');
+    const boxRight = boxEl ? boxEl.getBoundingClientRect().right : window.innerWidth;
+    const limit = Math.min(window.innerWidth, boxRight) - 12;
+    return panelRect.right <= limit;
+  }
+
   function initDatePicker(input, panel, opts){
     opts = opts || {};
     const today = new Date();
@@ -10083,9 +10098,9 @@
       // Stejná pojistka proti vodorovnému přetečení jako u
       // initMultiDatePicker níž — tenhle panel na 252 px je sice
       // o dost užší, ale u pole blízko pravého okraje (ClickPark, pravý
-      // sloupec) by i tak mohl utéct mimo obrazovku.
-      const panelRect = panel.getBoundingClientRect();
-      panel.classList.toggle('align-right', panelRect.right > window.innerWidth - 12);
+      // sloupec) by i tak mohl vyjet ven z dialogu (viz
+      // prikazDatepickerFitsRight výš).
+      panel.classList.toggle('align-right', !prikazDatepickerFitsRight(panel));
       setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
     }
     function close(){
@@ -10233,13 +10248,13 @@
       // Vodorovné přetečení se řeší stejně jako svislé (spaceBelow)
       // výš — panel je široký (dva měsíce vedle sebe) a defaultně visí
       // doleva od pole (left:0); když pole sedí blízko pravého okraje
-      // obrazovky (typicky u ClickParku, kde je pole v pravém sloupci),
-      // panel by jinak utíkal mimo viditelnou plochu — proto se po
-      // otevření (panel už má rozměry, jde je změřit) zkusí, jestli by
-      // se vešel, a když ne, zarovná se místo toho doprava (k pravému
+      // dialogu (typicky u ClickParku, kde je pole v pravém sloupci),
+      // panel by jinak vyjel ven z dialogu — proto se po otevření
+      // zkusí, jestli by se vešel (viz prikazDatepickerFitsRight výš,
+      // porovnává i proti okraji samotného dialogu, ne jen okna
+      // prohlížeče), a když ne, zarovná se místo toho doprava (k pravému
       // okraji pole, viz .align-right v CSS).
-      const panelRect = panel.getBoundingClientRect();
-      panel.classList.toggle('align-right', panelRect.right > window.innerWidth - 12);
+      panel.classList.toggle('align-right', !prikazDatepickerFitsRight(panel));
       setTimeout(() => document.addEventListener('mousedown', onOutside), 0);
     }
     function close(){
