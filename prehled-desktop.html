@@ -109,6 +109,9 @@
   #prikazCastkaField label{text-align:center;}
   #prikazCastkaField input{text-align:center;}
   #prikazCastkaField.prikaz-castka-missing{border-color:var(--bad);}
+  .prikaz-platba-checks{display:flex; gap:16px; padding-top:4px;}
+  .prikaz-platba-check{display:flex; align-items:center; gap:6px; font-size:14px; color:var(--text); cursor:pointer; font-weight:normal;}
+  .prikaz-platba-check input{width:16px; height:16px; cursor:pointer; accent-color:#2F6FED;}
   /* Obecná verze téhož pro RZ/datum/čas spáchání u "Přidat událost"
      (viz prikazValidateEventFields v JS) — na rozdíl od Částky, kde je
      appka zvýrazňuje jen jedno pole, tady jich může svítit víc najednou. */
@@ -1166,6 +1169,23 @@
             <label for="prikazDoklad" id="prikazDokladLabel">Číslo dokladu</label>
             <input type="text" id="prikazDoklad" inputmode="numeric" autocomplete="off">
             <div class="prikaz-suggest-list" id="prikazDokladSuggest"></div>
+          </div>
+        </div>
+      </div>
+      <!-- Jen u ClickParku ("Parkoviště s parkovacím poplatkem") + režim
+           Příkaz na místě (viz prikazIsClickParkEvent a prikazMode
+           v openPrikazModal) — částka (#prikazCastkaField, sdílené pole
+           používané i jinde, sem appka přes JS jen přesune) a způsob
+           platby coby tři zaškrtávací políčka, vždy právě jedno
+           zaškrtnuté (viz listenery u prikazPlatbaHotoveChk/KartouChk/
+           BpnChk níž). -->
+      <div id="prikazClickParkPrikazFieldsWrap" style="display:none;">
+        <div class="field">
+          <label>Způsob platby</label>
+          <div class="prikaz-platba-checks">
+            <label class="prikaz-platba-check"><input type="checkbox" id="prikazPlatbaHotoveChk" checked> Hotově</label>
+            <label class="prikaz-platba-check"><input type="checkbox" id="prikazPlatbaKartouChk"> Kartou</label>
+            <label class="prikaz-platba-check"><input type="checkbox" id="prikazPlatbaBpnChk"> BPN</label>
           </div>
         </div>
       </div>
@@ -8102,15 +8122,14 @@
     pickAddEventChoice('Parkoviste', 'domluva');
   });
   // "Příkaz na místě" (u existujících záznamů, viz menuVyresenoBtn) se
-  // nejdřív ptá na způsob platby (Hotově/Kartou/BPN) přes
-  // prikazPlatbaOverlay — tenhle krok se tu znovu použije, jen se navíc
-  // do pendingNewEventChoiceKey poznamená, že po výběru platby se má
-  // založit NOVÝ záznam (ne otevřít dialog na existujícím), viz
-  // choosePlatba níž.
+  // nejdřív ptá na způsob platby přes prikazPlatbaOverlay — u ClickParku
+  // tenhle krok appka nepotřebuje, protože částka i způsob platby (tři
+  // checkboxy) jsou přímo součástí formuláře
+  // (#prikazClickParkPrikazFieldsWrap, viz openPrikazModal), takže se
+  // rovnou zakládá záznam stejně jako u ostatních tří voleb výš.
   document.getElementById('addEventPlacenkyPrikazBtn').addEventListener('click', ()=>{
     document.getElementById('addEventPlacenkyModeOverlay').classList.remove('open');
-    pendingNewEventChoiceKey = 'Parkoviste';
-    document.getElementById('prikazPlatbaOverlay').classList.add('open');
+    pickAddEventChoice('Parkoviste', 'prikaz');
   });
   document.getElementById('addEventSpeedBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
@@ -9298,6 +9317,9 @@
     oznameni: 'Oznámení správnímu orgánu',
     domluva: 'Domluva'
   };
+  // ClickPark titulek doplňuje za pomlčku (Placené parkoviště - DOMLUVA)
+  // — u Výzvy zůstává beze změny.
+  const CLICKPARK_MODE_SUFFIX = { oznameni: 'OZNÁMENÍ', vyzva: null, prikaz: 'PŘÍKAZ NA MÍSTĚ', domluva: 'DOMLUVA' };
   let prikazMode = 'prikaz';
   // true jen když appka dialog otevřela z "Přidat událost" (nový záznam
   // bez SPZ/data/času z terénu) — viz openPrikazModal a pickAddEventChoice.
@@ -9458,6 +9480,24 @@
     }
   }
 
+  // Sestaví titulek dialogu — u ClickParku "Placené parkoviště" (+ typ
+  // dokumentu za pomlčku u režimů jiných než Výzva), jinde obvyklý název
+  // podle PRIKAZ_MODE_TITLES. U Příkazu na místě appka pod titulek ještě
+  // přidá zvolený způsob platby, ať je vidět bez otevírání formuláře.
+  // Volá se z openPrikazModal a znovu z listenerů u checkboxů způsobu
+  // platby (prikazPlatbaHotoveChk/KartouChk/BpnChk), aby se titulek
+  // hned aktualizoval při přepnutí.
+  function refreshPrikazTitle(){
+    const titleEl = document.getElementById('prikazDialogTitle');
+    const clickParkSuffix = CLICKPARK_MODE_SUFFIX[prikazMode];
+    const baseTitle = prikazIsClickParkEvent
+      ? ('Placené parkoviště' + (clickParkSuffix ? ' - ' + clickParkSuffix : ''))
+      : (PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz);
+    titleEl.innerHTML = (prikazMode === 'prikaz' && prikazPlatbaMetoda)
+      ? escapeHtml(baseTitle) + '<br>(' + escapeHtml(prikazPlatbaMetoda) + ')'
+      : escapeHtml(baseTitle);
+  }
+
   function openPrikazModal(mode, isNewEvent){
     prikazMode = mode || 'prikaz';
     prikazIsNewEvent = !!isNewEvent;
@@ -9470,24 +9510,37 @@
     // jde použít i mimo tuhle funkci (viz updatePrikazEventActionBtn
     // a click handler níž).
     prikazIsClickParkEvent = prikazIsNewEvent && (currentAddEventChoiceKey === 'Parkoviste' || (currentDetailRecord && currentDetailRecord.mpmUdalostId === '51989'));
-    const titleEl = document.getElementById('prikazDialogTitle');
     // U ClickParku se místo obecného "Výzva k podání vysvětlení" atd.
     // zobrazí "Placené parkoviště" — a u režimů jiných než Výzva se
     // ještě doplní typ dokumentu za pomlčku (Placené parkoviště -
-    // DOMLUVA), ať je hned jasné, co strážník zvolil.
-    const CLICKPARK_MODE_SUFFIX = { oznameni: 'OZNÁMENÍ', vyzva: null, prikaz: 'PŘÍKAZ NA MÍSTĚ', domluva: 'DOMLUVA' };
-    const clickParkSuffix = CLICKPARK_MODE_SUFFIX[prikazMode];
-    const baseTitle = prikazIsClickParkEvent
-      ? ('Placené parkoviště' + (clickParkSuffix ? ' - ' + clickParkSuffix : ''))
-      : (PRIKAZ_MODE_TITLES[prikazMode] || PRIKAZ_MODE_TITLES.prikaz);
-    // U příkazu appka přidá druhý řádek se zvoleným způsobem platby (viz
-    // prikazPlatbaOverlay) — jinde titulek zůstává jednořádkový jako dřív.
-    titleEl.innerHTML = (prikazMode === 'prikaz' && prikazPlatbaMetoda)
-      ? escapeHtml(baseTitle) + '<br>(' + escapeHtml(prikazPlatbaMetoda) + ')'
-      : escapeHtml(baseTitle);
+    // DOMLUVA), ať je hned jasné, co strážník zvolil (viz refreshPrikazTitle
+    // výš, volá se i z checkboxů způsobu platby).
+    refreshPrikazTitle();
     document.getElementById('prikazCastkaField').style.display = (prikazMode === 'prikaz') ? '' : 'none';
     document.getElementById('prikazCastka').value = '';
     document.getElementById('prikazCastkaField').classList.toggle('prikaz-castka-missing', prikazMode === 'prikaz');
+    // U ClickParku + Příkaz na místě se částka a způsob platby (checkboxy)
+    // přesouvají přímo do formuláře pod Datum narození/Číslo dokladu
+    // (#prikazClickParkPrikazFieldsWrap), místo samostatného kroku
+    // s prikazPlatbaOverlay — #prikazCastkaField je sdílené pole s
+    // ostatními režimy, proto se jen přesouvá v DOM (insertBefore/
+    // appendChild), ne kopíruje.
+    const wantClickParkPrikaz = prikazIsClickParkEvent && prikazMode === 'prikaz';
+    document.getElementById('prikazClickParkPrikazFieldsWrap').style.display = wantClickParkPrikaz ? '' : 'none';
+    const castkaEl = document.getElementById('prikazCastkaField');
+    if(wantClickParkPrikaz){
+      document.getElementById('prikazClickParkPrikazFieldsWrap').insertBefore(castkaEl, document.getElementById('prikazClickParkPrikazFieldsWrap').firstChild);
+      // Výchozí způsob platby se nastaví na "Hotově" — tenhle tok
+      // prikazPlatbaOverlay úplně obchází (viz addEventPlacenkyPrikazBtn
+      // v JS), takže platbu není odkud jinud převzít.
+      prikazPlatbaMetoda = 'Hotově';
+      document.getElementById('prikazPlatbaHotoveChk').checked = true;
+      document.getElementById('prikazPlatbaKartouChk').checked = false;
+      document.getElementById('prikazPlatbaBpnChk').checked = false;
+      refreshPrikazTitle();
+    } else if(castkaEl.parentElement !== document.getElementById('prikazBox')){
+      document.getElementById('prikazBox').insertBefore(castkaEl, document.getElementById('prikazEventFieldsWrap'));
+    }
 
     // Pole RZ/datum/čas spáchání appka zobrazí jen u záznamů založených
     // přes "Přidat událost" (viz pickAddEventChoice) — u běžných záznamů
@@ -9566,7 +9619,8 @@
     // co se dostavila a nesouhlasí, ne adresování dopisu provozovateli
     // jako u Výzvy) — appka to samozřejmě jde kdykoliv ručně přepnout
     // zpátky na PROVOZOVATEL tlačítkem ⇄.
-    prikazPrestupceToggled = (prikazMode === 'oznameni');
+    prikazPrestupceToggled = (prikazMode === 'oznameni')
+      || (prikazIsClickParkEvent && (prikazMode === 'domluva' || prikazMode === 'prikaz'));
     setPrikazProvozovatelMode(p && p.firma ? 'firma' : 'osoba');
     document.getElementById('prikazFirma').value = (p && p.firma) || '';
     document.getElementById('prikazIco').value = (p && p.ico) || '';
@@ -9700,6 +9754,32 @@
   // zmizí.
   document.getElementById('prikazCastka').addEventListener('input', (e)=>{
     document.getElementById('prikazCastkaField').classList.toggle('prikaz-castka-missing', e.target.value.trim() === '');
+  });
+
+  // Tři checkboxy způsobu platby u ClickParku + Příkaz na místě
+  // (#prikazClickParkPrikazFieldsWrap) — zajišťují, že je vždy
+  // zaškrtnuté právě jedno: zaškrtnutí jednoho odškrtne oba zbylé,
+  // pokus o odškrtnutí jediného zaškrtnutého ho rovnou zaškrtne zpátky.
+  // Výsledek se ukládá do prikazPlatbaMetoda (stejná proměnná, jakou
+  // plní i prikazPlatbaOverlay u ostatních toků) a hned aktualizuje
+  // titulek dialogu (viz refreshPrikazTitle).
+  const PRIKAZ_PLATBA_CHECKS = [
+    { id: 'prikazPlatbaHotoveChk', label: 'Hotově' },
+    { id: 'prikazPlatbaKartouChk', label: 'Kartou' },
+    { id: 'prikazPlatbaBpnChk', label: 'BPN' }
+  ];
+  PRIKAZ_PLATBA_CHECKS.forEach(({ id, label })=>{
+    document.getElementById(id).addEventListener('change', (e)=>{
+      if(e.target.checked){
+        PRIKAZ_PLATBA_CHECKS.forEach(({ id: otherId })=>{
+          if(otherId !== id) document.getElementById(otherId).checked = false;
+        });
+        prikazPlatbaMetoda = label;
+      } else {
+        e.target.checked = true;
+      }
+      refreshPrikazTitle();
+    });
   });
 
   // "Vymazat pole" — pro editaci, kdy se dostaví jiný pachatel než
