@@ -1290,11 +1290,11 @@
       ? ('Podle § 10 odst. 2 zákona č. 553/1991 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
          'Vám oznamuji podezření ze spáchání přestupku podle ' + introCite + ', porušením ' + parsedCitation.ref +
          ' téhož zákona' + (offenseLabelLower ? ' (' + offenseLabelLower + ')' : '') +
-         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené RZ a tovární značky, jehož jste provozovatelem.')
+         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené registrační značky.')
       : ('Podle § 10 odst. 2 zákona č. 553/1991 Sb., o obecní policii, ve znění pozdějších předpisů, ' +
          'Vám oznamuji podezření ze spáchání přestupku podle ' + introCite +
          (offenseLabelLower ? ' (' + offenseLabelLower + ')' : '') +
-         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené RZ a tovární značky, jehož jste provozovatelem.');
+         ', kterého se dopustil dosud neustanovený řidič vozidla níže uvedené registrační značky.');
     body += docxPara(intro, { size: 20, spacingAfter: 200, align: 'both' });
 
     body += docxLabelValuePara('Registrační značka:', record.plate || '', { size: 20, spacingAfter: 200, valueBold: true });
