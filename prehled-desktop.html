@@ -9792,6 +9792,30 @@
   // Snapshot polí dialogu → stejný tvar jako record.pachatel (mesto
   // jako "PSČ, obec"). Pole Doklad v režimu PROVOZOVATEL obsahuje číslo
   // jednací ("MP 2026/…"), to se jako číslo dokladu neukládá.
+  // Opak prikazSnapshotToPachatel — uložená osoba (record.prestupce/
+  // provozovatel, mesto jako "PSČ, obec") → snapshot polí dialogu.
+  // dokladText: u přestupce číslo dokladu, u provozovatele číslo
+  // jednací (pole Doklad se u něj zobrazuje jako "Číslo jednací").
+  function prikazPachatelToSnapshot(p, dokladText){
+    let psc = '', obec = '';
+    if(p && p.mesto){
+      const i = p.mesto.indexOf(', ');
+      if(i !== -1){ psc = p.mesto.slice(0, i); obec = p.mesto.slice(i + 2); } else { obec = p.mesto; }
+    }
+    return {
+      mode: (p && p.firma) ? 'firma' : 'osoba',
+      jmeno: (p && p.jmeno) || '',
+      prijmeni: (p && p.prijmeni) || '',
+      narozeni: (p && p.datumNarozeni) || '',
+      doklad: dokladText || '',
+      firma: (p && p.firma) || '',
+      ico: (p && p.ico) || '',
+      mesto: obec,
+      psc: psc,
+      ulice: (p && p.ulice) || '',
+      cisloDomu: (p && p.cisloDomu) || ''
+    };
+  }
   function prikazSnapshotToPachatel(snap){
     if(!snap) return null;
     const t = v => (v || '').trim();
@@ -10145,6 +10169,26 @@
     document.getElementById('prikazUlice').disabled = !prefillObec;
     document.getElementById('prikazUlice').placeholder = prefillObec ? 'ulice (nepovinné)' : 'nejdřív vyber obec';
     document.getElementById('prikazCisloDomu').value = (p && p.cisloDomu) || '';
+    // Opakované řešení záznamu, u kterého už je uložený zvlášť přestupce
+    // i provozovatel (viz prikazOsobyFromDialog/karta Osoby) — oba se
+    // načtou do snapshotů, ať přepínač PŘESTUPCE ⇄ PROVOZOVATEL funguje
+    // stejně jako při prvním vložení z bookmarkletu. Do polí se rovnou
+    // dá ta osoba, kterou určuje výchozí stav přepínače (u Oznámení
+    // PŘESTUPCE, u Výzvy PROVOZOVATEL).
+    if(currentDetailRecord && currentDetailRecord.prestupce && currentDetailRecord.provozovatel){
+      const rec = currentDetailRecord;
+      const cjRaw = (rec.mpmCisloJednaci || '').trim();
+      const cjText = cjRaw ? (/^MP\s/i.test(cjRaw) ? cjRaw : ('MP ' + cjRaw)) : '';
+      prikazPrestupceSnapshot = prikazPachatelToSnapshot(rec.prestupce, (rec.prestupce.cisloDokladu || ''));
+      prikazProvozovatelSnapshot = prikazPachatelToSnapshot(rec.provozovatel, cjText);
+      const startSnap = prikazPrestupceToggled ? prikazPrestupceSnapshot : prikazProvozovatelSnapshot;
+      prikazOsobaSnapshotWrite(startSnap);
+      document.getElementById('prikazDatovaSchranka').value = (!prikazPrestupceToggled && rec.provozovatel.datovaSchranka) || '';
+      setPrikazProvozovatelMode(prikazPrestupceToggled ? 'osoba' : (startSnap.mode || 'osoba'));
+      selectedMesto = startSnap.mesto ? { name: startSnap.mesto, position: null } : null;
+      document.getElementById('prikazUlice').disabled = !startSnap.mesto;
+      document.getElementById('prikazUlice').placeholder = startSnap.mesto ? 'ulice (nepovinné)' : 'nejdřív vyber obec';
+    }
     // Termín dostavení se — jen u Výzvy, jinde se pole vůbec nezobrazí.
     const showVyzvaTermin = (prikazMode === 'vyzva');
     document.getElementById('prikazVyzvaDatumField').style.display = showVyzvaTermin ? '' : 'none';
