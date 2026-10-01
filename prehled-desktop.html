@@ -9737,6 +9737,43 @@
   // ještě vůbec neví, jestli nalezený provozovatel bude osoba nebo
   // firma, a adresu appka pro Výzvu i tak potřebuje.
   let prikazPrestupceToggled = false;
+  // Při vložení ze schránky (viz applyProvozovatelText) může bookmarklet
+  // poslat dva různé lidi najednou — provozovatele vozidla (z lustrace)
+  // a zvlášť vyhledaného přestupce (z "IDENTIFIKACE OBYVATEL" v MP
+  // Manageru), když řidič není provozovatel. Pole Jméno/Příjmení/atd.
+  // jsou ale jedna sdílená sada (viz PŘESTUPCE/PROVOZOVATEL přepínač
+  // výš) — oba záznamy se proto drží tady stranou a přepínač (viz
+  // prikazPachatelToggle níž) mezi nimi při každém kliknutí přehazuje
+  // obsah polí, místo aby jeden z nich ztratil.
+  let prikazProvozovatelSnapshot = null;
+  let prikazPrestupceSnapshot = null;
+  function prikazOsobaSnapshotRead(){
+    return {
+      mode: prikazProvozovatelMode,
+      jmeno: prikazJmenoInput.value,
+      prijmeni: prikazPrijmeniInput.value,
+      narozeni: prikazNarozeniInput.value,
+      doklad: prikazDokladInput.value,
+      firma: document.getElementById('prikazFirma').value,
+      ico: document.getElementById('prikazIco').value,
+      mesto: prikazMestoInput.value,
+      psc: prikazPscInput.value,
+      ulice: prikazUliceInput.value,
+      cisloDomu: prikazCisloDomuInput.value
+    };
+  }
+  function prikazOsobaSnapshotWrite(snap){
+    prikazJmenoInput.value = snap.jmeno || '';
+    prikazPrijmeniInput.value = snap.prijmeni || '';
+    prikazNarozeniInput.value = snap.narozeni || '';
+    prikazDokladInput.value = snap.doklad || '';
+    document.getElementById('prikazFirma').value = snap.firma || '';
+    document.getElementById('prikazIco').value = snap.ico || '';
+    prikazMestoInput.value = snap.mesto || '';
+    prikazPscInput.value = snap.psc || '';
+    prikazUliceInput.value = snap.ulice || '';
+    prikazCisloDomuInput.value = snap.cisloDomu || '';
+  }
   // Appka na true nastaví v okamžiku, kdy strážník aspoň jednou klikne
   // na "Vyhledat DS" (ať už appka najde ID automaticky, nebo appka jen
   // otevře veřejný seznam k ručnímu dohledání) — appka to bere jako
@@ -9901,6 +9938,12 @@
   function openPrikazModal(mode, isNewEvent){
     prikazMode = mode || 'prikaz';
     prikazIsNewEvent = !!isNewEvent;
+    // Snapshoty provozovatel/přestupce (viz applyProvozovatelText a
+    // prikazPachatelToggle) patří vždycky k právě otevřenému záznamu —
+    // při otevření dialogu na jiném/novém záznamu se nulují, ať
+    // přepínač nenabízí data z předchozího přestupku.
+    prikazProvozovatelSnapshot = null;
+    prikazPrestupceSnapshot = null;
     // ClickPark ("Parkoviště s parkovacím poplatkem") se pozná buď
     // podle currentAddEventChoiceKey (hned po výběru v menu "Přidat
     // událost"), nebo — když dialog otevírá znovu později na už
@@ -11712,8 +11755,22 @@
   // vůbec neodpovídá téhle základní kostře (jméno+příjmení na začátku,
   // čárkami oddělené díly), příslušné pole prostě zůstane nevyplněné bez
   // chybové hlášky — strážník si zbytek dopíše ručně, appka ho nezdržuje.
-  function parseProvozovatelText(raw){
+  function parseProvozovatelText(raw, lastTokenIsJmeno){
     const result = {};
+    // Řádek "Přestupce: ..." (přidává ho nový bookmarklet pro zvlášť
+    // vyhledanou osobu z "IDENTIFIKACE OBYVATEL" v MP Manageru, ne
+    // z detailu vozidla) se odsekne jako první a pošle se rekurzivně
+    // do stejné funkce — vrátí stejný tvar výsledku ({jmeno, prijmeni,
+    // narozeniIso, adresa, ...}) jako běžný provozovatel, jen uložený
+    // pod result.prestupce. Bez tohohle odseknutí by se text za
+    // "Přestupce:" spletl s příjmením/adresou provozovatele výš.
+    const prestupceMatch = raw.match(/P[rř]estupce:\s*([\s\S]+)$/i);
+    let rawForOwner = raw;
+    if(prestupceMatch){
+      result.prestupce = parseProvozovatelText(prestupceMatch[1].trim(), true);
+      rawForOwner = raw.slice(0, prestupceMatch.index);
+    }
+    raw = rawForOwner;
     // Číslo jednací appka hledá jako první a odstraní ho z textu ještě
     // před zbytkem parsování — jinak by se řádek "Událost: 2026/02395"
     // (appka to takhle dostává z bookmarkletu, co čte z MP Manageru)
@@ -11782,10 +11839,17 @@
     const parts = rawWithoutCj.split(',').map(s => s.trim()).filter(Boolean);
     if(parts.length === 0) return result;
 
-    // Příjmení a jméno — appka čeká "PŘÍJMENÍ JMÉNO" (příjmení první,
-    // stejně jako appka i jinde předpokládá u textu z OP — viz toNameCase).
+    // Příjmení a jméno — běžně (provozovatel z lustrace vozidla) čeká
+    // "PŘÍJMENÍ JMÉNO" s jednoslovným příjmením první a zbytkem jako
+    // jméno. U přestupce (lastTokenIsJmeno, viz volání výš) posílá MP
+    // Manager opačné pořadí a příjmení může mít dvě slova (rozené +
+    // vdaná) — tam se bere poslední slovo jako jméno a všechno před ním
+    // jako příjmení.
     const nameTokens = parts[0].split(/\s+/).filter(Boolean);
-    if(nameTokens.length >= 2){
+    if(lastTokenIsJmeno && nameTokens.length >= 2){
+      result.prijmeni = toNameCase(nameTokens.slice(0, -1).join(' '));
+      result.jmeno = toNameCase(nameTokens[nameTokens.length - 1]);
+    } else if(nameTokens.length >= 2){
       result.prijmeni = toNameCase(nameTokens[0]);
       result.jmeno = toNameCase(nameTokens.slice(1).join(' '));
     } else if(nameTokens.length === 1){
@@ -11855,17 +11919,29 @@
     document.getElementById('prikazDokladLabel').textContent = isPrestupce ? 'Číslo dokladu' : (prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu');
   }
 
-  // Appka appku sama pozná firmu/osobu jen podle textu vloženého
-  // z lustrace (viz applyProvozovatelText) — když ale na místo dorazí
-  // jiná fyzická osoba (řidič, ne provozovatel-firma z první fáze
-  // Výzvy) a appka chce založit Oznámení na ni, dřív appka neměla jak
-  // přepnout zpátky na pole osoby, i když adresa/pole vlevo pořád
-  // existovala. Appka teď nechá popisek "PACHATEL"/"PROVOZOVATEL"
-  // klikací — přepne mezi osobou a firmou ručně, kdykoliv appka usoudí,
-  // že to appka poznala špatně nebo že se situace změnila. Appka žádná
-  // pole nemaže, jen schová/odkryje — když appka klikne zpátky, appka
-  // najde rozepsané údaje tak, jak appka je nechala.
+  // Ruční přepínač popisku PACHATEL/PROVOZOVATEL/PŘESTUPCE — pro případ,
+  // že se auto-detekce firma/osoba netrefila, nebo že na místo dorazí
+  // jiná fyzická osoba než provozovatel. Když bookmarklet poslal i
+  // zvlášť vyhledaného přestupce (viz applyProvozovatelText,
+  // prikazPrestupceSnapshot), přepínač mezi ním a provozovatelem
+  // přehazuje obsah polí tam a zpátky (viz prikazOsobaSnapshotRead/
+  // Write výš) — bez snapshotu zůstává původní chování: jen schová/
+  // odkryje stejná pole podle toho, jestli jde o osobu, nebo firmu.
   document.getElementById('prikazPachatelToggle').addEventListener('click', ()=>{
+    if(prikazPrestupceSnapshot){
+      if(prikazPrestupceToggled){
+        prikazPrestupceSnapshot = prikazOsobaSnapshotRead();
+        prikazOsobaSnapshotWrite(prikazProvozovatelSnapshot);
+        prikazPrestupceToggled = false;
+        setPrikazProvozovatelMode(prikazProvozovatelSnapshot.mode || 'osoba');
+      } else {
+        prikazProvozovatelSnapshot = prikazOsobaSnapshotRead();
+        prikazOsobaSnapshotWrite(prikazPrestupceSnapshot);
+        prikazPrestupceToggled = true;
+        setPrikazProvozovatelMode('osoba');
+      }
+      return;
+    }
     prikazPrestupceToggled = true;
     setPrikazProvozovatelMode(prikazProvozovatelMode === 'firma' ? 'osoba' : 'firma');
   });
@@ -11941,6 +12017,33 @@
       // strážník vidí a může i ručně opravit (viz cisloJednaciPara).
       prikazMpmCisloJednaci = p.cisloJednaci;
       if(prikazUsesEventActionBtn()) document.getElementById('prikazDoklad').value = 'MP ' + p.cisloJednaci;
+    }
+    // Pokud bookmarklet poslal i zvlášť vyhledaného přestupce (řádek
+    // "Přestupce: ..." v textu, viz parseProvozovatelText), jeho údaje
+    // se uloží stranou do prikazPrestupceSnapshot a právě vyplněná pole
+    // provozovatele se zazálohují do prikazProvozovatelSnapshot —
+    // přepínač PŘESTUPCE ⇄ PROVOZOVATEL (viz prikazPachatelToggle níž)
+    // pak mezi oběma záznamy přehazuje obsah polí, aniž by jeden z nich
+    // zmizel. Bez přestupce v textu se oba snapshoty vynulují, ať
+    // nezůstane viset záznam z předchozího vloženého textu.
+    if(p.prestupce){
+      prikazPrestupceSnapshot = {
+        mode: 'osoba',
+        jmeno: p.prestupce.jmeno || '',
+        prijmeni: p.prestupce.prijmeni || '',
+        narozeni: p.prestupce.narozeniIso ? isoToDotted(p.prestupce.narozeniIso) : '',
+        doklad: '',
+        firma: '',
+        ico: '',
+        mesto: p.prestupce.obec || '',
+        psc: p.prestupce.psc || '',
+        ulice: p.prestupce.ulice || '',
+        cisloDomu: p.prestupce.cisloDomu || ''
+      };
+      prikazProvozovatelSnapshot = prikazOsobaSnapshotRead();
+    } else {
+      prikazPrestupceSnapshot = null;
+      prikazProvozovatelSnapshot = null;
     }
     // checkStreetsAndAdvance() výš mezitím přesouvá fokus (na Ulici) a
     // to umí některé z těchhle bublin (viz attachConfirmChip) nechat
