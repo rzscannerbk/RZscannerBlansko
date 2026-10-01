@@ -371,6 +371,16 @@
     background:var(--asphalt-3); display:flex; align-items:center; justify-content:center;
     color:var(--faint); font-size:11px; cursor:pointer;
   }
+  .detail-rail-cj{
+    display:flex; align-items:baseline; justify-content:center; gap:8px;
+    padding:7px 8px; border-radius:8px; border:1px dashed var(--line, rgba(128,128,128,.35));
+    background:var(--asphalt-3); cursor:pointer; user-select:none;
+    font-family:'Roboto Mono',monospace;
+  }
+  .detail-rail-cj .lbl{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--faint);}
+  .detail-rail-cj .val{font-size:14px; font-weight:800; color:var(--text);}
+  .detail-rail-cj.copied{border-color:var(--good);}
+  .detail-rail-cj.copied .val{color:var(--good);}
   .detail-rail-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
   .detail-rail-facts{font-size:12px;}
   .detail-rail-facts .row{
@@ -992,6 +1002,7 @@
         <div class="detail-rail">
           <div class="detail-rail-plate" id="detailRailPlate">—</div>
           <div class="detail-rail-badge" id="detailRailBadge"></div>
+            <div class="detail-rail-cj" id="detailRailCj" style="display:none;" title="Kliknutím zkopíruješ do schránky"><span class="lbl">Č. j.</span><span class="val" id="detailRailCjVal"></span></div>
           <div class="detail-rail-thumb" id="detailRailThumb"></div>
           <div class="detail-rail-facts" id="detailRailFacts"></div>
           <div class="detail-rail-actions">
@@ -9238,6 +9249,29 @@
       badge.className = 'detail-rail-badge is-unresolved';
     }
 
+    // Číslo jednací z MP Manageru (record.mpmCisloJednaci, vkládá ho
+    // bookmarklet "MP to RZ") — ukáže se jen když ho záznam má, vždy
+    // s prefixem "MP " (stejně jako v dokumentech, viz cisloJednaciPara).
+    // Klik ho zkopíruje do schránky.
+    const cjBox = document.getElementById('detailRailCj');
+    const cjRaw = (record.mpmCisloJednaci || '').trim();
+    cjBox.classList.remove('copied');
+    if(cjRaw){
+      const cjText = /^MP\s/i.test(cjRaw) ? cjRaw : ('MP ' + cjRaw);
+      document.getElementById('detailRailCjVal').textContent = cjText;
+      cjBox.style.display = '';
+      cjBox.onclick = function(){
+        if(!navigator.clipboard) return;
+        navigator.clipboard.writeText(cjText).then(()=>{
+          cjBox.classList.add('copied');
+          setTimeout(()=> cjBox.classList.remove('copied'), 1500);
+        }, ()=>{});
+      };
+    } else {
+      cjBox.style.display = 'none';
+      cjBox.onclick = null;
+    }
+
     const thumb = document.getElementById('detailRailThumb');
     const photos = record._resolvedPhotos;
     if(photos && photos.length){
@@ -9648,7 +9682,10 @@
     }
     if(extra && extra.oznameniAsPrestupce != null) record.oznameniAsPrestupce = extra.oznameniAsPrestupce;
     updateResolveBtn(record);
-    if(currentDetailRecord && currentDetailRecord.id === record.id) renderResolutionHistory(record);
+    if(currentDetailRecord && currentDetailRecord.id === record.id){
+      renderResolutionHistory(record);
+      updateDetailRail(record);
+    }
     refreshView();
     if(!isEdit) showUndoToast(record, method);
   }
