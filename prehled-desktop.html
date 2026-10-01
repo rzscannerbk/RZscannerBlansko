@@ -1010,7 +1010,7 @@
         <div class="detail-main">
           <div class="detail-tabs" id="detailTabs">
             <button class="detail-tab active" data-tab="prehled" type="button">Přehled</button>
-            <button class="detail-tab" data-tab="osoba" type="button">Osoba</button>
+            <button class="detail-tab" data-tab="osoba" type="button">Osoby</button>
             <button class="detail-tab" data-tab="reseni" type="button">Řešení</button>
             <button class="detail-tab" data-tab="foto" type="button">Foto</button>
             <button class="detail-tab" data-tab="kopie" id="detailTabKopie" type="button" style="display:none;">Kopie výzvy/oznámení</button>
@@ -9327,13 +9327,9 @@
     return html;
   }
 
-  function buildDetailOsobaHtml(record){
-    const p = record.pachatel;
-    if(!p || !(p.jmeno || p.prijmeni || p.firma)){
-      return '<div class="detail-info-empty">U tohohle záznamu zatím není uložená žádná osoba ani firma.</div>';
-    }
+  function buildOsobaSectionHtml(p, title){
     const isFirma = !!p.firma;
-    let html = '<div class="detail-info-section"><h4>' + (isFirma ? 'Provozovatel — firma' : 'Osoba') + '</h4><div class="detail-info-fields">';
+    let html = '<div class="detail-info-section"><h4>' + escapeHtml(title) + '</h4><div class="detail-info-fields">';
     if(isFirma){
       html += detailInfoField('Název firmy', p.firma);
       html += detailInfoField('IČO', p.ico);
@@ -9352,6 +9348,26 @@
     }
     html += '</div></div>';
     return html;
+  }
+
+  // Karta "Osoby": když je k záznamu uložený zvlášť přestupce i
+  // provozovatel (viz prikazOsobyFromDialog), ukážou se pod sebou —
+  // nejdřív přestupce, pod ním provozovatel. Starší záznamy mají jen
+  // record.pachatel, ten se ukáže samostatně jako dřív.
+  function buildDetailOsobaHtml(record){
+    const has = p => p && (p.jmeno || p.prijmeni || p.firma);
+    if(has(record.prestupce) || has(record.provozovatel)){
+      let html = '';
+      if(has(record.prestupce)) html += buildOsobaSectionHtml(record.prestupce, 'Přestupce');
+      if(has(record.provozovatel)) html += buildOsobaSectionHtml(record.provozovatel, record.provozovatel.firma ? 'Provozovatel — firma' : 'Provozovatel');
+      return html;
+    }
+    const p = record.pachatel;
+    if(!has(p)){
+      return '<div class="detail-info-empty">U tohohle záznamu zatím není uložená žádná osoba ani firma.</div>';
+    }
+    const title = p.firma ? 'Provozovatel — firma' : (record.oznameniAsPrestupce ? 'Přestupce' : 'Osoba');
+    return buildOsobaSectionHtml(p, title);
   }
 
   function buildDetailReseniHtml(record){
@@ -9653,6 +9669,15 @@
     if(extra && extra.castka != null) updateData.castka = extra.castka;
     if(extra && extra.platba) updateData.platba = extra.platba;
     if(extra && extra.pachatel) updateData.pachatel = extra.pachatel;
+    // Přestupce a provozovatel zvlášť (karta "Osoby" v detailu) — jen
+    // když bookmarklet "MP to RZ" poslal i zvlášť vyhledaného přestupce
+    // (viz prikazOsobyFromDialog). Bez něj se případná dvojice
+    // z dřívějšího uložení smaže, ať v detailu nevisí stará data.
+    const osobyPair = (extra && extra.pachatel) ? prikazOsobyFromDialog(extra.pachatel) : null;
+    if(extra && extra.pachatel){
+      updateData.prestupce = osobyPair ? osobyPair.prestupce : firebase.firestore.FieldValue.delete();
+      updateData.provozovatel = osobyPair ? osobyPair.provozovatel : firebase.firestore.FieldValue.delete();
+    }
     // Oznámení má jiný text podle toho, jestli je pachatel PŘESTUPCE —
     // příznak se nastaví v prikazEventActionBtn/prikazConfirmBtn výš,
     // tady se jen posílá dál do Firestore, aby i re-download z detailu
@@ -9667,6 +9692,10 @@
     if(extra && extra.castka != null) record.castka = extra.castka;
     if(extra && extra.platba) record.platba = extra.platba;
     if(extra && extra.pachatel) record.pachatel = extra.pachatel;
+    if(extra && extra.pachatel){
+      record.prestupce = osobyPair ? osobyPair.prestupce : null;
+      record.provozovatel = osobyPair ? osobyPair.provozovatel : null;
+    }
     if(extra && extra.oznameniAsPrestupce != null) record.oznameniAsPrestupce = extra.oznameniAsPrestupce;
     updateResolveBtn(record);
     if(currentDetailRecord && currentDetailRecord.id === record.id) renderResolutionHistory(record);
@@ -9772,6 +9801,40 @@
     prikazPscInput.value = snap.psc || '';
     prikazUliceInput.value = snap.ulice || '';
     prikazCisloDomuInput.value = snap.cisloDomu || '';
+  }
+  // Snapshot polí dialogu → stejný tvar jako record.pachatel (mesto
+  // jako "PSČ, obec"). Pole Doklad v režimu PROVOZOVATEL obsahuje číslo
+  // jednací ("MP 2026/…"), to se jako číslo dokladu neukládá.
+  function prikazSnapshotToPachatel(snap){
+    if(!snap) return null;
+    const t = v => (v || '').trim();
+    const doklad = t(snap.doklad);
+    const isFirma = snap.mode === 'firma';
+    const o = {
+      jmeno: isFirma ? null : (t(snap.jmeno) || null),
+      prijmeni: isFirma ? null : (t(snap.prijmeni) || null),
+      datumNarozeni: isFirma ? null : (t(snap.narozeni) || null),
+      cisloDokladu: (!isFirma && doklad && !/^MP\s/i.test(doklad)) ? doklad : null,
+      firma: isFirma ? (t(snap.firma) || null) : null,
+      ico: isFirma ? (t(snap.ico) || null) : null,
+      datovaSchranka: isFirma ? (t(document.getElementById('prikazDatovaSchranka').value) || null) : null,
+      mesto: [t(snap.psc), t(snap.mesto)].filter(Boolean).join(', ') || null,
+      ulice: t(snap.ulice) || null,
+      cisloDomu: t(snap.cisloDomu) || null
+    };
+    return (o.jmeno || o.prijmeni || o.firma) ? o : null;
+  }
+  // Dvojice přestupce + provozovatel pro uložení k záznamu — existuje
+  // jen když bookmarklet poslal i zvlášť vyhledaného přestupce (oba
+  // snapshoty). Aktivní osoba v dialogu je právě ukládaný pachatel,
+  // druhá se vezme ze snapshotu.
+  function prikazOsobyFromDialog(activePachatel){
+    if(!prikazPrestupceSnapshot || !prikazProvozovatelSnapshot) return null;
+    const pair = prikazPrestupceToggled
+      ? { prestupce: activePachatel, provozovatel: prikazSnapshotToPachatel(prikazProvozovatelSnapshot) }
+      : { prestupce: prikazSnapshotToPachatel(prikazPrestupceSnapshot), provozovatel: activePachatel };
+    if(!pair.prestupce || !pair.provozovatel) return null;
+    return pair;
   }
   // Aplikace na true nastaví v okamžiku, kdy strážník aspoň jednou klikne
   // na "Vyhledat DS" (ať už aplikace najde ID automaticky, nebo aplikace jen
