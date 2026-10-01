@@ -18,7 +18,7 @@
   Tisk na Epson TM-P20II přes ePOS-Print XML (dřív tu byl Star webPRNT SDK,
   přešli jsme na Epson — viz funkce printViaEpson() a buildEposPrintXml()
   níže). ePOS-Print XML je jen HTTP POST s malým XML dokumentem na tiskárnu,
-  takže appka žádný externí SDK soubor nepotřebuje — zůstává jeden HTML
+  takže aplikace žádný externí SDK soubor nepotřebuje — zůstává jeden HTML
   soubor beze změny.
 -->
 <style>
@@ -39,7 +39,7 @@
   }
   /* Skrytý světlý režim — aktivuje se 4s podržením loga na úvodní
      obrazovce (viz JS), žádné viditelné tlačítko/nápověda v UI. Stejná
-     paleta appky, jen prohozená na světlé pozadí. */
+     paleta aplikace, jen prohozená na světlé pozadí. */
   html.light-theme{
     --asphalt:#F4F5F7;
     --asphalt-2:#FFFFFF;
@@ -572,7 +572,7 @@
     <div id="camError"></div>
     <div class="confirm-overlay" id="settingsOverlay">
       <div class="confirm-box">
-        <div class="confirm-text">Nastavení appky</div>
+        <div class="confirm-text">Nastavení aplikace</div>
         <div class="confirm-btns confirm-btns-col">
           <button class="confirm-btn confirm-no" id="settingsApiKeyBtn">Nastavit API klíč (Plate Recognizer)</button>
           <button class="confirm-btn confirm-no" id="settingsVisionKeyBtn">Nastavit Vision API klíč (značka)</button>
@@ -832,7 +832,7 @@
       <button class="history-back" id="batchQueueBackBtn">←</button>
       <h2>Fronta dávky</h2>
     </div>
-    <p style="text-align:center; color:var(--muted); font-size:13.5px; padding:0 20px; margin:6px 0 14px;">Klepnutím na položku zkontrolujte SPZ a odešlete. Po vytištění appka automaticky otevře další.</p>
+    <p style="text-align:center; color:var(--muted); font-size:13.5px; padding:0 20px; margin:6px 0 14px;">Klepnutím na položku zkontrolujte SPZ a odešlete. Po vytištění se automaticky otevře další.</p>
     <div id="batchQueueList"></div>
     <div class="confirm-overlay" id="batchLeaveConfirmOverlay">
       <div class="confirm-box">
@@ -952,9 +952,9 @@
 (function(){
   // ---------- Oprava výšky viewportu na iOS Safari ----------
   // iOS Safari nespolehlivě počítá výšku pro position:fixed;inset:0 —
-  // po použití kamery nebo po sbalení adresního řádku appka nezaplní
-  // celou obrazovku a dole zůstane černá mezera (mimo dosah appky, mimo
-  // vlastní CSS appky). Řešení: JS změří skutečnou výšku viditelné
+  // po použití kamery nebo po sbalení adresního řádku aplikace nezaplní
+  // celou obrazovku a dole zůstane černá mezera (mimo dosah aplikace, mimo
+  // vlastní CSS aplikace). Řešení: JS změří skutečnou výšku viditelné
   // plochy (visualViewport, nebo innerHeight jako záloha) a uloží ji do
   // CSS proměnné --app-height, na kterou je #app navázané místo inset:0.
   // Když má fokus nativní kalendář/čas (<input type="date"/"time">), přepočet
@@ -982,16 +982,16 @@
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', setAppHeight);
   }
-  // Appka spuštěná z plochy (standalone) hlásí při startu na iOS občas
+  // Aplikace spuštěná z plochy (standalone) hlásí při startu na iOS občas
   // ještě neustálenou výšku (probíhá spouštěcí animace) — přeměříme
-  // ještě několikrát s prodlevou, ať se appka doopravdy natáhne na celou
+  // ještě několikrát s prodlevou, ať se aplikace doopravdy natáhne na celou
   // obrazovku i po doběhnutí přechodu.
   [50, 150, 300, 600, 1000, 1500].forEach(ms => setTimeout(setAppHeight, ms));
 
   // ---------- Nastavení API klíčů přes odkaz (setup link) ----------
-  // Po smazání a novém přidání appky na plochu iOS vytvoří nový, prázdný
-  // úložný kontejner (localStorage se vynuluje) — appka se pak znovu zeptá
-  // na klíče. Aby se nemusely přepisovat na telefonní klávesnici, appka
+  // Po smazání a novém přidání aplikace na plochu iOS vytvoří nový, prázdný
+  // úložný kontejner (localStorage se vynuluje) — aplikace se pak znovu zeptá
+  // na klíče. Aby se nemusely přepisovat na telefonní klávesnici, aplikace
   // umí klíče převzít rovnou z URL (?prToken=...&visionKey=...&printerHost=...), uložit je
   // do localStorage a hned je z adresy smazat, ať nezůstanou viditelné
   // v historii prohlížeče. Takový odkaz (s klíči) je nutné držet stejně
@@ -1020,14 +1020,14 @@
 
   // Skrytý přepínač světlý/tmavý režim — 4s podržení loga na úvodní
   // obrazovce. Žádné viditelné tlačítko ani nápověda, jen gesto. Volba se
-  // pamatuje přes localStorage a appka ji při startu rovnou uplatní, ať
+  // pamatuje přes localStorage a aplikace ji při startu rovnou uplatní, ať
   // nebliká tmavým rámem, než se JS stihne spustit.
   try{
     const savedTheme = localStorage.getItem('rzTheme');
     if(savedTheme === 'light'){
       document.documentElement.classList.add('light-theme');
     } else if(savedTheme !== 'dark'){
-      // Nikdo motiv zatím ručně nepřepnul — appka si ho vybere sama podle
+      // Nikdo motiv zatím ručně nepřepnul — aplikace si ho vybere sama podle
       // denní doby (19:00–7:00 tmavý, jinak světlý), ať v noci nesvítí do
       // očí a přes den se dobře čte na slunci. Jakmile někdo motiv jednou
       // ručně přepne (4s podržení loga), tahle automatika se pro tenhle
@@ -1066,10 +1066,10 @@
   let capturedDataUrl = null;
 
   // ---------- Dávkový režim (víc aut za sebou) ----------
-  // batchCapturing: appka právě prochází foťákem víc aut po sobě, bez
+  // batchCapturing: aplikace právě prochází foťákem víc aut po sobě, bez
   // zastavení u formuláře po každé fotce (viz finishCapture).
-  // currentBatchIndex: appka teď kontroluje/odesílá KONKRÉTNÍ položku z
-  // fronty (nastaví openBatchItemForReview) — dokud je nastavené, appka
+  // currentBatchIndex: aplikace teď kontroluje/odesílá KONKRÉTNÍ položku z
+  // fronty (nastaví openBatchItemForReview) — dokud je nastavené, aplikace
   // po odeslání/tisku automaticky otevře další nevyřízenou položku místo
   // návratu na úvodní obrazovku, a Náhled se už neptá znovu na typ
   // dokumentu (ten se vybírá jednou pro celou dávku).
@@ -1094,13 +1094,13 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
-  // Appka vynucuje přihlášení hned na startu (dřív appka nechala nikoho
+  // Aplikace vynucuje přihlášení hned na startu (dřív aplikace nechala nikoho
   // nepřihlášeného volně na úvodní obrazovce a přihlášení vynucovala až
   // později, typicky až u výběru strážníka). Výhoda vynuceného přihlášení
-  // hned na startu: appka i prehled.html běží na stejném Firebase projektu
+  // hned na startu: aplikace i prehled.html běží na stejném Firebase projektu
   // a stejné doméně (rzscannerbk.github.io), takže přihlašovací session se
   // mezi nimi sdílí (Firebase Auth ji ukládá per origin) — jakmile je
-  // appka po startu přihlášená, "Odeslané přestupky" (prehled.html) se
+  // aplikace po startu přihlášená, "Odeslané přestupky" (prehled.html) se
   // v nové záložce otevře už bez vlastního přihlašování.
   //
   // initialAuthCheckDone hlídá, aby se tohle přesměrování na login stalo
@@ -1110,7 +1110,7 @@
   // applyOfficerLock (a jí aktualizovaný box "Přihlášený strážník"), aby
   // byly v pořádku i mimo tok přihlašování/focení — funkce jsou definované
   // až níž v souboru, v pořádku, protože se tenhle listener spustí až
-  // asynchronně, kdy už bude mít appka celý skript načtený.
+  // asynchronně, kdy už bude mít aplikace celý skript načtený.
   let initialAuthCheckDone = false;
   auth.onAuthStateChanged((user)=>{
     if(!initialAuthCheckDone){
@@ -1128,20 +1128,20 @@
   // reviewed in Safari, without re-rendering it.
   let lastGeneratedPdf = null;
   // GPS souřadnice k aktuálnímu záznamu (odděleně od textové adresy) —
-  // potřebné jen pro export "Oznámení přestupku" v přehledu, appka sama
+  // potřebné jen pro export "Oznámení přestupku" v přehledu, aplikace sama
   // adresu vždy zobrazuje jako text.
   let lastResolvedGps = null;
   // If a submit was requested while logged out, resume it right after login.
   let pendingSubmitAfterLogin = false;
   // Když se tlačítko "Tisk" na obrazovce Kontrola údajů zeptá na
-  // přihlášení (appka nebyla přihlášená), potřebuje appka po úspěšném
+  // přihlášení (aplikace nebyla přihlášená), potřebuje aplikace po úspěšném
   // přihlášení vědět, že má rovnou i vytisknout, ne jen odeslat.
   let pendingAutoPrintAfterLogin = false;
-  // Kam appka skočí po kliknutí na "Zpět" na přihlašovací obrazovce —
+  // Kam aplikace skočí po kliknutí na "Zpět" na přihlašovací obrazovce —
   // výchozí 'result' zachovává původní chování (přihlášení vyžádané
   // uprostřed rozpracovaného záznamu se zruší zpátky na náhled záznamu).
   // Box "Přihlášený strážník" na úvodní obrazovce (a vynucené přihlášení
-  // hned po startu appky) si před zobrazením loginu přepne tohle na
+  // hned po startu aplikace) si před zobrazením loginu přepne tohle na
   // 'start', ať "Zpět" vrátí na úvodní obrazovku, ne doprostřed
   // rozpracovaného/neexistujícího záznamu.
   let loginCancelDestination = 'result';
@@ -1286,12 +1286,12 @@
 
   // Tlačítko "Odeslat" na Kontrole údajů — nejdřív ověří, že existuje
   // aspoň jedna fotka (bez ní se přestupek vůbec neodešle ani nevytiskne),
-  // pak VŽDY rovnou odešle do přehledu a zkusí vytisknout — appka už
+  // pak VŽDY rovnou odešle do přehledu a zkusí vytisknout — aplikace už
   // dopředu nezjišťuje, jestli je tiskárna dostupná (tlačítko je pořád
   // zeleně aktivní). Když se pak (uvnitř submitAndPrintFromPreview)
-  // ukáže, že tiskárna zrovna není dostupná, appka nabídne dialog
+  // ukáže, že tiskárna zrovna není dostupná, aplikace nabídne dialog
   // "Připoj tiskárnu" s tlačítkem Tisk, které se samo odemkne, jakmile
-  // appka tiskárnu najde.
+  // aplikace tiskárnu najde.
   document.getElementById('pdfPreviewPrintBtn').addEventListener('click', ()=>{
     if(!lastGeneratedPdf){
       show('result');
@@ -1317,7 +1317,7 @@
   });
 
   // Živě zkouší dostupnost tiskárny, dokud je dialog "Tiskárna není
-  // připojena" otevřený — jakmile appka zjistí, že jde tiskárnu použít,
+  // připojena" otevřený — jakmile aplikace zjistí, že jde tiskárnu použít,
   // tlačítko Tisk se samo aktivuje bez nutnosti dialog zavřít a znovu
   // otevřít. Vrací true, pokud strážník klikl na (aktivní) Tisk, false
   // při "Netisknout".
@@ -1361,9 +1361,9 @@
   async function submitAndPrintFromPreview(opts){
     opts = opts || {};
     // Kontrola limitu velikosti fotek (Firestore ~1 MB) hned na začátku,
-    // dřív než appka vůbec začne cokoliv měnit na tlačítku — ať se
+    // dřív než aplikace vůbec začne cokoliv měnit na tlačítku — ať se
     // neobjeví na zlomek vteřiny "Odesílám…" a hned nato chybová hláška.
-    // Místo červeného textu appka rovnou ukáže dialog, ať je to nepřehlédnutelné.
+    // Místo červeného textu aplikace rovnou ukáže dialog, ať je to nepřehlédnutelné.
     const photos = lastGeneratedPdf.photos || [];
     const approxBytes = photos.reduce((sum, p) => sum + p.length, 0);
     if(approxBytes > 950000){
@@ -1418,12 +1418,12 @@
   });
 
   // Explicitní odhlášení přímo z přihlašovací obrazovky (mezi "Zpět" a
-  // "Přihlásit se") — na rozdíl od kliku na officerStatusBox appka tady
+  // "Přihlásit se") — na rozdíl od kliku na officerStatusBox aplikace tady
   // odhlásí HNED, bez čekání na nové přihlášení (viz komentář u
   // officerStatusBox níž, proč se tam odhlášení dřív dělalo předčasně).
-  // Appka pak zůstane na loginu, ať se rovnou může přihlásit další
+  // Aplikace pak zůstane na loginu, ať se rovnou může přihlásit další
   // strážník — box "Přihlášený strážník" na startu by jinak chvíli ukázal
-  // "Nepřihlášen", než by si appka tuhle obrazovku stihla zavřít.
+  // "Nepřihlášen", než by si aplikace tuhle obrazovku stihla zavřít.
   document.getElementById('loginLogoutBtn').addEventListener('click', async ()=>{
     await auth.signOut();
     document.getElementById('loginEmail').value = '';
@@ -1455,7 +1455,7 @@
       } else if(capturedDataUrl){
         show('result');
       } else {
-        // Appka vynucuje přihlášení hned na startu (viz onAuthStateChanged
+        // Aplikace vynucuje přihlášení hned na startu (viz onAuthStateChanged
         // výš) — v tu chvíli ještě nic nevyfotila, takže "result" by byl
         // prázdný/rozbitý. Vrátí se na úvodní obrazovku "Vyfoť značku".
         show('start');
@@ -1490,7 +1490,7 @@
   // ---------- Google Vision API key — Logo Detection pro tovární značku ----------
   // Stejný princip jako u Plate Recognizeru: klíč se ukládá jen do
   // localStorage tohoto telefonu, nikdy natvrdo do kódu / GitHub repa (ten
-  // je veřejný). Bez klíče appka jen vynechá tenhle krok a značku necháš
+  // je veřejný). Bez klíče aplikace jen vynechá tenhle krok a značku necháš
   // vyplnit ručně — nic se nerozbije.
   const VISION_TOKEN_STORAGE_KEY = 'googleVisionApiKey';
   function getVisionApiToken(){
@@ -1511,14 +1511,14 @@
   });
 
   // ---------- Adresa tiskárny Epson TM-P20II (ePOS-Print XML přes Wi-Fi) ----------
-  // Ukládá se jen IP/hostname tiskárny, ne celá URL — tu si appka doplní sama
-  // (viz epsonPrinterEndpoint níže). Appka běží na https://rzscannerbk.github.io,
+  // Ukládá se jen IP/hostname tiskárny, ne celá URL — tu si aplikace doplní sama
+  // (viz epsonPrinterEndpoint níže). Aplikace běží na https://rzscannerbk.github.io,
   // takže prohlížeč zablokuje volání na obyčejné http:// (tzv. mixed content).
-  // Proto appka vždy sestaví https:// adresu, ledaže zadáš adresu už s http://
+  // Proto aplikace vždy sestaví https:// adresu, ledaže zadáš adresu už s http://
   // nebo https:// na začátku — pak ji použije přesně tak, jak je napsaná.
   // Tiskárna musí mít v TMNet WebConfig zapnuté HTTPS (SSL/TLS) na stejném
   // portu/cestě a ty musíš v Safari jednou navštívit https://<IP tiskárny>/
-  // a potvrdit "Navštívit web" u certifikátu — až pak appka smí přes fetch()
+  // a potvrdit "Navštívit web" u certifikátu — až pak aplikace smí přes fetch()
   // na tuto adresu volat i z jiné stránky (viz tlačítko "Otestovat tiskárnu").
   const PRINTER_HOST_STORAGE_KEY = 'eposPrinterHost';
   function getPrinterHost(){
@@ -1530,11 +1530,11 @@
       ? '⚙ Tiskárna: ' + host
       : '⚙ Nastavit tiskárnu (Epson TM-P20II)';
   }
-  // Jakmile je tiskárna jednou nastavená, appka schová oba odkazy (nastavit
+  // Jakmile je tiskárna jednou nastavená, aplikace schová oba odkazy (nastavit
   // i otestovat) — stejný princip jako u apiKeyLink výše, ať úvodní
   // obrazovka po prvotním nastavení zůstane čistá. Pokud bude potřeba
   // adresu později změnit, jde to i tak přes setup odkaz s ?printerHost=...
-  // (viz začátek souboru) — appka ho zpracuje, i když je tenhle odkaz
+  // (viz začátek souboru) — aplikace ho zpracuje, i když je tenhle odkaz
   // schovaný.
   function updatePrinterHostLinkVisibility(){
     const configured = !!getPrinterHost();
@@ -1548,7 +1548,7 @@
     const current = getPrinterHost();
     const val = window.prompt(
       'Zadej IP adresu tiskárny TM-P20II (např. 192.168.192.168 ve Wi-Fi Direct ' +
-      'režimu, nebo IP přidělenou vaší sítí/hotspotem). Appka se na ni vždy ' +
+      'režimu, nebo IP přidělenou vaší sítí/hotspotem). Aplikace se na ni vždy ' +
       'připojí přes HTTPS — pokud tiskárna HTTPS ještě nemá zapnuté, napiš ' +
       'adresu s "http://" na začátku:',
       current
@@ -1701,8 +1701,8 @@
     logo.addEventListener('mouseleave', cancel);
   })();
 
-  // Skryté nastavení appky — 4s podržení tlačítka fotoaparátu (SKENUJ).
-  // Appka schovává odkazy na nastavení API klíčů a tiskárny, jakmile jsou
+  // Skryté nastavení aplikace — 4s podržení tlačítka fotoaparátu (SKENUJ).
+  // Aplikace schovává odkazy na nastavení API klíčů a tiskárny, jakmile jsou
   // jednou vyplněné (viz updateApiKeyLinkVisibility/updatePrinterHostLinkVisibility
   // výše) — tohle gesto je jediná cesta, jak se k nim pak vrátit. Skryté
   // odkazy (apiKeyLink, visionApiKeyLink, printerHostLink) zůstávají v DOM
@@ -1930,7 +1930,7 @@
     // wait twice for two separate network round-trips.
     const locationPromise = getLocationAndAddress();
     // Google Vision Logo Detection i Object Localization běží jen když je
-    // nastavený klíč — jinak se appka rovnou přeskočí, žádné volání navíc.
+    // nastavený klíč — jinak se aplikace rovnou přeskočí, žádné volání navíc.
     const visionKey = getVisionApiToken();
     const visionBoxPromise = (USE_VISION_COLOR_BOX && visionKey)
       ? detectVehicleBoxViaGoogleVision(fullShotDataUrl, visionKey)
@@ -1949,7 +1949,7 @@
     ]);
 
     if(batchCapturing){
-      // Dávkový režim — appka nečeká na kontrolu po každé fotce. Přidá
+      // Dávkový režim — aplikace nečeká na kontrolu po každé fotce. Přidá
       // záznam do fronty (i když se OCR nepovedlo — ve frontě to bude
       // označené jako "zkontrolovat ručně") a rovnou znovu otevře foťák
       // na další auto, dokud strážník neklikne na "Dokončit dávku".
@@ -2014,7 +2014,7 @@
   }
 
   async function startBatchAfterOffensePicked(){
-    // V dávce se appka na typ dokumentu neptá — hromadné botičky se
+    // V dávce se aplikace na typ dokumentu neptá — hromadné botičky se
     // prakticky nedělají, vždycky se použije Výzva (parkovačka).
     batchDocType = 'vyzva';
     batchQueue = [];
@@ -2066,7 +2066,7 @@
 
   function showBatchQueueScreen(){
     // Prázdná fronta (žádná fotka nebyla pořízena) — obrazovku fronty
-    // vůbec neukazovat, jen by to bylo zbytečné mezikroku, appka jde
+    // vůbec neukazovat, jen by to bylo zbytečné mezikroku, aplikace jde
     // rovnou na úvodní obrazovku.
     if(batchQueue.length === 0){
       batchOffense = null;
@@ -2101,7 +2101,7 @@
   }
 
   // Zavolá se po úspěšném odeslání/tisku (nebo po zamítnutí tisku) —
-  // pokud šlo o kontrolu položky z dávky, appka rovnou otevře další
+  // pokud šlo o kontrolu položky z dávky, aplikace rovnou otevře další
   // nevyřízenou položku ve frontě místo návratu na úvodní obrazovku.
   function finishBatchItemOrGoHome(){
     if(currentBatchIndex !== null && batchQueue[currentBatchIndex]){
@@ -2152,7 +2152,7 @@
 
   // Nominatim u venkovských částí (bez pojmenované ulice) občas vrátí do
   // pole "residential" jen číselný identifikátor zástavby (např. "37440"),
-  // ne skutečný název ulice. Bez tohoto ošetření appka takový kód mylně
+  // ne skutečný název ulice. Bez tohoto ošetření aplikace takový kód mylně
   // vyhodnotila jako "ulice se našla" a vrátila ho místo spolehlivého
   // dohledání místní části (Těchov, Lažánky, ...) níže.
   function looksLikeRealStreetName(s){
@@ -2225,12 +2225,12 @@
     const muniEntry = chain.find(s => s.type === 'regional.municipality');
     let city = (muniPartEntry && muniPartEntry.name) || (muniEntry && muniEntry.name) || '';
     // U spojených obcí se dvěma jmény přes pomlčku (typicky "Rájec-Jestřebí",
-    // vzniklé sloučením dvou historických obcí) appka nechce vracet jen
+    // vzniklé sloučením dvou historických obcí) aplikace nechce vracet jen
     // polovinu jména — Mapy.com totiž tu polovinu ("Rájec") vrací jako
-    // "regional.municipality_part", což appka jinak upřednostňuje (kvůli
+    // "regional.municipality_part", což aplikace jinak upřednostňuje (kvůli
     // místním částem Blanska typu Klepačov, kde je to naopak žádoucí).
     // Pozná se to tak, že jméno místní části je obsažené v pomlčkovém
-    // jménu celé obce — pak appka radši použije celý úřední název.
+    // jménu celé obce — pak aplikace radši použije celý úřední název.
     if(muniPartEntry && muniEntry && muniEntry.name && muniEntry.name.includes('-') &&
        muniEntry.name.toLowerCase().includes(muniPartEntry.name.toLowerCase())){
       city = muniEntry.name;
@@ -2295,7 +2295,7 @@
       const best = json.results.slice().sort((a,b)=> (b.score||0) - (a.score||0))[0];
       const out = { text: (best.plate||'').toUpperCase(), confidence: Math.round((best.score||0) * 100) };
       // MMC doplněk (jen pokud je na účtu aktivovaný) — nejlepší uhodnutá
-      // značka a barva, jen když appka daný výraz zná ze seznamu v selectu.
+      // značka a barva, jen když aplikace daný výraz zná ze seznamu v selectu.
       if(best.model_make && best.model_make.length){
         const topMake = best.model_make.slice().sort((a,b)=>(b.score||0)-(a.score||0))[0];
         if(topMake && topMake.make) out.brand = topMake.make;
@@ -2310,7 +2310,7 @@
   }
 
   // Anglické názvy barev, jak je vrací Plate Recognizer MMC, namapované na
-  // možnosti v selectu (česky). Značky appka porovnává case-insensitive
+  // možnosti v selectu (česky). Značky aplikace porovnává case-insensitive
   // přímo s <option> texty, protože Plate Recognizer už vrací "BMW",
   // "Škoda" apod. v běžném tvaru.
   const MMC_COLOR_MAP = {
@@ -2363,7 +2363,7 @@
   }
 
   // ---------- Zdarma lokální odhad barvy vozidla z fotky ----------
-  // Bez placeného MMC doplňku appka spočítá převažující barvu karoserie
+  // Bez placeného MMC doplňku aplikace spočítá převažující barvu karoserie
   // přímo v telefonu (canvas, žádné volání ven, žádné náklady). Nejde o
   // dokonalé rozpoznávání (fotka není segmentovaná — auto/pozadí), ale pro
   // rychlé předvyplnění základní barvy to ve většině fotek stačí. Strážník
@@ -2438,13 +2438,13 @@
             y0 = Math.round(h * (visionBox.y0f + boxHf * 0.35));
             y1 = Math.round(h * (visionBox.y0f + boxHf * 0.65));
           } else if(plateBox && plateBox.fullW && plateBox.fullH){
-            // Appka zná přesnou polohu žlutého rámečku z obrazovky kamery
-            // (stejná oblast, kterou appka ořízne pro OCR). Celý rámeček
+            // Aplikace zná přesnou polohu žlutého rámečku z obrazovky kamery
+            // (stejná oblast, kterou aplikace ořízne pro OCR). Celý rámeček
             // vzorkovat nešlo — bývá v něm mřížka, chrom, stíny i samotná
-            // SPZ, což barvu spolehlivě kazilo. Místo toho appka vzorkuje
+            // SPZ, což barvu spolehlivě kazilo. Místo toho aplikace vzorkuje
             // jen malý pevný výřez v horní-střední části rámečku (kapota
             // těsně nad mřížkou/nárazníkem) — tam bývá čistý lak bez
-            // rušivých prvků, viz zakreslený vzor v appce.
+            // rušivých prvků, viz zakreslený vzor v aplikaci.
             const x0f = plateBox.x / plateBox.fullW;
             const y0f = plateBox.y / plateBox.fullH;
             const boxWf = plateBox.w / plateBox.fullW;
@@ -2486,12 +2486,12 @@
 
   // ---------- Google Vision Logo Detection — tovární značka z fotky ----------
   // Volitelný doplněk vedle zdarma detekce barvy: pokud je nastavený Vision
-  // API klíč, appka pošle zmenšenou fotku na Google Cloud Vision a zkusí
+  // API klíč, aplikace pošle zmenšenou fotku na Google Cloud Vision a zkusí
   // najít logo výrobce (přední maska/znak). Bez nastaveného klíče se tohle
-  // celé přeskočí — appka nikdy nevolá Vision bez klíče.
+  // celé přeskočí — aplikace nikdy nevolá Vision bez klíče.
 
   // Pokud by tohle nefungovalo lépe než stará metoda, stačí přepnout na
-  // false a appka se vrátí přesně k původnímu (fixní výřez nad SPZ) chování
+  // false a aplikace se vrátí přesně k původnímu (fixní výřez nad SPZ) chování
   // — zbytek kódu (detectDominantVehicleColor) na to reaguje sám, nic
   // dalšího mazat/upravovat netřeba.
   const USE_VISION_COLOR_BOX = true;
@@ -2500,7 +2500,7 @@
   // přes Google Vision Object Localization — má vlastní samostatnou
   // bezplatnou kvótu 1000 použití/měsíc, nezávislou na Logo Detection.
   // Vrací normalizovaný box (0–1) nebo null, pokud se nic vozidlu podobného
-  // nenašlo / appka nemá Vision klíč / volání selhalo — volající pak prostě
+  // nenašlo / aplikace nemá Vision klíč / volání selhalo — volající pak prostě
   // spadne zpátky na starý fixní výřez.
   async function detectVehicleBoxViaGoogleVision(dataUrl, apiKey){
     try{
@@ -2585,14 +2585,14 @@
     const loginOverlay = document.getElementById('officerLoginOverlay');
     const lockedOfficer = getLockedOfficerName();
     if(lockedOfficer){
-      // Přihlášený účet patří konkrétnímu strážníkovi — appka mu jméno
+      // Přihlášený účet patří konkrétnímu strážníkovi — aplikace mu jméno
       // vybere sama a znemožní ho změnit (viz getLockedOfficerName výše).
       officerSelect.value = lockedOfficer;
       officerSelect.disabled = true;
       officerSelect.title = 'Jméno se určuje podle přihlášeného účtu';
       loginOverlay.style.display = 'none';
     } else if(auth.currentUser){
-      // admin@rzscanner.cz — ruční výběr jako dřív, appka si jen pamatuje
+      // admin@rzscanner.cz — ruční výběr jako dřív, aplikace si jen pamatuje
       // poslední vybrané jméno v telefonu.
       const savedOfficer = getSavedOfficer();
       officerSelect.disabled = false;
@@ -2602,7 +2602,7 @@
       loginOverlay.style.display = 'none';
     } else {
       // Nikdo není přihlášený — místo volného ručního výběru (což by šlo
-      // zneužít k vydávání se za kohokoliv) appka radši rovnou nabídne
+      // zneužít k vydávání se za kohokoliv) aplikace radši rovnou nabídne
       // přihlášení. Select zůstává zamčený, přes něj leží klikací overlay.
       officerSelect.disabled = true;
       officerSelect.title = 'Pro výběr strážníka se nejdřív přihlaste';
@@ -2619,7 +2619,7 @@
   // Box "Přihlášený strážník" na úvodní obrazovce (nad logem RZ Scanner).
   // Zobrazuje str. číslo + jméno podle přihlášeného účtu (stejná logika
   // jako getLockedOfficerName/OFFICER_NUMBERS výš) — u účtu admin@rzscanner.cz
-  // appka nemá koho zobrazit napevno, takže ukáže jen e-mail účtu.
+  // aplikace nemá koho zobrazit napevno, takže ukáže jen e-mail účtu.
   function updateOfficerStatusBox(){
     const nameEl = document.getElementById('officerStatusName');
     if(!nameEl) return;
@@ -2634,11 +2634,11 @@
     }
   }
 
-  // Klik na box = appka umožní přihlásit se jako jiný strážník. Appka
+  // Klik na box = aplikace umožní přihlásit se jako jiný strážník. Aplikace
   // NEODHLAŠUJE hned teď — signInWithEmailAndPassword aktuální relaci
   // sama přepíše, jakmile se někdo nový úspěšně přihlásí. Díky tomu, když
   // uživatel na přihlašovací obrazovce dá "Zpět" (bez přihlášení), zůstane
-  // appka přihlášená jako předtím, místo aby skončila bez přihlášeného
+  // aplikace přihlášená jako předtím, místo aby skončila bez přihlášeného
   // strážníka (viz loginCancelDestination výš).
   document.getElementById('officerStatusBox').addEventListener('click', ()=>{
     document.getElementById('loginError').style.display = 'none';
@@ -2660,7 +2660,7 @@
 
     applyOfficerLock();
 
-    // Značka/barva se resetují pro každý nový snímek — appka je případně
+    // Značka/barva se resetují pro každý nový snímek — aplikace je případně
     // znovu předvyplní podle MMC výsledku (viz applyRecognizedBrandColor).
     document.getElementById('brandSelect').value = '';
     updateBrandDisplay();
@@ -2696,9 +2696,9 @@
 
   // Upozorní, pokud stejná RZ už dnes má nevyřešený záznam — nezakazuje
   // nic, jen informuje, aby se snáz předešlo dvojímu řešení stejného auta.
-  // Hláška je klikací — otevře dialog přímo v appce se seznamem všech
+  // Hláška je klikací — otevře dialog přímo v aplikaci se seznamem všech
   // nevyřešených záznamů té RZ (RZ, číslo, kvalifikace, místo, datum,
-  // čas), ať appka neopouští rozpracovaný přestupek kvůli tomu, že by se
+  // čas), ať aplikace neopouští rozpracovaný přestupek kvůli tomu, že by se
   // muselo přecházet na samostatnou stránku přehledu. Volá se pokaždé,
   // když se v poli objeví nová/jiná RZ (po OCR, po ručním přepsání, po
   // otevření položky z dávky ke kontrole).
@@ -2785,7 +2785,7 @@
   }
 
   // Klepnutí na položku v seznamu pod aktivně zaostřeným textovým polem
-  // (výběr přestupku/značky/adresy, kde appka má nahoře vyhledávání a
+  // (výběr přestupku/značky/adresy, kde aplikace má nahoře vyhledávání a
   // klávesnici) — na iOS Safari první klepnutí mimo pole jen schová
   // klávesnici a "click" se nespustí, dokud se neklepne podruhé. Tenhle
   // helper místo "click" poslouchá "touchend" (ten se nepolyká), s
@@ -2872,19 +2872,19 @@
   }
 
   // ---------- Tisk na Epson TM-P20II přes Wi-Fi (ePOS-Print XML) ----------
-  // Appka pošle na tiskárnu obyčejný HTTP(S) POST s malým XML dokumentem —
-  // žádná zvláštní appka/prohlížeč navíc není potřeba, funguje přímo z
-  // tohoto Safari. Adresu tiskárny (IP) si appka bere z nastavení (viz
+  // Aplikace pošle na tiskárnu obyčejný HTTP(S) POST s malým XML dokumentem —
+  // žádná zvláštní aplikace/prohlížeč navíc není potřeba, funguje přímo z
+  // tohoto Safari. Adresu tiskárny (IP) si aplikace bere z nastavení (viz
   // getPrinterHost/PRINTER_HOST_STORAGE_KEY výše, tlačítko "⚙ Nastavit
   // tiskárnu" na úvodní obrazovce).
   //
-  // POZNÁMKA PRO LUKÁŠE: Appka běží na https://rzscannerbk.github.io, takže
+  // POZNÁMKA PRO LUKÁŠE: Aplikace běží na https://rzscannerbk.github.io, takže
   // Safari zablokuje obyčejné http:// volání na tiskárnu (mixed content).
   // Řešení: v tiskárně přes TMNet WebConfig zapni HTTPS (SSL/TLS) na tom
   // stejném ePOS-Print endpointu, a v Safari jednou navštiv přímo
   // https://<IP tiskárny>/ a potvrď "Navštívit web" u varování o
   // certifikátu (tiskárna má vlastní, nedůvěryhodný certifikát) — pak by
-  // měla fungovat i volání odsud z appky. Přesné názvy XML elementů a
+  // měla fungovat i volání odsud z aplikace. Přesné názvy XML elementů a
   // atributů (text/align/em/width/height, formát SOAP obálky) jsem čerpal
   // z veřejné Epson dokumentace (ePOS-Print XML User's Manual), ale bez
   // reálné tiskárny po ruce jsem to nemohl naživo odzkoušet — použij
@@ -2966,7 +2966,7 @@
   };
 
   // ---------- Vazba přihlašovacího účtu na jméno strážníka ----------
-  // Fiktivní přihlašovací e-maily (příjmení.číslo@rzscanner.cz) — appka po
+  // Fiktivní přihlašovací e-maily (příjmení.číslo@rzscanner.cz) — aplikace po
   // přihlášení automaticky vybere odpovídající jméno na výzvě a zamkne
   // rozbalovací seznam, ať se nikdo pod přihlášeným účtem nemůže vydávat za
   // jiného strážníka. E-maily jsou fiktivní, nemusí to být funkční schránka
@@ -2992,7 +2992,7 @@
 
   // Vrací jméno strážníka, na které se má výběr zamknout podle aktuálně
   // přihlášeného účtu — nebo null, pokud je přihlášený admin@rzscanner.cz
-  // (ruční výběr) nebo e-mail appka nezná (bezpečný výchozí stav: radši
+  // (ruční výběr) nebo e-mail aplikace nezná (bezpečný výchozí stav: radši
   // nechat ruční výběr, než hádat).
   function getLockedOfficerName(){
     const email = auth.currentUser && auth.currentUser.email;
@@ -3102,7 +3102,7 @@
 
   // Sestaví plnou adresu tiskárny. Pokud je uložená hodnota jen holá IP/
   // doména (bez http/https), doplní https:// (kvůli mixed-content
-  // blokaci — appka běží na https://rzscannerbk.github.io). Pokud sis adresu
+  // blokaci — aplikace běží na https://rzscannerbk.github.io). Pokud sis adresu
   // uložil rovnou s "http://" nebo "https://", použije se přesně tak.
   function epsonPrinterEndpoint(){
     const host = getPrinterHost();
@@ -3120,13 +3120,13 @@
   // setPrinterTestNote, protože #submitNote leží na úplně jiné obrazovce
   // a byl by neviditelný.
   //
-  // POZNÁMKA PRO LUKÁŠE: Appka běží na jiné adrese (rzscannerbk.github.io) než
+  // POZNÁMKA PRO LUKÁŠE: Aplikace běží na jiné adrese (rzscannerbk.github.io) než
   // tiskárna (172.16.10.1), takže jde o cross-origin volání a prohlížeč ho
   // hlídá přes CORS — pokud tiskárna v odpovědi neposílá hlavičku
   // Access-Control-Allow-Origin, JS nesmí odpověď přečíst, i kdyby tisk na
   // pozadí proběhl. Proto request držíme co nejjednodušší (bez vlastních
   // hlaviček navíc, které by vyvolaly tzv. "preflight" dotaz), a když i tak
-  // prohlížeč volání odmítne, zkusíme to znovu v režimu "no-cors" — appka
+  // prohlížeč volání odmítne, zkusíme to znovu v režimu "no-cors" — aplikace
   // pak sice nepozná jistě, jestli tisk skutečně proběhl, ale požadavek se
   // aspoň odešle a tiskárna by měla vytisknout.
   function printViaEpson(record, onStatus){
@@ -3196,7 +3196,7 @@
       // Druhý pokus: no-cors. Prohlížeč požadavek pošle, ale odpověď je
       // "opaque" — nejde z ní nic přečíst (ani úspěch/chybu). Pokud fetch
       // vůbec proběhne bez síťové chyby, je slušná šance, že tiskárna
-      // dokument dostala a vytiskla; jistotu ale appka nemá.
+      // dokument dostala a vytiskla; jistotu ale aplikace nemá.
       const fallback = await attempt('no-cors');
       if(fallback.ok){
         report(
@@ -3243,7 +3243,7 @@
   // Lehká kontrola dostupnosti tiskárny — na rozdíl od printViaEpson()
   // nic netiskne (žádný ePOS-Print XML příkaz, žádné odtržení papíru),
   // jen zkusí, jestli síťové spojení na danou IP vůbec projde. Používá se
-  // před potvrzením tisku, ať appka ví dřív, než strážník klikne "Ano".
+  // před potvrzením tisku, ať aplikace ví dřív, než strážník klikne "Ano".
   function pingPrinter(){
     return new Promise(async (resolve)=>{
       const host = getPrinterHost();
@@ -3252,7 +3252,7 @@
       const controller = new AbortController();
       const timeoutId = setTimeout(()=>controller.abort(), 3000);
       try{
-        // no-cors: appka nepřečte odpověď, ale request musí síťově projít
+        // no-cors: aplikace nepřečte odpověď, ale request musí síťově projít
         // (TCP/TLS spojení navázáno) — to samo o sobě stačí jako signál
         // "tiskárna je na síti dostupná".
         await fetch('https://' + bareHost + '/', { mode: 'no-cors', signal: controller.signal });
@@ -3266,9 +3266,9 @@
   }
 
   // Zastaví průběžné sledování tiskárny na obrazovce Kontrola údajů —
-  // appka ho spouštěla, dokud tlačítko "Odeslat" ještě podle dostupnosti
+  // aplikace ho spouštěla, dokud tlačítko "Odeslat" ještě podle dostupnosti
   // tiskárny šedlo/aktivovalo se; teď je tlačítko vždycky zeleně aktivní
-  // (viz click listener výš) a appka tiskárnu zjišťuje až PO odeslání
+  // (viz click listener výš) a aplikace tiskárnu zjišťuje až PO odeslání
   // (submitAndPrintFromPreview), takže tahle funkce už žádný interval
   // nikde nespouští — jen tu zůstává jako no-op pro volání, která ji
   // ještě volají (Zpět, submitAndPrintFromPreview).
@@ -3295,7 +3295,7 @@
       yesBtn.addEventListener('click', onYes);
       noBtn.addEventListener('click', onNo);
 
-      // Dokud appka neví, jestli je tiskárna dostupná, je "Ano" zašedlé a
+      // Dokud aplikace neví, jestli je tiskárna dostupná, je "Ano" zašedlé a
       // neklikatelné — strážník tak hned vidí, že tisk pravděpodobně
       // neproběhne, místo aby na to přišel až po kliknutí a čekání na
       // timeout.
@@ -3358,7 +3358,7 @@
 
     if(!officerName || !selectedOffense){
       if(!officerName && !auth.currentUser){
-        // Strážník chybí, protože appka vůbec neví, kdo je přihlášený —
+        // Strážník chybí, protože aplikace vůbec neví, kdo je přihlášený —
         // místo červené hlášky rovnou nabídnout přihlášení (stejné pole je
         // beztak zamčené, viz applyOfficerLock).
         document.getElementById('loginError').style.display = 'none';
@@ -3424,12 +3424,12 @@
       document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(lastGeneratedPdf);
       refreshPdfPreviewGallery();
 
-      // Tlačítko "Odeslat" a poznámka pod ním appka resetuje na výchozí
+      // Tlačítko "Odeslat" a poznámka pod ním aplikace resetuje na výchozí
       // stav vždy, když se tahle obrazovka otevírá pro nový přestupek —
-      // jinak (druhý a další přestupek ve stejné session appky) zůstávalo
+      // jinak (druhý a další přestupek ve stejné session aplikace) zůstávalo
       // tlačítko zaseklé v "Odesílám…"/disabled ze submitAndPrintFromPreview
       // předchozího přestupku (ta ho na úspěšné cestě záměrně nevrací
-      // zpátky, protože normálně appka rovnou odejde na jinou obrazovku —
+      // zpátky, protože normálně aplikace rovnou odejde na jinou obrazovku —
       // jenže "Kontrola údajů" je jedna sdílená obrazovka/tlačítko pro
       // všechny přestupky, ne nová pro každý).
       const submitBtn = document.getElementById('pdfPreviewPrintBtn');
@@ -3467,7 +3467,7 @@
     document.getElementById('photoLightboxOverlay').classList.remove('open');
   });
 
-  // Tlačítko Rozmazat přímo ve fullscreen náhledu — appka si pamatuje,
+  // Tlačítko Rozmazat přímo ve fullscreen náhledu — aplikace si pamatuje,
   // kterou fotku (index v poli photos) náhled zrovna zobrazuje (viz
   // currentLightboxIdx níž), aby vědělo, na kterou fotku otevřít editor
   // rozmazání. stopPropagation, ať klik na tlačítko nezavře náhled dřív,
@@ -3510,7 +3510,7 @@
       });
       item.appendChild(removeBtn);
 
-      // Ruční rozmazání obličejů/cizích značek přímo ve fotce — appka
+      // Ruční rozmazání obličejů/cizích značek přímo ve fotce — aplikace
       // záměrně nedělá automatickou detekci (nespolehlivá, dala by falešný
       // pocit bezpečí), jen jednoduchý nástroj, kde si to strážník sám
       // přejetím prstu rozmaže tam, kde potřeba.
@@ -3532,9 +3532,9 @@
   // ---------- Ruční rozmazání ve fotce (obličeje, cizí značky) ----------
   // Vědomě NEjde o automatickou AI detekci — ta by u obličeje z boku,
   // malého/rozmazaného obličeje nebo natočené značky snadno něco
-  // propásla, a appka by tím strážníkovi dala falešný pocit bezpečí.
-  // Místo toho appka nabízí jednoduchý štětec: strážník přejede prstem
-  // přes to, co se má schovat, appka to na místě "propixeluje" (zmenší
+  // propásla, a aplikace by tím strážníkovi dala falešný pocit bezpečí.
+  // Místo toho aplikace nabízí jednoduchý štětec: strážník přejede prstem
+  // přes to, co se má schovat, aplikace to na místě "propixeluje" (zmenší
   // a zase zvětší danou oblast bez vyhlazení) — spolehlivé, protože to
   // kontroluje člověk, ne algoritmus.
   let blurEditingIdx = null;
@@ -3552,7 +3552,7 @@
       canvas.height = img.naturalHeight;
       ctx.drawImage(img, 0, 0);
       document.getElementById('blurOverlay').classList.add('open');
-      // Zobrazenou velikost appka počítá a nastavuje sama v JS (ne přes
+      // Zobrazenou velikost aplikace počítá a nastavuje sama v JS (ne přes
       // CSS max-width/max-height) — na některých mobilních prohlížečích
       // (iOS Safari) se canvas uvnitř flexboxu bez explicitní velikosti
       // uměl vykreslit s nulovou viditelnou velikostí, i když obsah byl
@@ -3673,7 +3673,7 @@
   });
 
   // "Přidej foto" přímo na Kontrole údajů — pro případ, že hlavní fotka
-  // chybí nebo je potřeba doplnit další záběr, aniž by se appka musela
+  // chybí nebo je potřeba doplnit další záběr, aniž by se aplikace musela
   // vracet na předchozí obrazovku. Fotka se rovnou přidá do
   // lastGeneratedPdf.photos (stejné pole, které jde na "Odeslat") a hned
   // se ukáže v náhledové galerii.
@@ -3691,7 +3691,7 @@
       lastGeneratedPdf.photos.push(processed.split(',')[1]);
       refreshPdfPreviewGallery();
       // Fotka teď existuje, takže případná hláška "Doplň fotodokumentaci"
-      // už neplatí — appka ji jen schová.
+      // už neplatí — aplikace ji jen schová.
       const note = document.getElementById('pdfPreviewPrinterNote');
       if(note.textContent === 'Doplň fotodokumentaci.'){
         note.style.color = '';
@@ -4077,7 +4077,7 @@
     renderOffenseList('');
     show('offense');
     // V dávce klávesnice automaticky nevyjíždí — jen seznam přestupků k
-    // výběru. Kdyby appka pole rovnou zaostřila, klávesnice by první
+    // výběru. Kdyby aplikace pole rovnou zaostřila, klávesnice by první
     // klepnutí na položku "sežrala" jen na svoje schování (známá vlastnost
     // iOS Safari), takže by šlo vybrat až na druhé klepnutí. Klávesnice
     // se tak v dávce ukáže, jen když se do vyhledávání skutečně klepne.
@@ -4097,7 +4097,7 @@
   });
 
   document.getElementById('batchQueueBackBtn').addEventListener('click', ()=>{
-    // Pokud ve frontě zbývá aspoň jedna nevyřízená položka, appka se
+    // Pokud ve frontě zbývá aspoň jedna nevyřízená položka, aplikace se
     // nejdřív zeptá — jinak by šlo nechtěným/neopatrným klepnutím na
     // šipku zpět nenávratně přijít o všechny zatím nafocené přestupky.
     const hasPending = batchQueue.some(it => !it.done);
@@ -4140,11 +4140,11 @@
 
   // ---------- Tovární značka: celoobrazovkový výběr s A–Z rejstříkem ----------
   // Skutečný <select id="brandSelect"> zůstává v DOM jako datový zdroj
-  // (skrytý), ať zbytek appky (MMC/Vision auto-vyplnění, reset, odeslání)
+  // (skrytý), ať zbytek aplikace (MMC/Vision auto-vyplnění, reset, odeslání)
   // funguje beze změny — mění se jen způsob výběru na obrazovce.
   let brandActiveLetter = null;
 
-  // Stejný princip jako "Nejčastěji hledané" u přestupků — appka si
+  // Stejný princip jako "Nejčastěji hledané" u přestupků — aplikace si
   // pamatuje, jak často byla která značka skutečně vybraná, a nejčastější
   // z nich nabídne jako první, ještě před abecedním seznamem.
   const BRAND_USAGE_KEY = 'brandUsageCounts';
@@ -4463,8 +4463,8 @@
 })();
 </script>
 <script>
-  // Registrace service workeru jen kvůli instalovatelnosti appky na
-  // Androidu (viz sw.js) — na iOS Safari tenhle krok nic nemění, appka se
+  // Registrace service workeru jen kvůli instalovatelnosti aplikace na
+  // Androidu (viz sw.js) — na iOS Safari tenhle krok nic nemění, aplikace se
   // na plochu přidává úplně stejně jako dřív.
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
