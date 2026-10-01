@@ -11892,9 +11892,9 @@
     // popisek "PROVOZOVATEL ⇄" opravdu ručně klikl (viz
     // prikazPachatelToggle/prikazPrestupceToggled) — typicky se na
     // místě dostavila jiná konkrétní fyzická osoba a aplikace teď
-    // potřebuje jen jméno/příjmení/datum narození/číslo OP k přenosu
-    // přes MPM do Manageru (tKontaktJM/PR/DN/Papers), ne celou adresu
-    // ani termín dostavení. Bez toho ručního přepnutí aplikace ukazuje
+    // potřebuje jméno/příjmení/datum narození/číslo OP k přenosu
+    // přes MPM do Manageru (tKontaktJM/PR/DN/Papers) a adresu pobytu
+    // do dokumentu, ne termín dostavení. Bez toho ručního přepnutí aplikace ukazuje
     // "PROVOZOVATEL" s plnými poli i u osoby — aplikace totiž na začátku
     // ještě neví, jestli nalezený provozovatel bude osoba nebo firma,
     // a adresu aplikace pro Výzvu/Oznámení potřebuje v obou případech. U
@@ -11904,16 +11904,15 @@
     const isPrestupce = prikazPrestupceActive();
     document.getElementById('prikazPachatelLabel').textContent =
       (mode === 'firma') ? 'PROVOZOVATEL' : (isPrestupce ? 'PŘESTUPCE' : (prikazUsesEventActionBtn() ? 'PROVOZOVATEL' : 'PACHATEL'));
-    // U ClickParku ("Parkoviště s parkovacím poplatkem") se u Příkazu na
-    // místě, Domluvy a Oznámení dělá výjimka z PŘESTUPCE zjednodušení
-    // výš: adresu (Obec/PSČ/Ulice/Č.p., se stejným našeptávačem přes
-    // Mapy.com, jaký se používá jinde) tady chceme mít i u PŘESTUPCE, a
-    // naopak se tu Číslo dokladu vůbec neukazuje (nahrazuje ho adresa) —
-    // u ostatních PŘESTUPCE toků zůstává beze změny (adresa schovaná,
-    // Číslo dokladu vidět), protože Doklad se tam skutečně posílá do MP
-    // Manageru (tKontaktPapers).
+    // Adresa trvalého pobytu (Obec/PSČ/Ulice/Č.p.) je vidět VŽDYCKY, i u
+    // PŘESTUPCE — bookmarklet "MP to RZ" posílá adresu i u zvlášť
+    // vyhledaného přestupce (viz prikazPrestupceSnapshot) a do Oznámení
+    // se zapisuje jako "Bydliště:". Dřív byla u PŘESTUPCE schovaná.
+    // U ClickParku (Příkaz na místě/Domluva/Oznámení) se navíc
+    // neukazuje Číslo dokladu (nahrazuje ho adresa); jinde zůstává,
+    // protože se posílá do MP Manageru (tKontaktPapers).
     const wantClickParkAddress = prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva' || prikazMode === 'oznameni');
-    document.getElementById('prikazAdresaWrap').style.display = (isPrestupce && !wantClickParkAddress) ? 'none' : '';
+    document.getElementById('prikazAdresaWrap').style.display = '';
     document.getElementById('prikazDokladField').style.display = wantClickParkAddress ? 'none' : '';
     document.getElementById('prikazDokladLabel').textContent = isPrestupce ? 'Číslo dokladu' : (prikazUsesEventActionBtn() ? 'Číslo jednací' : 'Číslo dokladu');
   }
