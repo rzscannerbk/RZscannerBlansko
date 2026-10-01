@@ -11942,8 +11942,22 @@
       }
       return;
     }
-    prikazPrestupceToggled = true;
-    setPrikazProvozovatelMode(prikazProvozovatelMode === 'firma' ? 'osoba' : 'firma');
+    if(prikazProvozovatelMode === 'firma'){
+      // Bez snapshotu zvlášť vyhledaného přestupce zůstává pro opravu
+      // chybně rozpoznané firmy/osoby původní chování — přepnutí na
+      // pole osoby (prázdná, dokud se nevyplní).
+      prikazPrestupceToggled = true;
+      setPrikazProvozovatelMode('osoba');
+      return;
+    }
+    // Běžný případ: provozovatel je osoba a žádný zvlášť vyhledaný
+    // přestupce nepřišel (bookmarklet ho na stránce nenašel, nebo se
+    // nehledal). Přepínač pak jen otočí popisek PŘESTUPCE/PROVOZOVATEL
+    // nad stejnými poli — hodnoty (jméno/příjmení/datum narození/
+    // adresa) se vůbec nemění, takže nemůžou "zmizet" jen proto, že se
+    // strážník mezi oběma popisky několikrát přeplácí.
+    prikazPrestupceToggled = !prikazPrestupceToggled;
+    setPrikazProvozovatelMode('osoba');
   });
 
   function applyProvozovatelText(raw){
