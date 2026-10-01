@@ -1036,14 +1036,6 @@
               </div>
               <div class="notice-photo-wrap" id="photoWrap">
                 <div id="photoGallery"></div>
-                <div class="docx-preview" id="docxPreview">
-                  <div class="docx-preview-icon">📄</div>
-                  <div class="docx-preview-info">
-                    <div class="docx-preview-title">Oznámení (.docx)</div>
-                    <div class="docx-preview-status" id="docxPreviewStatus">Připravuji náhled…</div>
-                  </div>
-                  <button class="btn" id="docxOpenBtn" disabled>Otevřít</button>
-                </div>
               </div>
             </div>
             <div class="detail-tab-panel" data-tab-panel="kopie">
@@ -9459,49 +9451,13 @@
     updateResolveBtn(record);
     setDetailNote('', '');
     currentRecordPrinted = false;
-    prepareOznameniPreview(record);
 
     document.getElementById('detailModalOverlay').classList.add('open');
   }
 
-  // Rovnou (na pozadí) připraví soubor Oznámení pro tenhle záznam, ať je
-  // tlačítko "Otevřít" pod fotkami hned použitelné, bez čekání — používá
-  // stejnou funkci jako běžný export z nabídky Dořešit → Oznámení.
-  let currentOznameniBlob = null;
-  async function prepareOznameniPreview(record){
-    currentOznameniBlob = null;
-    const statusEl = document.getElementById('docxPreviewStatus');
-    const btn = document.getElementById('docxOpenBtn');
-    statusEl.textContent = 'Připravuji náhled…';
-    btn.disabled = true;
-    try{
-      if(typeof JSZip === 'undefined'){
-        statusEl.textContent = 'Nepodařilo se načíst knihovnu pro Word.';
-        return;
-      }
-      let photosB64 = record._resolvedPhotos;
-      if(!photosB64 && record.hasPhotos){
-        const res = await ensurePhotosLoaded(record);
-        photosB64 = res.photos;
-      }
-      const blob = await buildOznameniDocx(record, photosB64 || []);
-      // Modál mezitím mohl přepnout na jiný záznam — starý (už neplatný)
-      // náhled v tom případě zahodíme.
-      if(currentDetailRecord !== record) return;
-      currentOznameniBlob = blob;
-      statusEl.textContent = 'Náhled připraven';
-      btn.disabled = false;
-    }catch(e){
-      console.error('Příprava náhledu Oznámení selhala:', e);
-      if(currentDetailRecord === record) statusEl.textContent = 'Náhled se nepodařilo připravit.';
-    }
-  }
-
-  document.getElementById('docxOpenBtn').addEventListener('click', async ()=>{
-    if(!currentOznameniBlob || !currentDetailRecord) return;
-    downloadBlobWithFilename(currentOznameniBlob, buildDocFilename('Oznámení', currentDetailRecord));
-    if(!currentDetailRecord.resolved) await markResolved(currentDetailRecord, 'oznameni');
-  });
+  // Karta "Oznámení (.docx)" pod fotkami je zrušená — Výzva i Oznámení
+  // se stahují ikonkami vlevo pod tlačítkem Dořešit (docLinkVyzva/
+  // docLinkOznameni).
 
   // Pomocná funkce na získání srovnatelného Date z Firestore Timestamp
   // i obyčejného JS Date — aplikace historii (Vytvořeno/Dořešeno/Upraveno)
