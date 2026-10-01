@@ -11957,6 +11957,17 @@
       alert('Ve schránce je teď appky vlastní JSON (appka ho tam dala tlačítkem "MPM" pro bookmarklet), ne text z lustrace z MP Manageru. Nejdřív v Manageru spusť bookmarklet "MP to RZ" (zkopíruje provozovatele do schránky), pak se vrať sem a zkus Vložit znovu.');
       return false;
     }
+    // Stejná pojistka jako u JSON výš, ale pro případ, že se do
+    // schránky dostane zdrojový kód samotného bookmarkletu
+    // ("javascript:(function(){...") — typicky se to stane při úpravě
+    // bookmarku (vkládání kódu do pole URL přepíše schránku), takže
+    // "Vlož provozovatele" pak dostane kus kódu místo osobních údajů
+    // (poznat se to dá přesně podle textů "Try{ var cj..." nebo
+    // "Javascript:(function(" v polích Jméno/Příjmení).
+    if(/^\s*javascript\s*:/i.test(raw) || /^\s*\(\s*function\s*\(/i.test(raw)){
+      alert('Ve schránce je teď zdrojový kód bookmarkletu, ne text z lustrace z MP Manageru — nejspíš se schránka přepsala při úpravě bookmarku (vkládání kódu do pole URL). Spusť v MP Manageru bookmarklet "MP to RZ" znovu (zkopíruje čerstvé údaje do schránky) a hned potom se vrať sem a zkus Vložit.');
+      return false;
+    }
     // U ClickParku "Vlož provozovatele" rozhoduje, jestli má strážník
     // vyplněné jméno nebo příjmení přestupce. Pokud ano, bere se z textu
     // jen číslo jednací (osoba je známá, pole se nemají přepisovat).
