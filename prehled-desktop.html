@@ -1187,7 +1187,7 @@
       <label class="radar-drop" id="radarDrop">
         <input type="file" id="radarFileInput" accept=".txt,text/plain" multiple hidden>
         <span class="radar-drop-main">Vyber nebo sem přetáhni textové soubory (.txt)</span>
-        <span class="radar-drop-sub">Název souboru = registrační značka · tolerance měřidla 3 km/h do 100 km/h, 3 % nad 100 km/h</span>
+        <span class="radar-drop-sub">RZ = název souboru, případně část vlevo od pomlčky · tolerance měřidla 3 km/h do 100 km/h, 3 % nad 100 km/h</span>
       </label>
       <div class="radar-table-wrap" id="radarTableWrap" style="display:none;">
         <table class="radar-table">
@@ -8576,7 +8576,10 @@
         const i = line.indexOf(':');
         if(i > 0) f[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
       });
-      row.plate = file.name.replace(/\.[^.]+$/, '').replace(/[\s-]+/g, '').toUpperCase();
+      // Název souboru je buď jen RZ ("2bk3955.txt"), nebo RZ a za pomlčkou
+      // další údaje z radaru ("2bk3955 - 1772535771_6T200_0303_110251.txt")
+      // — RZ je vždycky všechno vlevo od první pomlčky.
+      row.plate = file.name.replace(/\.[^.]+$/, '').split('-')[0].replace(/\s+/g, '').toUpperCase();
       const dm = (f['date'] || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       const tm = (f['time'] || '').match(/(\d{1,2}):(\d{2})/);
       const num = k => { const m = (f[k] || '').match(/-?\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(',', '.')) : null; };
