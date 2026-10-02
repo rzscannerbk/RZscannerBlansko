@@ -1046,6 +1046,7 @@
           <div class="detail-rail-facts" id="detailRailFacts"></div>
           <div class="detail-rail-actions">
             <button class="btn btn-ghost" id="mpmExportBtn" title="Zkopírovat údaje pro MP Manager">MPM</button>
+            <button class="btn btn-ghost" id="detailPasteMpBtn" title="Vložit provozovatele, přestupce a číslo jednací zkopírované bookmarkletem MP to RZ">Vložit z MP</button>
             <button class="btn btn-primary" id="resolveMenuBtn">Dořešit</button>
             <div class="detail-rail-doclinks">
               <button class="doc-link-btn" id="docLinkVyzva" style="display:none;" title="Znovu stáhnout Výzvu">
@@ -9864,6 +9865,9 @@
 
     // Reset tlačítka MPM na výchozí stav (kdyby na předchozím záznamu
     // zůstalo zabarvené po úspěšném/neúspěšném kopírování).
+    const pasteMpBtn = document.getElementById('detailPasteMpBtn');
+    pasteMpBtn.classList.remove('copied', 'copy-err', 'mpm-busy');
+    pasteMpBtn.textContent = 'Vložit z MP';
     const mpmBtn = document.getElementById('mpmExportBtn');
     if(mpmBtn){
       mpmBtn.textContent = 'MPM';
@@ -10085,6 +10089,8 @@
     if(extra && extra.castka != null) updateData.castka = extra.castka;
     if(extra && extra.platba) updateData.platba = extra.platba;
     if(extra && extra.pachatel) updateData.pachatel = extra.pachatel;
+    // Data vložená z MP v detailu ("Vložit z MP") už řešení převzalo.
+    updateData.mpmVlozenyPending = false;
     // Přestupce a provozovatel zvlášť (karta "Osoby" v detailu) — jen
     // když bookmarklet "MP to RZ" poslal i zvlášť vyhledaného přestupce
     // (viz prikazOsobyFromDialog). Bez něj se případná dvojice
@@ -10108,6 +10114,7 @@
     if(extra && extra.castka != null) record.castka = extra.castka;
     if(extra && extra.platba) record.platba = extra.platba;
     if(extra && extra.pachatel) record.pachatel = extra.pachatel;
+    record.mpmVlozenyPending = false;
     if(extra && extra.pachatel){
       record.prestupce = osobyPair ? osobyPair.prestupce : null;
       record.provozovatel = osobyPair ? osobyPair.provozovatel : null;
@@ -10683,7 +10690,12 @@
     // U ClickParku aplikace vícestavové tlačítko pouští od 'clickpark'
     // (aplikace na něm nejdřív vloží data z e-mailu), jinde aplikace rovnou
     // začíná na 'mpm' jako dřív.
-    prikazEventBtnState = prikazIsClickParkEvent ? 'clickpark' : 'mpm';
+    // Když už byl tenhle záznam zkopírovaný tlačítkem MPM v detailu
+    // (mpmCopiedFromDetailId), dialog začne rovnou na "Vložit" — data
+    // z MP Manageru (bookmarklet MP to RZ) se tak vloží bez druhého
+    // kopírování MPM uvnitř dialogu.
+    const mpmUzZkopirovano = !prikazIsClickParkEvent && currentDetailRecord && mpmCopiedFromDetailId === currentDetailRecord.id;
+    prikazEventBtnState = prikazIsClickParkEvent ? 'clickpark' : (mpmUzZkopirovano ? 'paste' : 'mpm');
     prikazEventPasted = false;
     prikazMpmCisloJednaci = null;
     // Aplikace požadavek na "aspoň jednou Vyhledat DS" resetuje při každém
@@ -10705,6 +10717,18 @@
       document.getElementById('prikazSpz').focus();
     } else if(!p){
       (prikazMode === 'prikaz' ? document.getElementById('prikazCastka') : document.getElementById('prikazJmeno')).focus();
+    }
+    // Údaje vložené dřív v detailu tlačítkem "Vložit z MP" (zatím
+    // nepřevzaté žádným řešením) se u Výzvy/Oznámení vloží rovnou —
+    // stejnou cestou jako tlačítko "Vložit" v dialogu, takže tlačítko
+    // dole rovnou ukáže "Vloženo ✓" a dál "Potvrdit a uložit".
+    const recPending = currentDetailRecord;
+    if(!prikazIsNewEvent && !prikazIsClickParkEvent && prikazUsesEventActionBtn() &&
+       recPending && recPending.mpmVlozenyPending && recPending.mpmVlozenyText){
+      if(applyProvozovatelText(recPending.mpmVlozenyText)){
+        prikazEventBtnState = 'paste';
+        prikazEventPasted = true;
+      }
     }
     updatePrikazEventFieldValidation();
     updatePrikazEventActionBtn();
@@ -12876,6 +12900,91 @@
     await exportOznameni(record, record.pachatel, filename);
   });
 
+  // "Vložit z MP" v detailu — přečte schránku s textem z bookmarkletu
+  // "MP to RZ" (Událost: RRRR/číslo, provozovatel, případně řádek
+  // "Přestupce: …") a uloží k záznamu, ještě BEZ řešení:
+  //  - provozovatel / prestupce (stejný tvar jako record.pachatel, viz
+  //    karta Osoby a sloupce v přehledu),
+  //  - mpmCisloJednaci,
+  //  - mpmVlozenyText + mpmVlozenyPending — dialog Dořešit (openPrikazModal)
+  //    pak tenhle text sám vloží přes applyProvozovatelText, takže
+  //    přepínač PŘESTUPCE ⇄ PROVOZOVATEL, adresy i číslo jednací fungují
+  //    stejně jako při vložení v dialogu. markResolved příznak smaže.
+  function parsedToOsoba(p){
+    if(!p || !(p.jmeno || p.prijmeni || p.firma)) return null;
+    let dn = null;
+    if(p.narozeniIso){ const m = p.narozeniIso.split('-'); if(m.length === 3) dn = m[2] + '.' + m[1] + '.' + m[0]; }
+    return {
+      jmeno: p.firma ? null : (p.jmeno || null),
+      prijmeni: p.firma ? null : (p.prijmeni || null),
+      datumNarozeni: p.firma ? null : dn,
+      cisloDokladu: null,
+      firma: p.firma || null,
+      ico: p.ico || null,
+      datovaSchranka: null,
+      mesto: [p.psc, p.obec].filter(Boolean).join(', ') || null,
+      ulice: p.ulice || null,
+      cisloDomu: p.cisloDomu || null
+    };
+  }
+  document.getElementById('detailPasteMpBtn').addEventListener('click', async ()=>{
+    const record = currentDetailRecord;
+    if(!record) return;
+    const btn = document.getElementById('detailPasteMpBtn');
+    if(btn.classList.contains('mpm-busy')) return;
+    let text;
+    try{ text = await navigator.clipboard.readText(); }
+    catch(e){ alert('Nepodařilo se přečíst schránku. Povol pro tuhle stránku přístup ke schránce a zkus to znovu.'); return; }
+    text = (text || '').trim();
+    if(!text){ alert('Schránka je prázdná. V MP Manageru nejdřív spusť bookmarklet "MP to RZ".'); return; }
+    if(text.charAt(0) === '{' || /^javascript:/i.test(text)){
+      alert('Ve schránce není text z bookmarkletu "MP to RZ" (je tam ' + (text.charAt(0) === '{' ? 'JSON z tlačítka MPM' : 'kód bookmarkletu') + '). V MP Manageru spusť "MP to RZ" a hned potom klikni na Vložit z MP.');
+      return;
+    }
+    const parsed = parseProvozovatelText(text);
+    const provozovatel = parsedToOsoba(parsed);
+    const prestupce = parsedToOsoba(parsed.prestupce);
+    if(!provozovatel && !prestupce && !parsed.cisloJednaci){
+      alert('Ve schránce nenajdu provozovatele, přestupce ani číslo jednací. Spusť v MP Manageru bookmarklet "MP to RZ" znovu.');
+      return;
+    }
+    btn.classList.add('mpm-busy');
+    btn.textContent = '...';
+    const upd = {
+      mpmVlozenyText: text,
+      mpmVlozenyPending: true,
+      provozovatel: provozovatel || firebase.firestore.FieldValue.delete(),
+      prestupce: prestupce || firebase.firestore.FieldValue.delete()
+    };
+    if(parsed.cisloJednaci) upd.mpmCisloJednaci = parsed.cisloJednaci;
+    try{
+      await db.collection('prestupky').doc(record.id).update(upd);
+      record.mpmVlozenyText = text;
+      record.mpmVlozenyPending = true;
+      record.provozovatel = provozovatel;
+      record.prestupce = prestupce;
+      if(parsed.cisloJednaci) record.mpmCisloJednaci = parsed.cisloJednaci;
+      btn.classList.remove('mpm-busy');
+      btn.textContent = 'Vloženo ✓';
+      btn.classList.add('copied');
+      if(currentDetailRecord && currentDetailRecord.id === record.id){
+        document.getElementById('detailOsobaContent').innerHTML = buildDetailOsobaHtml(record);
+        updateDetailRail(record);
+        setDetailTab('osoba');
+      }
+      renderList(document.getElementById('searchInput') ? document.getElementById('searchInput').value : '');
+    }catch(e){
+      console.error('Vložení z MP do detailu selhalo:', e);
+      btn.classList.remove('mpm-busy');
+      btn.textContent = 'Nezdařilo se';
+      btn.classList.add('copy-err');
+      alert('Uložení se nezdařilo (' + e.message + ').');
+    }
+  });
+
+  // Id záznamu, u kterého proběhlo MPM kopírování z detailu (viz
+  // openPrikazModal — dialog řešení pak začíná rovnou na "Vložit").
+  let mpmCopiedFromDetailId = null;
   document.getElementById('mpmExportBtn').addEventListener('click', async ()=>{
     if(!currentDetailRecord) return;
     const btn = document.getElementById('mpmExportBtn');
@@ -12887,6 +12996,7 @@
     btn.classList.remove('mpm-busy');
     btn.textContent = ok ? 'Zkopírováno ✓' : 'Nezdařilo se';
     btn.classList.add(ok ? 'copied' : 'copy-err');
+    if(ok) mpmCopiedFromDetailId = currentDetailRecord.id;
     // Zůstává zabarvené a s textem "Zkopírováno ✓" trvale, dokud se
     // neotevře jiný záznam (viz reset v openDetail) nebo se znovu
     // neklikne na MPM — ať je vidět, že kopírování proběhlo, i s
