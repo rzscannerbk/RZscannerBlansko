@@ -699,6 +699,8 @@
   .radar-table tr.bad td{opacity:.55;}
   .radar-table tr.warn td.note{color:var(--amber);}
   .radar-table tr.err td.note{color:#E5534B; opacity:1;}
+  .radar-btn-row{display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
+  .radar-btn-row .confirm-btn{flex:0 0 auto; min-width:210px; padding:11px 24px;}
   .radar-table select{font:inherit; padding:3px 4px; border-radius:6px; border:1px solid var(--line); background:var(--asphalt-2); color:var(--text);}
   .confirm-btn{
     flex:1; padding:11px 12px; border-radius:10px; font-family:'Inter',sans-serif;
@@ -1197,11 +1199,11 @@
           <tbody id="radarTableBody"></tbody>
         </table>
       </div>
-      <div class="confirm-btns confirm-btns-col">
+      <div class="radar-btn-row">
         <button class="confirm-btn confirm-yes" id="radarCreateBtn" disabled>Založit události</button>
         <button class="confirm-btn confirm-no" id="radarManualBtn">Pokračovat bez souborů</button>
-        <button class="confirm-cancel" id="radarBackBtn">← Zpět</button>
       </div>
+      <button class="confirm-cancel" id="radarBackBtn">← Zpět</button>
     </div>
   </div>
 
@@ -8597,7 +8599,11 @@
       const dm = (f['date'] || '').match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/);
       const tm = (f['time'] || '').match(/(\d{1,2}):(\d{2})/);
       const num = k => { const m = (f[k] || '').match(/-?\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(',', '.')) : null; };
-      row.measured = num('measured speed');
+      // Znaménko u naměřené rychlosti jen rozlišuje směr jízdy vůči
+      // měřiči (+ přijíždí, − vzdaluje se) — rychlost je vždycky kladná.
+      const measuredRaw = num('measured speed');
+      row.measured = measuredRaw == null ? null : Math.abs(measuredRaw);
+      row.receding = measuredRaw != null && measuredRaw < 0;
       row.limit = num('speed limit');
       row.distance = num('measured distance');
       row.serial = f['serial number'] || null;
@@ -8755,7 +8761,8 @@
           radar: {
             fileName: r.fileName, serial: r.serial, category: r.cat,
             measured: r.measured, limit: r.limit, corrected: r.corrected,
-            excess: r.excess, distance: r.distance, inObec: r.inObec
+            excess: r.excess, distance: r.distance, inObec: r.inObec,
+            direction: r.receding ? 'vzdaluje se' : 'přijíždí'
           }
         });
         done++;
