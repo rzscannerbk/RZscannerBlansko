@@ -210,7 +210,18 @@
   .rail-toggle:hover{background:var(--asphalt-3);}
 
   /* ---------- LIST ---------- */
-  .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .list-area{flex:1; min-width:0; display:flex; flex-direction:column; position:relative;}
+  .scroll-top-btn{
+    position:absolute; right:26px; bottom:26px; z-index:5;
+    width:44px; height:44px; border-radius:50%; border:1px solid var(--line);
+    background:var(--asphalt-2, var(--asphalt-3)); color:var(--amber);
+    font-size:20px; font-weight:700; line-height:1; cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    opacity:0; transform:translateY(10px); pointer-events:none;
+    transition:opacity .2s, transform .2s;
+  }
+  .scroll-top-btn.show{opacity:1; transform:none; pointer-events:auto;}
+  .scroll-top-btn:hover{border-color:var(--amber);}
   .list-head{
     display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 130px 130px 150px 150px 130px 64px 36px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
@@ -226,7 +237,7 @@
   .record-item.stale .record-plate{color:#E88A80;}
   .record-item.kbd-focus{outline:1.5px solid var(--faint); outline-offset:-1.5px;}
   .confirm-btn.kbd-focus{outline:2px solid var(--faint); outline-offset:2px;}
-  .list-head span.head-left{text-align:left;}
+  .list-head span.head-left{text-align:center;}
   #listBody{flex:1; overflow-y:auto;}
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
@@ -248,7 +259,7 @@
   .record-item .stripe{width:3px; align-self:stretch; border-radius:2px; background:#5D9CFF;}
   .record-item.boticka .stripe{background:var(--amber);}
 
-  .record-plate-col{display:flex; flex-direction:column; gap:3px; padding-top:1px;}
+  .record-plate-col{display:flex; flex-direction:column; align-items:center; gap:3px; padding-top:1px; text-align:center;}
   .record-plate{font-family:'Roboto Mono',monospace; font-weight:700; font-size:15px; letter-spacing:.02em; line-height:1.3;}
   .record-notice-number{font-family:'Roboto Mono',monospace; font-size:15px; font-weight:700; color:var(--faint); letter-spacing:.02em;}
 
@@ -258,14 +269,14 @@
   .record-addr{font-size:12.5px; color:var(--muted); line-height:1.4; padding-top:3px; padding-right:10px; text-align:center;}
 
   .record-offense{
-    font-size:12.5px; color:var(--muted); line-height:1.4; padding-right:16px; padding-top:3px;
+    font-size:12.5px; color:var(--muted); line-height:1.4; padding:3px 8px 0; text-align:center;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:help;
   }
 
   .record-pachatel{font-size:12px; color:var(--muted); line-height:1.35; padding-top:4px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .record-castka{font-family:'Roboto Mono',monospace; font-size:12.5px; color:var(--text); padding-top:4px; text-align:center; white-space:nowrap;}
 
-  .record-status{display:flex; flex-direction:column; gap:2px; padding-top:5px; font-size:12px; color:var(--muted); cursor:pointer;}
+  .record-status{display:flex; flex-direction:column; align-items:center; text-align:center; gap:2px; padding-top:5px; font-size:12px; color:var(--muted); cursor:pointer;}
   .record-status:hover{color:var(--text);}
   .record-status:hover .record-status-sub{color:var(--muted);}
   .record-status-top{display:flex; align-items:center; gap:8px;}
@@ -974,14 +985,15 @@
           <span class="sortable" data-sort="type">Typ</span>
           <span class="sortable" data-sort="address">Ulice</span>
           <span class="sortable" data-sort="offense">Přestupek</span>
-          <span>Provozovatel</span>
-          <span>Přestupce</span>
-          <span>Částka</span>
+          <span class="sortable" data-sort="provozovatel">Provozovatel</span>
+          <span class="sortable" data-sort="prestupce">Přestupce</span>
+          <span class="sortable" data-sort="castka">Částka</span>
           <span class="head-left sortable" data-sort="status">Stav</span>
           <span class="sortable" data-sort="sent">Vytvořeno</span>
           <span></span>
           <span></span>
         </div>
+        <button type="button" class="scroll-top-btn" id="scrollTopBtn" title="Zpět na začátek">↑</button>
         <div id="listBody">
           <div class="list-empty" id="listStatus">Načítám…</div>
         </div>
@@ -7056,6 +7068,18 @@
   let sortDir = 1;
   const STATUS_ORDER = ['pending', 'oznameni', 'vyzva', 'prikaz', 'domluva'];
 
+  // Šipka "zpět na začátek" — objeví se po odscrollování seznamu níž
+  // než o ~1,5 obrazovky řádků, klik plynule odscrolluje nahoru.
+  (function(){
+    const listBodyEl = document.getElementById('listBody');
+    const btn = document.getElementById('scrollTopBtn');
+    if(!listBodyEl || !btn) return;
+    listBodyEl.addEventListener('scroll', ()=>{
+      btn.classList.toggle('show', listBodyEl.scrollTop > 400);
+    }, { passive: true });
+    btn.addEventListener('click', ()=> listBodyEl.scrollTo({ top: 0, behavior: 'smooth' }));
+  })();
+
   function sortRecords(records){
     if(!sortKey) return records;
     const arr = records.slice();
@@ -7069,6 +7093,27 @@
       else if(sortKey === 'sent'){
         va = (a.createdAt && a.createdAt.toDate) ? a.createdAt.toDate().getTime() : 0;
         vb = (b.createdAt && b.createdAt.toDate) ? b.createdAt.toDate().getTime() : 0;
+      }
+      else if(sortKey === 'provozovatel' || sortKey === 'prestupce' || sortKey === 'castka'){
+        // Řadí se podle příjmení (pak jména), u firmy podle názvu, u částky
+        // číselně. Záznamy bez hodnoty jdou vždycky na konec, v obou
+        // směrech řazení.
+        const key = r => {
+          if(sortKey === 'castka'){
+            const n = parseFloat(String(r.castka == null ? '' : r.castka).replace(/[^0-9.,]/g, '').replace(',', '.'));
+            return isNaN(n) ? null : n;
+          }
+          const p = recordOsoby(r)[sortKey];
+          if(!p) return null;
+          const t = p.firma || [p.prijmeni, p.jmeno].filter(Boolean).join(' ');
+          return t ? t.toLocaleLowerCase('cs') : null;
+        };
+        const ka = key(a), kb = key(b);
+        if(ka === null && kb === null) return 0;
+        if(ka === null) return 1;
+        if(kb === null) return -1;
+        if(typeof ka === 'string') return ka.localeCompare(kb, 'cs') * sortDir;
+        return (ka - kb) * sortDir;
       }
       if(typeof va === 'string') va = va.toLowerCase();
       if(typeof vb === 'string') vb = vb.toLowerCase();
