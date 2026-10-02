@@ -33,7 +33,15 @@
 
   navigator.clipboard.readText().then(function(t){
     var d;
-    try{ d = JSON.parse(t); } catch(e){ alert('Schránka neobsahuje platná data z RZ Scanneru.'); return; }
+    try{ d = JSON.parse(t); } catch(e){ d = null; }
+    // Ve schránce musí být JSON z tlačítka MPM v RZ Scanneru. Typicky ho
+    // přepíše cokoliv zkopírovaného mezitím (třeba kód bookmarkletu při
+    // úpravě záložky) — hláška proto ukáže začátek toho, co ve schránce
+    // doopravdy je.
+    if(!d || typeof d !== 'object' || !('rz' in d)){
+      alert('Ve schránce nejsou data z RZ Scanneru.\n\nV přehledu RZ Scanneru nejdřív klikni na tlačítko MPM a hned potom spusť tuhle záložku.\n\nZačátek schránky: ' + (t ? String(t).slice(0, 60) : '(prázdná)'));
+      return;
+    }
     function set(id,v){ var el=document.getElementById(id); if(el&&v){ el.value=v; } }
     set('tSPZ', d.rz);
     set('tCarSubType', d.carSubType);
@@ -141,7 +149,9 @@
     // AUTO_SAVE === false: formulář se jen vyplní a nechá ho ke
     // kontrole — uložení (a tím i druhý krok s "Ověřit v RSV") je teď
     // na tobě, ručně.
-  }).catch(function(){
-    alert('Nepodařilo se přečíst schránku ze zásuvky prohlížeče. Zkus to znovu nebo zkontroluj oprávnění ke schránce pro tuto stránku.');
+  }).catch(function(err){
+    // Sem se dostane jak odmítnuté čtení schránky, tak jakákoliv chyba
+    // při vyplňování — hláška ukáže skutečnou příčinu.
+    alert('Záložka RZ to MP selhala: ' + ((err && err.message) ? err.message : String(err)) + '\n\nPokud jde o schránku, povol pro mp.blansko.cz přístup ke schránce (ikona zámku vlevo v adresním řádku).');
   });
 })();

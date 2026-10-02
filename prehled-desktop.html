@@ -212,7 +212,7 @@
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column;}
   .list-head{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px 36px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 130px 130px 150px 150px 130px 64px 36px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
     font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
     color:var(--faint); border-bottom:1px solid var(--line); gap:0 10px;
@@ -231,7 +231,7 @@
   .list-empty{text-align:center; color:var(--muted); font-size:13.5px; margin-top:60px; line-height:1.6;}
 
   .record-item{
-    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 110px 150px 150px 130px 64px 36px;
+    display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 130px 130px 150px 150px 130px 64px 36px;
     align-items:start; padding:12px 22px; min-height:74px; cursor:pointer;
     border-bottom:1px solid var(--line-soft); position:relative; gap:0 10px;
     background:rgba(51,211,153,.05);
@@ -936,7 +936,7 @@
       <div class="searchbox-wrap">
         <div class="searchbox">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="searchInput" placeholder="Hledat SPZ, adresu, přestupek, číslo jednací nebo strážníka…" autocomplete="off">
+          <input type="text" id="searchInput" placeholder="Hledat SPZ, adresu, přestupek, jméno, číslo jednací nebo strážníka…" autocomplete="off">
         </div>
         <div class="search-suggestions" id="searchSuggestions"></div>
       </div>
@@ -974,7 +974,8 @@
           <span class="sortable" data-sort="type">Typ</span>
           <span class="sortable" data-sort="address">Ulice</span>
           <span class="sortable" data-sort="offense">Přestupek</span>
-          <span>Pachatel</span>
+          <span>Provozovatel</span>
+          <span>Přestupce</span>
           <span>Částka</span>
           <span class="head-left sortable" data-sort="status">Stav</span>
           <span class="sortable" data-sort="sent">Vytvořeno</span>
@@ -7115,10 +7116,50 @@
   // navigace (šipky/Enter) níže, ať ví, na co ukazuje.
   let currentRenderedRecords = [];
 
+  // Kdo je u záznamu přestupce a kdo provozovatel:
+  //  - když jsou uložení oba zvlášť (record.prestupce/provozovatel, viz
+  //    prikazOsobyFromDialog), použijí se rovnou,
+  //  - jinak je k dispozici jen record.pachatel a jeho roli určuje
+  //    způsob řešení — u Výzvy a Oznámení (pokud nebylo podané na
+  //    přestupce, oznameniAsPrestupce) je to PROVOZOVATEL (tak ho
+  //    dialog i nazývá), u Příkazu na místě a Domluvy přímo PŘESTUPCE.
+  function recordOsoby(r){
+    const has = p => p && (p.jmeno || p.prijmeni || p.firma);
+    if(has(r.prestupce) || has(r.provozovatel)){
+      return { prestupce: has(r.prestupce) ? r.prestupce : null, provozovatel: has(r.provozovatel) ? r.provozovatel : null };
+    }
+    if(!has(r.pachatel)) return { prestupce: null, provozovatel: null };
+    const jeProvozovatel = r.resolvedMethod === 'vyzva' || (r.resolvedMethod === 'oznameni' && !r.oznameniAsPrestupce);
+    return jeProvozovatel
+      ? { prestupce: null, provozovatel: r.pachatel }
+      : { prestupce: r.pachatel, provozovatel: null };
+  }
+  function osobaDisplayName(p){
+    if(!p) return '';
+    return p.firma || [p.jmeno, p.prijmeni].filter(Boolean).join(' ');
+  }
+  // Text pro vyhledávání podle jména — přestupce, provozovatel i
+  // record.pachatel; obě pořadí (jméno příjmení i příjmení jméno),
+  // u firmy název a IČO.
+  function recordOsobySearchText(r){
+    const out = [];
+    [r.prestupce, r.provozovatel, r.pachatel].forEach(p=>{
+      if(!p) return;
+      const j = p.jmeno || '', pr = p.prijmeni || '';
+      out.push(j + ' ' + pr, pr + ' ' + j);
+      if(p.firma) out.push(p.firma);
+      if(p.ico) out.push(p.ico);
+    });
+    return out.join(' | ');
+  }
+
   function renderList(filterText){
     const container = document.getElementById('listBody');
     const statusEl = document.getElementById('listStatus');
     const q = (filterText || '').trim().toLowerCase();
+    // Jména se hledají i bez diakritiky ("mozna" najde "Možnarová").
+    const stripDia = x => (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const qPlain = stripDia(q);
 
     let filtered = allRecords.filter(passesFilters);
     if(q){
@@ -7127,7 +7168,8 @@
         (r.address || '').toLowerCase().includes(q) ||
         (r.noticeNumber || '').toLowerCase().includes(q) ||
         (r.officerName || '').toLowerCase().includes(q) ||
-        (r.offenseLabel || '').toLowerCase().includes(q)
+        (r.offenseLabel || '').toLowerCase().includes(q) ||
+        stripDia(recordOsobySearchText(r)).includes(qPlain)
       );
     }
     filtered = sortRecords(filtered);
@@ -7224,12 +7266,22 @@
       if(r.offenseLabel) offense.title = r.offenseLabel;
       item.appendChild(offense);
 
-      const pachatelCell = document.createElement('span');
-      pachatelCell.className = 'record-pachatel';
-      const pachatelName = r.pachatel ? [r.pachatel.jmeno, r.pachatel.prijmeni].filter(Boolean).join(' ') : '';
-      pachatelCell.textContent = pachatelName || '—';
-      if(pachatelName) pachatelCell.title = pachatelName + (r.pachatel.datumNarozeni ? ' · nar. ' + r.pachatel.datumNarozeni : '') + (r.pachatel.cisloDokladu ? ' · OP ' + r.pachatel.cisloDokladu : '');
-      item.appendChild(pachatelCell);
+      // Sloupce Provozovatel a Přestupce (viz recordOsoby) — každý
+      // s tooltipem s datem narození / číslem dokladu / IČO.
+      const osoby = recordOsoby(r);
+      [osoby.provozovatel, osoby.prestupce].forEach(p=>{
+        const cell = document.createElement('span');
+        cell.className = 'record-pachatel';
+        const name = osobaDisplayName(p);
+        cell.textContent = name || '—';
+        if(name){
+          cell.title = name +
+            (p.datumNarozeni ? ' · nar. ' + p.datumNarozeni : '') +
+            (p.cisloDokladu ? ' · OP ' + p.cisloDokladu : '') +
+            (p.ico ? ' · IČO ' + p.ico : '');
+        }
+        item.appendChild(cell);
+      });
 
       const castkaCell = document.createElement('span');
       castkaCell.className = 'record-castka';
@@ -9848,7 +9900,11 @@
   // druhá se vezme ze snapshotu.
   function prikazOsobyFromDialog(activePachatel){
     if(!prikazPrestupceSnapshot || !prikazProvozovatelSnapshot) return null;
-    const pair = prikazPrestupceToggled
+    // U Příkazu na místě a Domluvy (u existujícího záznamu, kde přepínač
+    // PŘESTUPCE ⇄ PROVOZOVATEL neplatí) je osoba v dialogu vždycky ten,
+    // kdo přestupek spáchal — tedy přestupce.
+    const activeJePrestupce = prikazPrestupceToggled || !prikazUsesEventActionBtn();
+    const pair = activeJePrestupce
       ? { prestupce: activePachatel, provozovatel: prikazSnapshotToPachatel(prikazProvozovatelSnapshot) }
       : { prestupce: prikazSnapshotToPachatel(prikazPrestupceSnapshot), provozovatel: activePachatel };
     if(!pair.prestupce || !pair.provozovatel) return null;
@@ -10188,10 +10244,13 @@
       const cjText = cjRaw ? (/^MP\s/i.test(cjRaw) ? cjRaw : ('MP ' + cjRaw)) : '';
       prikazPrestupceSnapshot = prikazPachatelToSnapshot(rec.prestupce, (rec.prestupce.cisloDokladu || ''));
       prikazProvozovatelSnapshot = prikazPachatelToSnapshot(rec.provozovatel, cjText);
-      const startSnap = prikazPrestupceToggled ? prikazPrestupceSnapshot : prikazProvozovatelSnapshot;
+      // U Příkazu na místě/Domluvy se do polí dává přestupce (ten
+      // pokutu platí / dostává domluvu), viz i prikazOsobyFromDialog.
+      const startPrestupce = prikazPrestupceToggled || !prikazUsesEventActionBtn();
+      const startSnap = startPrestupce ? prikazPrestupceSnapshot : prikazProvozovatelSnapshot;
       prikazOsobaSnapshotWrite(startSnap);
-      document.getElementById('prikazDatovaSchranka').value = (!prikazPrestupceToggled && rec.provozovatel.datovaSchranka) || '';
-      setPrikazProvozovatelMode(prikazPrestupceToggled ? 'osoba' : (startSnap.mode || 'osoba'));
+      document.getElementById('prikazDatovaSchranka').value = (!startPrestupce && rec.provozovatel.datovaSchranka) || '';
+      setPrikazProvozovatelMode(startPrestupce ? 'osoba' : (startSnap.mode || 'osoba'));
       selectedMesto = startSnap.mesto ? { name: startSnap.mesto, position: null } : null;
       document.getElementById('prikazUlice').disabled = !startSnap.mesto;
       document.getElementById('prikazUlice').placeholder = startSnap.mesto ? 'ulice (nepovinné)' : 'nejdřív vyber obec';
