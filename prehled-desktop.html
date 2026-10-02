@@ -211,17 +211,20 @@
 
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column; position:relative;}
+  /* Šipka "zpět na začátek" — světle modrý kruh s bílou šipkou, dole
+     uprostřed rolovaného seznamu. */
   .scroll-top-btn{
-    position:absolute; right:26px; bottom:26px; z-index:5;
-    width:44px; height:44px; border-radius:50%; border:1px solid var(--line);
-    background:var(--asphalt-2, var(--asphalt-3)); color:var(--amber);
-    font-size:20px; font-weight:700; line-height:1; cursor:pointer;
-    box-shadow:0 6px 18px rgba(0,0,0,.35);
-    opacity:0; transform:translateY(10px); pointer-events:none;
-    transition:opacity .2s, transform .2s;
+    position:absolute; left:50%; bottom:26px; z-index:5;
+    width:66px; height:66px; border-radius:50%; border:none;
+    background:#5D9CFF; color:#fff;
+    font-size:30px; font-weight:700; line-height:1; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 22px rgba(93,156,255,.45);
+    opacity:0; transform:translate(-50%, 12px); pointer-events:none;
+    transition:opacity .2s, transform .2s, background .15s;
   }
-  .scroll-top-btn.show{opacity:1; transform:none; pointer-events:auto;}
-  .scroll-top-btn:hover{border-color:var(--amber);}
+  .scroll-top-btn.show{opacity:1; transform:translate(-50%, 0); pointer-events:auto;}
+  .scroll-top-btn:hover{background:#4A8CF5;}
   .list-head{
     display:grid; grid-template-columns: 3px 122px 96px 100px 1fr 130px 130px 150px 150px 130px 64px 36px;
     padding:0 22px; height:36px; align-items:center; flex:0 0 auto;
