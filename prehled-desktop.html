@@ -8545,12 +8545,24 @@
     if(m[4] && /[SW]/i.test(m[4])) v = -v;
     return Math.round(v * 1e6) / 1e6;
   }
-  // Soubor může být v UTF-8 i ve Windows-1250 (Poznámkový blok) — zkusí
-  // se přísné UTF-8 a při chybě 1250, ať se neztratí diakritika.
+  // Kódování souboru: radar/Windows ukládá .txt často v UTF-16 (každý
+  // znak 2 bajty, polovina z nich nulových) — takový soubor by jinak
+  // prošel i jako "platné UTF-8", jen s nulovými znaky mezi písmeny,
+  // a žádný klíč by se nenašel. Pořadí: BOM (UTF-8/UTF-16 LE/BE) →
+  // UTF-16 bez BOM podle nulových bajtů → přísné UTF-8 → Windows-1250.
   async function radarReadText(file){
-    const buf = await file.arrayBuffer();
-    try{ return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^\uFEFF/, ''); }
-    catch(e){ return new TextDecoder('windows-1250').decode(buf); }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const dec = (enc, b) => new TextDecoder(enc).decode(b || bytes);
+    if(bytes[0] === 0xFF && bytes[1] === 0xFE) return dec('utf-16le', bytes.subarray(2));
+    if(bytes[0] === 0xFE && bytes[1] === 0xFF) return dec('utf-16be', bytes.subarray(2));
+    if(bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return dec('utf-8', bytes.subarray(3));
+    const n = Math.min(bytes.length, 400);
+    let zeroEven = 0, zeroOdd = 0;
+    for(let i = 0; i < n; i++){ if(bytes[i] === 0){ if(i % 2) zeroOdd++; else zeroEven++; } }
+    if(zeroOdd > n * 0.3) return dec('utf-16le');
+    if(zeroEven > n * 0.3) return dec('utf-16be');
+    try{ return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+    catch(e){ return dec('windows-1250'); }
   }
   function radarOfficerFromFile(opId, opName){
     if(opId){
@@ -8570,17 +8582,19 @@
   async function radarParseFile(file){
     const row = { fileName: file.name, ok: false, selected: false, manualCat: false, note: '' };
     try{
-      const text = await radarReadText(file);
+      // Nulové znaky a pevné mezery pryč, řádky oddělené \r\n, \n i \r.
+      const text = (await radarReadText(file)).replace(/\u0000/g, '').replace(/\u00A0/g, ' ');
       const f = {};
-      text.split(/\r?\n/).forEach(line=>{
+      text.split(/\r\n|\n|\r/).forEach(line=>{
         const i = line.indexOf(':');
-        if(i > 0) f[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
+        if(i > 0) f[line.slice(0, i).trim().toLowerCase().replace(/\s+/g, ' ')] = line.slice(i + 1).trim();
       });
+      row.firstLine = (text.split(/\r\n|\n|\r/).find(l => l.trim()) || '').trim().slice(0, 50);
       // Název souboru je buď jen RZ ("2bk3955.txt"), nebo RZ a za pomlčkou
       // další údaje z radaru ("2bk3955 - 1772535771_6T200_0303_110251.txt")
       // — RZ je vždycky všechno vlevo od první pomlčky.
       row.plate = file.name.replace(/\.[^.]+$/, '').split('-')[0].replace(/\s+/g, '').toUpperCase();
-      const dm = (f['date'] || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      const dm = (f['date'] || '').match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})/);
       const tm = (f['time'] || '').match(/(\d{1,2}):(\d{2})/);
       const num = k => { const m = (f[k] || '').match(/-?\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(',', '.')) : null; };
       row.measured = num('measured speed');
@@ -8594,7 +8608,7 @@
       row.officer = radarOfficerFromFile(f['operator id'], f['operator name']);
       row.type = f['type'] || '';
       if(!row.plate) { row.note = 'Chybí RZ v názvu souboru.'; return row; }
-      if(!dm || !tm){ row.note = 'Nenašel jsem datum nebo čas měření.'; return row; }
+      if(!dm || !tm){ row.note = 'Nenašel jsem datum nebo čas měření. První řádek souboru: „' + row.firstLine + '“'; return row; }
       if(row.measured == null || row.limit == null){ row.note = 'Nenašel jsem naměřenou nebo povolenou rychlost.'; return row; }
       if(row.type && !/speed/i.test(row.type)){ row.note = 'Soubor není měření rychlosti (Type: ' + row.type + ').'; return row; }
       row.date = dm[3] + '-' + dm[2].padStart(2, '0') + '-' + dm[1].padStart(2, '0');
