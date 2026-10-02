@@ -5258,7 +5258,14 @@
       // Způsob platby (select tPayType v MP Manageru zná jen Hotově/
       // Kartou — BPN tam možnost nemá, takže se nemapuje a pole zůstane
       // na výchozí prázdné hodnotě).
-      payType: record.platba === 'Hotově' ? 'H' : (record.platba === 'Kartou' ? 'K' : null)
+      payType: record.platba === 'Hotově' ? 'H' : (record.platba === 'Kartou' ? 'K' : null),
+      // Role strážníka v MP Manageru (select tTypyStrL0) podle způsobu
+      // řešení: Domluva/Příkaz na místě (Hotově/Kartou/BPN)/Oznámení →
+      // "dořešil", Výzva → "řešil", jinak (ještě nevyřešeno) "hlídka".
+      // Bookmarklet "RZ to MP" vybírá volbu podle textu, ne podle value.
+      straznikRole: (['prikaz', 'domluva', 'oznameni'].indexOf(record.resolvedMethod) !== -1)
+        ? 'doresil'
+        : (record.resolvedMethod === 'vyzva' ? 'resil' : 'hlidka')
     };
 
     try{
