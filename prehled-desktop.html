@@ -679,6 +679,27 @@
   .confirm-text{font-size:15.5px; color:var(--text); margin-bottom:18px; line-height:1.4;}
   .confirm-btns{display:flex; gap:12px;}
   .confirm-btns-col{flex-direction:column;}
+  /* Okno "Rychlost — soubory z radaru" — širší než běžné potvrzovací
+     okno, kvůli kontrolní tabulce. */
+  .confirm-box.radar-box{max-width:min(1080px, 94vw);}
+  .radar-drop{
+    display:flex; flex-direction:column; gap:6px; align-items:center; justify-content:center;
+    padding:22px 16px; margin-bottom:16px; border:2px dashed var(--line); border-radius:12px;
+    cursor:pointer; color:var(--text); transition:border-color .15s, background .15s;
+  }
+  .radar-drop:hover, .radar-drop.drag{border-color:#5D9CFF; background:rgba(93,156,255,.08);}
+  .radar-drop-main{font-weight:600; font-size:14.5px;}
+  .radar-drop-sub{font-size:12px; color:var(--muted);}
+  .radar-table-wrap{max-height:46vh; overflow:auto; margin-bottom:16px; border:1px solid var(--line); border-radius:10px;}
+  .radar-table{width:100%; border-collapse:collapse; font-size:12.5px; color:var(--text);}
+  .radar-table th{position:sticky; top:0; background:var(--asphalt-3); font-family:'Roboto Mono',monospace; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--faint); padding:8px 6px; text-align:center; white-space:nowrap;}
+  .radar-table td{padding:7px 6px; border-top:1px solid var(--line); text-align:center; vertical-align:middle;}
+  .radar-table td.rz{font-family:'Roboto Mono',monospace; font-weight:800; white-space:nowrap;}
+  .radar-table td.note{font-size:11.5px; color:var(--muted); text-align:left; max-width:220px;}
+  .radar-table tr.bad td{opacity:.55;}
+  .radar-table tr.warn td.note{color:var(--amber);}
+  .radar-table tr.err td.note{color:#E5534B; opacity:1;}
+  .radar-table select{font:inherit; padding:3px 4px; border-radius:6px; border:1px solid var(--line); background:var(--asphalt-2); color:var(--text);}
   .confirm-btn{
     flex:1; padding:11px 12px; border-radius:10px; font-family:'Inter',sans-serif;
     font-weight:600; font-size:14.5px; cursor:pointer; line-height:1.3; border:none;
@@ -1155,10 +1176,38 @@
     </div>
   </div>
 
-  <!-- Přidat událost — podvýběr "Rychlost": stupně
-       překročení podle § 124 odst. 15 písm. d) (K — aplikace to zatím
-       nazývá "K", MP to smí řešit sama i pod 10 km/h, ale aplikace to
-       nemá dořešené, jak přesně) a § 125c odst. 1 písm. f) body 2/3/4. -->
+  <!-- Přidat událost — "Rychlost", krok 1: hromadné nahrání textových
+       souborů z radaru (jeden soubor = jedno měření, název souboru = RZ).
+       Po kontrole v tabulce se pro každý vybraný soubor založí jedna
+       nevyřešená událost (viz radarParseFile/createRadarRecords v JS).
+       "Pokračovat bez souborů" vede na ruční výběr stupně níž. -->
+  <div class="confirm-overlay" id="addEventRadarOverlay">
+    <div class="confirm-box radar-box">
+      <div class="confirm-text">Rychlost — soubory z radaru</div>
+      <label class="radar-drop" id="radarDrop">
+        <input type="file" id="radarFileInput" accept=".txt,text/plain" multiple hidden>
+        <span class="radar-drop-main">Vyber nebo sem přetáhni textové soubory (.txt)</span>
+        <span class="radar-drop-sub">Název souboru = registrační značka · tolerance měřidla 3 km/h do 100 km/h, 3 % nad 100 km/h</span>
+      </label>
+      <div class="radar-table-wrap" id="radarTableWrap" style="display:none;">
+        <table class="radar-table">
+          <thead><tr>
+            <th></th><th>RZ</th><th>Datum a čas</th><th>Místo</th><th>Naměřeno / povoleno</th><th>Po odečtu</th><th>Překročení</th><th>Obec</th><th>Stupeň</th><th>Poznámka</th>
+          </tr></thead>
+          <tbody id="radarTableBody"></tbody>
+        </table>
+      </div>
+      <div class="confirm-btns confirm-btns-col">
+        <button class="confirm-btn confirm-yes" id="radarCreateBtn" disabled>Založit události</button>
+        <button class="confirm-btn confirm-no" id="radarManualBtn">Pokračovat bez souborů</button>
+        <button class="confirm-cancel" id="radarBackBtn">← Zpět</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Přidat událost — "Rychlost", krok 2 (ruční výběr bez souborů):
+       stupně překročení K (§ 125c odst. 1 písm. k), MPM 54735)
+       a § 125c odst. 1 písm. f) body 4/3/2 (F4/F3/F2). -->
   <div class="confirm-overlay" id="addEventSpeedOverlay">
     <div class="confirm-box">
       <div class="confirm-text">Rychlost — stupeň překročení</div>
@@ -8441,17 +8490,269 @@
   });
   document.getElementById('addEventSpeedBtn').addEventListener('click', ()=>{
     document.getElementById('addEventOverlay').classList.remove('open');
-    document.getElementById('addEventSpeedOverlay').classList.add('open');
+    radarResetUi();
+    document.getElementById('addEventRadarOverlay').classList.add('open');
   });
+  // "← Zpět" z ručního výběru stupně vede o krok zpět na nahrání souborů.
   document.getElementById('addEventSpeedBackBtn').addEventListener('click', ()=>{
     document.getElementById('addEventSpeedOverlay').classList.remove('open');
-    document.getElementById('addEventOverlay').classList.add('open');
+    document.getElementById('addEventRadarOverlay').classList.add('open');
   });
   document.getElementById('addEventSpeedChoices').addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-choice]');
     if(!btn) return;
     pickAddEventChoice(btn.dataset.choice);
   });
+
+  // ================== Rychlost — hromadné nahrání souborů z radaru ==================
+  // Každý textový soubor z radaru obsahuje jedno měření ve tvaru
+  // "Klíč: hodnota" (Serial Number, Date DD/MM/RRRR, Time, Operator ID,
+  // Operator Name, Street Name, Street Code = obec, Measured Speed,
+  // Measured Distance, Speed Limit, Latitude/Longitude ve stupních,
+  // minutách a vteřinách). Název souboru je registrační značka.
+  //
+  // Stupeň překročení se počítá z rychlosti PO ODEČTENÍ TOLERANCE
+  // MĚŘIDLA: 3 km/h do 100 km/h, 3 % nad 100 km/h (výsledek se zaokrouhlí
+  // dolů, tj. ve prospěch řidiče). Hranice:
+  //   v obci:     < 10 → K, 10–19 → F4, 20–39 → F3, 40+ → F2
+  //   mimo obec:  < 10 → K, 10–29 → F4, 30–49 → F3, 50+ → F2
+  // Soubor neříká, jestli se měřilo v obci — výchozí je "v obci" při
+  // limitu do 50 km/h, jinak "mimo obec"; v tabulce jde přepnout.
+  let radarRows = [];
+
+  function radarToleranceCorrected(measured){
+    return measured <= 100 ? measured - 3 : Math.floor(measured * 0.97);
+  }
+  function radarCategory(excess, inObec){
+    if(!(excess > 0)) return null;
+    if(excess < 10) return 'K';
+    if(inObec){
+      if(excess < 20) return 'F4';
+      if(excess < 40) return 'F3';
+      return 'F2';
+    }
+    if(excess < 30) return 'F4';
+    if(excess < 50) return 'F3';
+    return 'F2';
+  }
+  // 49° 22' 02.85" N → 49.367458 (jižní šířka / západní délka záporně)
+  function radarDmsToDecimal(txt){
+    if(!txt) return null;
+    const m = String(txt).match(/(\d+(?:[.,]\d+)?)\D+(\d+(?:[.,]\d+)?)\D+(\d+(?:[.,]\d+)?)\D*([NSEW])?/i);
+    if(!m) return null;
+    const num = x => parseFloat(x.replace(',', '.'));
+    let v = num(m[1]) + num(m[2]) / 60 + num(m[3]) / 3600;
+    if(m[4] && /[SW]/i.test(m[4])) v = -v;
+    return Math.round(v * 1e6) / 1e6;
+  }
+  // Soubor může být v UTF-8 i ve Windows-1250 (Poznámkový blok) — zkusí
+  // se přísné UTF-8 a při chybě 1250, ať se neztratí diakritika.
+  async function radarReadText(file){
+    const buf = await file.arrayBuffer();
+    try{ return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^\uFEFF/, ''); }
+    catch(e){ return new TextDecoder('windows-1250').decode(buf); }
+  }
+  function radarOfficerFromFile(opId, opName){
+    if(opId){
+      for(const name in OFFICER_BADGE_NUMBERS){
+        if(OFFICER_BADGE_NUMBERS[name] === String(opId).trim()) return name;
+      }
+    }
+    // "Lukáš Juračka" → "Juračka Lukáš" (formát, jaký používá zbytek aplikace)
+    if(opName){
+      const parts = opName.trim().split(/\s+/);
+      if(parts.length >= 2) return parts.slice(1).join(' ') + ' ' + parts[0];
+      return opName.trim();
+    }
+    return currentOfficerName() || null;
+  }
+
+  async function radarParseFile(file){
+    const row = { fileName: file.name, ok: false, selected: false, manualCat: false, note: '' };
+    try{
+      const text = await radarReadText(file);
+      const f = {};
+      text.split(/\r?\n/).forEach(line=>{
+        const i = line.indexOf(':');
+        if(i > 0) f[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
+      });
+      row.plate = file.name.replace(/\.[^.]+$/, '').replace(/[\s-]+/g, '').toUpperCase();
+      const dm = (f['date'] || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      const tm = (f['time'] || '').match(/(\d{1,2}):(\d{2})/);
+      const num = k => { const m = (f[k] || '').match(/-?\d+(?:[.,]\d+)?/); return m ? parseFloat(m[0].replace(',', '.')) : null; };
+      row.measured = num('measured speed');
+      row.limit = num('speed limit');
+      row.distance = num('measured distance');
+      row.serial = f['serial number'] || null;
+      row.street = f['street name'] || '';
+      row.city = f['street code'] || '';
+      row.lat = radarDmsToDecimal(f['latitude']);
+      row.lng = radarDmsToDecimal(f['longitude']);
+      row.officer = radarOfficerFromFile(f['operator id'], f['operator name']);
+      row.type = f['type'] || '';
+      if(!row.plate) { row.note = 'Chybí RZ v názvu souboru.'; return row; }
+      if(!dm || !tm){ row.note = 'Nenašel jsem datum nebo čas měření.'; return row; }
+      if(row.measured == null || row.limit == null){ row.note = 'Nenašel jsem naměřenou nebo povolenou rychlost.'; return row; }
+      if(row.type && !/speed/i.test(row.type)){ row.note = 'Soubor není měření rychlosti (Type: ' + row.type + ').'; return row; }
+      row.date = dm[3] + '-' + dm[2].padStart(2, '0') + '-' + dm[1].padStart(2, '0');
+      row.time = tm[1].padStart(2, '0') + ':' + tm[2];
+      row.corrected = radarToleranceCorrected(row.measured);
+      row.excess = row.corrected - row.limit;
+      row.inObec = row.limit <= 50;
+      row.cat = radarCategory(row.excess, row.inObec);
+      if(!row.cat){ row.note = 'Po odečtu tolerance bez překročení — nezaloží se.'; return row; }
+      row.ok = true;
+      row.selected = true;
+      // Stejné RZ + datum + čas už v přehledu je (soubor nahraný podruhé)
+      const dup = allRecords.some(r => (r.plate || '').replace(/\s+/g, '').toUpperCase() === row.plate && r.date === row.date && r.time === row.time);
+      if(dup){ row.selected = false; row.warn = true; row.note = 'Záznam se stejnou RZ, datem a časem už existuje — nezaškrtnuto.'; }
+      else if(row.cat === 'F2'){ row.warn = true; row.note = 'F2 řeší výhradně Policie ČR.'; }
+    }catch(e){
+      row.note = 'Soubor nejde přečíst: ' + e.message;
+    }
+    return row;
+  }
+
+  function radarResetUi(){
+    radarRows = [];
+    document.getElementById('radarFileInput').value = '';
+    renderRadarTable();
+  }
+
+  function renderRadarTable(){
+    const wrap = document.getElementById('radarTableWrap');
+    const body = document.getElementById('radarTableBody');
+    const btn = document.getElementById('radarCreateBtn');
+    wrap.style.display = radarRows.length ? '' : 'none';
+    body.innerHTML = '';
+    radarRows.forEach((r, idx)=>{
+      const tr = document.createElement('tr');
+      tr.className = (!r.ok ? 'bad err' : '') + (r.warn ? ' warn' : '');
+      const datum = r.date ? (formatDateCz(r.date) + ' ' + r.time) : '—';
+      const misto = [r.street, r.city].filter(Boolean).join(', ') || '—';
+      const catOpts = ['K', 'F4', 'F3', 'F2'].map(c => '<option' + (r.cat === c ? ' selected' : '') + '>' + c + '</option>').join('');
+      tr.innerHTML =
+        '<td><input type="checkbox" data-idx="' + idx + '" class="radar-sel"' + (r.selected ? ' checked' : '') + (r.ok ? '' : ' disabled') + '></td>' +
+        '<td class="rz">' + escapeHtml(formatPlate(r.plate) || r.fileName) + '</td>' +
+        '<td>' + escapeHtml(datum) + '</td>' +
+        '<td>' + escapeHtml(misto) + '</td>' +
+        '<td>' + (r.measured != null ? r.measured + ' / ' + r.limit + ' km/h' : '—') + '</td>' +
+        '<td>' + (r.corrected != null ? r.corrected + ' km/h' : '—') + '</td>' +
+        '<td>' + (r.excess != null ? (r.excess > 0 ? '+' : '') + r.excess + ' km/h' : '—') + '</td>' +
+        '<td>' + (r.ok ? '<select class="radar-obec" data-idx="' + idx + '"><option value="1"' + (r.inObec ? ' selected' : '') + '>V obci</option><option value="0"' + (r.inObec ? '' : ' selected') + '>Mimo obec</option></select>' : '—') + '</td>' +
+        '<td>' + (r.ok ? '<select class="radar-cat" data-idx="' + idx + '">' + catOpts + '</select>' : '—') + '</td>' +
+        '<td class="note">' + escapeHtml(r.note || '') + '</td>';
+      body.appendChild(tr);
+    });
+    const n = radarRows.filter(r => r.ok && r.selected).length;
+    btn.disabled = n === 0;
+    btn.textContent = n ? ('Založit ' + n + ' ' + (n === 1 ? 'událost' : (n < 5 ? 'události' : 'událostí'))) : 'Založit události';
+  }
+
+  async function radarAddFiles(fileList){
+    const files = Array.from(fileList || []).filter(f => /\.txt$/i.test(f.name) || f.type === 'text/plain');
+    if(!files.length) return;
+    const parsed = await Promise.all(files.map(radarParseFile));
+    parsed.forEach(p=>{
+      // Stejný soubor vybraný znovu nahradí původní řádek
+      const i = radarRows.findIndex(r => r.fileName === p.fileName);
+      if(i !== -1) radarRows[i] = p; else radarRows.push(p);
+    });
+    renderRadarTable();
+  }
+
+  document.getElementById('radarFileInput').addEventListener('change', (e)=> radarAddFiles(e.target.files));
+  (function(){
+    const drop = document.getElementById('radarDrop');
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop', e => radarAddFiles(e.dataTransfer.files));
+  })();
+  document.getElementById('radarTableBody').addEventListener('change', (e)=>{
+    const idx = +e.target.dataset.idx;
+    const r = radarRows[idx];
+    if(!r) return;
+    if(e.target.classList.contains('radar-sel')) r.selected = e.target.checked;
+    if(e.target.classList.contains('radar-cat')){ r.cat = e.target.value; r.manualCat = true; }
+    if(e.target.classList.contains('radar-obec')){
+      r.inObec = e.target.value === '1';
+      // Ručně zvolený stupeň zůstává, jinak se přepočítá podle obce
+      if(!r.manualCat) r.cat = radarCategory(r.excess, r.inObec) || r.cat;
+    }
+    renderRadarTable();
+  });
+  document.getElementById('radarManualBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventRadarOverlay').classList.remove('open');
+    document.getElementById('addEventSpeedOverlay').classList.add('open');
+  });
+  document.getElementById('radarBackBtn').addEventListener('click', ()=>{
+    document.getElementById('addEventRadarOverlay').classList.remove('open');
+    document.getElementById('addEventOverlay').classList.add('open');
+  });
+
+  // Popis skutku do dokumentů (věta "…tím, že {offenseVerb}, čímž
+  // naplnil znaky přestupku…") — s konkrétními hodnotami z měření.
+  function radarOffenseVerb(r){
+    const dec = v => String(v).replace('.', ',');
+    return 'překročil nejvyšší dovolenou rychlost ' + r.limit + ' km/h ' + (r.inObec ? 'v obci' : 'mimo obec') +
+      ' o ' + r.excess + ' km/h, když mu byla' +
+      (r.serial ? ' rychloměrem v. č. ' + r.serial : ' rychloměrem') +
+      (r.distance != null ? ' ze vzdálenosti ' + dec(r.distance) + ' m' : '') +
+      ' naměřena rychlost ' + r.measured + ' km/h, po odečtení tolerance měřidla ' + r.corrected + ' km/h';
+  }
+
+  async function createRadarRecords(){
+    const rows = radarRows.filter(r => r.ok && r.selected);
+    if(!rows.length) return;
+    const btn = document.getElementById('radarCreateBtn');
+    btn.disabled = true;
+    let done = 0;
+    const failed = [];
+    for(const r of rows){
+      btn.textContent = 'Zakládám ' + (done + 1) + ' / ' + rows.length + '…';
+      try{
+        const off = ADD_EVENT_OFFENSES[r.cat];
+        const noticeNumber = await getNextNoticeNumberDesktop();
+        await db.collection('prestupky').doc().set({
+          plate: r.plate,
+          date: r.date,
+          time: r.time,
+          address: [r.street, r.city].filter(Boolean).join(', ') || null,
+          offenseLabel: off.label,
+          offenseVerb: radarOffenseVerb(r),
+          offenseCitation: off.citation,
+          hasPhotos: false,
+          resolved: false,
+          expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)),
+          submittedBy: auth.currentUser ? auth.currentUser.email : null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          officerName: r.officer || currentOfficerName() || null,
+          noticeNumber,
+          lat: r.lat, lng: r.lng,
+          brand: null, color: null,
+          docType: 'vyzva',
+          mpmUdalostId: off.mpmId || null,
+          mpmUdalostText: off.mpmText || null,
+          source: 'addEvent',
+          // Údaje z měření — pro dohledání a případné úpravy dokumentů
+          radar: {
+            fileName: r.fileName, serial: r.serial, category: r.cat,
+            measured: r.measured, limit: r.limit, corrected: r.corrected,
+            excess: r.excess, distance: r.distance, inObec: r.inObec
+          }
+        });
+        done++;
+      }catch(e){
+        console.error('Založení záznamu z radaru selhalo:', r.fileName, e);
+        failed.push(formatPlate(r.plate) + ' (' + e.message + ')');
+      }
+    }
+    document.getElementById('addEventRadarOverlay').classList.remove('open');
+    alert('Založeno ' + done + ' z ' + rows.length + ' událostí z radaru. Najdeš je mezi nevyřešenými.' +
+      (failed.length ? '\n\nNezaložilo se:\n' + failed.join('\n') : ''));
+    radarResetUi();
+  }
+  document.getElementById('radarCreateBtn').addEventListener('click', createRadarRecords);
 
   document.getElementById('shiftSummaryCloseBtn').addEventListener('click', ()=>{
     document.getElementById('shiftSummaryOverlay').classList.remove('open');
