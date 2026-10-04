@@ -6126,7 +6126,8 @@
       { size: 22, spacingAfter: 400 }
     );
 
-    body += docxPara('Ing. Martin Lepka', { size: 22, spacingBefore: 600 });
+    // Volné místo pro podpis ředitele (~9 řádků) — podle vzoru od strážníků.
+    body += docxPara('Ing. Martin Lepka', { size: 22, spacingBefore: 2400 });
     body += docxPara('ředitel MP Blansko', { size: 22 });
 
     const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +

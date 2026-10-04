@@ -1076,22 +1076,38 @@
   const VYZVA_LOCAL_PARTS = ['Těchov','Lažánky','Obůrka','Klepačov','Hořice',
     'Horní Lhota','Dolní Lhota','Olešná','Žižlavice','Skalní mlýn','Češkovice'];
 
+  // Místní části Blanska — v dokumentech se místo "na ulici …/v ulici …"
+  // píše "místní část …" bez čísla silnice ("Těchov III/37440, Blansko"
+  // → Výzva "v Blansku, místní část Těchov", Oznámení "v Blansku
+  // v místní části Těchov"). Adresa se porovnává podle začátku první
+  // části (před čárkou), takže projde i "Těchov III/37440".
+  const DOC_LOCAL_PARTS = ['Těchov', 'Obůrka', 'Lažánky', 'Klepačov', 'Horní Lhota', 'Dolní Lhota', 'Olešná', 'Hořice',
+    'Žižlavice', 'Skalní mlýn', 'Češkovice'];
+  function docLocalPart(address){
+    const first = String(address || '').split(',')[0].trim();
+    return DOC_LOCAL_PARTS.find(p => first === p || first.indexOf(p + ' ') === 0) || null;
+  }
+  // "Blansko" → "Blansku" (6. pád do věty "v …"); jiné obce zůstávají
+  // tak, jak jsou uložené v adrese.
+  function docCityLocative(city){
+    const c = (city || '').trim();
+    if(!c || /^blansk[ou]$/i.test(c)) return 'Blansku';
+    return c;
+  }
+
   function addressForLetter(address){
-    if(!address) return { city: 'Blansko', locationPhrase: '' };
+    if(!address) return { city: 'Blansku', locationPhrase: '' };
     const parts = address.split(',').map(s => s.trim()).filter(Boolean);
     const first = parts[0] || '';
-    // Aplikace dřív město do dopisu dávala natvrdo "Blansko" bez ohledu na
-    // to, co je v record.address uložené — u přestupků mimo Blansko
-    // (Doubravice nad Svitavou, Rájec-Jestřebí…) to bylo špatně. Když
-    // aplikace v adrese má i druhou část za čárkou (obec), použije ji;
-    // jinak jde o místní část Blanska uloženou bez obce (jen "Těchov"
-    // apod.), kde zůstává dosavadní výchozí "Blansko".
-    const city = parts[1] || 'Blansko';
-    if(VYZVA_LOCAL_PARTS.includes(first)){
-      return { city, locationPhrase: 'v místní části ' + first };
-    }
-    return { city, locationPhrase: 'na ulici ' + first };
+    // Obec za čárkou (jinak Blansko), ve tvaru pro "v …" — viz docCityLocative.
+    const city = docCityLocative(parts[1]);
+    const part = docLocalPart(address);
+    // Stejně jako v Oznámení: "v Blansku v místní části Těchov" (bez čárky,
+    // viz sep — ulice dál "v Blansku, na ulici …").
+    if(part) return { city, locationPhrase: 'v místní části ' + part, sep: ' ' };
+    return { city, locationPhrase: 'na ulici ' + first, sep: ', ' };
   }
+
 
   async function buildVyzvaDopisDocx(record, pachatel, dostaveniTermin){
     // Do hlavičky/podpisu dokumentu aplikace dává strážníka, který přestupek
@@ -1186,7 +1202,7 @@
         'přestupku podle ' + skutekBaseCite + ', kterého se dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') +
         ' hodin dopustil dosud neustanovený řidič vozidla ', { size: 20 }) +
       docxRun(vehicleBoldPart, { size: 20, bold: true }) +
-      docxRun(' v ' + loc.city + (loc.locationPhrase ? ', ' + loc.locationPhrase : ''), { size: 20 });
+      docxRun(' v ' + loc.city + (loc.locationPhrase ? (loc.sep || ', ') + loc.locationPhrase : ''), { size: 20 });
     if(gpsRunXml){
       vyzvaRuns += docxRun(' (', { size: 20 }) + gpsRunXml + docxRun(')', { size: 20 });
     }
@@ -1205,7 +1221,8 @@
       { size: 20, spacingAfter: 400 }
     );
 
-    body += docxPara('Ing. Martin Lepka', { size: 20, spacingBefore: 600 });
+    // Volné místo pro podpis ředitele (~9 řádků) — podle vzoru od strážníků.
+    body += docxPara('Ing. Martin Lepka', { size: 20, spacingBefore: 2400 });
     body += docxPara('ředitel MP Blansko', { size: 20 });
 
     const documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
@@ -1347,7 +1364,9 @@
       docxRun(formatDateCz(record.date) + ' v ' + (record.time || '—'), { size: 20, bold: true }) +
       docxRun(' hodin se dosud neustanovený řidič vozidla registrační značky ', { size: 20 }) +
       docxRun(record.plate || '', { size: 20, bold: true }) +
-      docxRun(' v ulici ' + (record.address || ''), { size: 20 });
+      docxRun(docLocalPart(record.address)
+        ? (' v ' + docCityLocative((record.address || '').split(',')[1]) + ' v místní části ' + docLocalPart(record.address))
+        : (' v ulici ' + (record.address || '')), { size: 20 });
     if(gpsRunXml){
       skutekRuns += docxRun(' (', { size: 20 }) + gpsRunXml + docxRun(')', { size: 20 });
     }
