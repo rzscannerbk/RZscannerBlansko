@@ -8389,6 +8389,20 @@
     return pages;
   }
 
+  // PDF → JPEG tak, aby se výsledek vešel do zadaného limitu (base64
+  // délka, Firestore má na dokument s přílohami ~1 MB). Zkouší postupně
+  // nižší kvalitu a rozlišení, dokud se nevejde; když se nevejde ani
+  // nejmenší varianta, vrátí null.
+  async function renderPdfToJpegFit(file, maxBase64Len){
+    const steps = [[0.85, 1600], [0.75, 1600], [0.7, 1400], [0.6, 1300], [0.55, 1150], [0.5, 1000], [0.45, 900]];
+    for(const [q, dim] of steps){
+      const pages = await renderPdfToJpegPages(file, q, dim);
+      const len = pages.reduce((sum, p) => sum + p.length, 0);
+      if(len <= maxBase64Len) return pages;
+    }
+    return null;
+  }
+
   // "Přidej fotodokumentaci" aplikace otevírá výběr souborů, jen dokud
   // aplikace nic nemá — jakmile aplikace aspoň jeden soubor přidá, popisek se
   // změní na "N soubor(ů) přidáno" a klik místo toho otevře
@@ -8448,13 +8462,21 @@
           // uvnitř), aplikace radši přiloží originální PDF beze změny, než
           // aby aplikace celý soubor zahodila.
           try{
-            const jpegPages = await renderPdfToJpegPages(file, 1, 1600);
+            // Limit pro tenhle soubor = co zbývá z ~1 MB po už přidaných
+            // souborech (aspoň 250 kB) — viz renderPdfToJpegFit.
+            const usedLen = prikazNewEventFiles.reduce((sum, f) => sum + (f.data ? f.data.length : 0), 0);
+            const jpegPages = await renderPdfToJpegFit(file, Math.max(250000, 950000 - usedLen));
+            if(!jpegPages) throw new Error('PDF se ani po zmenšení nevejde do limitu 1 MB');
             const baseName = file.name.replace(/\.pdf$/i, '');
             jpegPages.forEach((data, idx)=>{
               const suffix = jpegPages.length > 1 ? ('_str' + (idx + 1)) : '';
               prikazNewEventFiles.push({ data, mime: 'image/jpeg', name: baseName + suffix + '.jpg' });
             });
           }catch(err){
+            if(err && /limitu 1 MB/.test(err.message)){
+              alert('Soubor ' + file.name + ' se ani po zmenšení nevejde do limitu 1 MB a nepřiloží se.');
+              continue;
+            }
             console.error('Převod PDF na obrázek selhal, aplikace přiloží PDF beze změny:', file.name, err);
             try{
               const data = await fileToBase64(file);
@@ -8677,8 +8699,8 @@
         // Příloha: PDF → JPEG (jako v dialogu), při selhání originální PDF.
         let photos = [], mimes = [];
         try{
-          const pages = await renderPdfToJpegPages(r.file, 1, 1600);
-          photos = pages; mimes = pages.map(() => 'image/jpeg');
+          const pages = await renderPdfToJpegFit(r.file, 950000);
+          if(pages){ photos = pages; mimes = pages.map(() => 'image/jpeg'); }
         }catch(e){
           try{ photos = [await fileToBase64(r.file)]; mimes = ['application/pdf']; }catch(e2){}
         }
