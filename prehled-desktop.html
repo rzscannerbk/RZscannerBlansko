@@ -699,6 +699,15 @@
   .radar-table tr.bad td{opacity:.55;}
   .radar-table tr.warn td.note{color:var(--amber);}
   .radar-table tr.err td.note{color:#E5534B; opacity:1;}
+  /* Menu MKDS: vedle každé položky čtvercové tlačítko "dávka" */
+  .mkds-row{display:flex; gap:8px; align-items:stretch;}
+  .mkds-row .confirm-btn{flex:1;}
+  .mkds-batch-btn{
+    flex:0 0 auto; width:46px; border-radius:10px; border:1px solid var(--line);
+    background:var(--asphalt-3); color:var(--text); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; padding:0;
+  }
+  .mkds-batch-btn:hover{border-color:var(--amber); color:var(--amber);}
   .radar-btn-row{display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;}
   .radar-btn-row .confirm-btn{flex:0 0 auto; min-width:210px; padding:11px 24px;}
   .radar-table select{font:inherit; padding:3px 4px; border-radius:6px; border:1px solid var(--line); background:var(--asphalt-2); color:var(--text);}
@@ -1135,10 +1144,22 @@
     <div class="confirm-box">
       <div class="confirm-text">Přestupky z MKDS</div>
       <div class="confirm-btns confirm-btns-col" id="addEventMkdsChoices">
-        <button class="confirm-btn confirm-no" data-choice="Rožmitálova B28">Rožmitálova B28</button>
-        <button class="confirm-btn confirm-no" data-choice="Vodní B28">Vodní B28</button>
-        <button class="confirm-btn confirm-no" data-choice="Nám. Republiky B2">Nám. Republiky B2</button>
-        <button class="confirm-btn confirm-no" data-choice="Nám. Svobody B2">Nám. Svobody B2</button>
+        <div class="mkds-row">
+          <button class="confirm-btn confirm-no" data-choice="Rožmitálova B28">Rožmitálova B28</button>
+          <button class="mkds-batch-btn" data-batch="Rožmitálova B28" title="Dávka — Rožmitálova B28" aria-label="Dávka — Rožmitálova B28"><svg viewBox="0 0 24 24" fill="none" width="22" height="22"><rect x="2" y="9" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="5.5" y="5.5" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="9" y="2" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        </div>
+        <div class="mkds-row">
+          <button class="confirm-btn confirm-no" data-choice="Vodní B28">Vodní B28</button>
+          <button class="mkds-batch-btn" data-batch="Vodní B28" title="Dávka — Vodní B28" aria-label="Dávka — Vodní B28"><svg viewBox="0 0 24 24" fill="none" width="22" height="22"><rect x="2" y="9" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="5.5" y="5.5" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="9" y="2" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        </div>
+        <div class="mkds-row">
+          <button class="confirm-btn confirm-no" data-choice="Nám. Republiky B2">Nám. Republiky B2</button>
+          <button class="mkds-batch-btn" data-batch="Nám. Republiky B2" title="Dávka — Nám. Republiky B2" aria-label="Dávka — Nám. Republiky B2"><svg viewBox="0 0 24 24" fill="none" width="22" height="22"><rect x="2" y="9" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="5.5" y="5.5" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="9" y="2" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        </div>
+        <div class="mkds-row">
+          <button class="confirm-btn confirm-no" data-choice="Nám. Svobody B2">Nám. Svobody B2</button>
+          <button class="mkds-batch-btn" data-batch="Nám. Svobody B2" title="Dávka — Nám. Svobody B2" aria-label="Dávka — Nám. Svobody B2"><svg viewBox="0 0 24 24" fill="none" width="22" height="22"><rect x="2" y="9" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="5.5" y="5.5" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/><rect x="9" y="2" width="13" height="10" rx="1.6" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        </div>
         <button class="confirm-cancel" id="addEventMkdsBackBtn">← Zpět</button>
       </div>
     </div>
@@ -1176,6 +1197,33 @@
         <button class="confirm-btn confirm-no" id="addEventPlacenkyDomluvaBtn">Domluva</button>
         <button class="confirm-cancel" id="addEventPlacenkyModeCancelBtn">Zrušit</button>
       </div>
+    </div>
+  </div>
+
+  <!-- MKDS — dávka: přetažené složky ve tvaru "RZ tovární značka"
+       (např. "1adf176 škoda"), z každé se vezme PRVNÍ PDF (podle názvu),
+       z něj datum a čas přestupku; ulice a kvalifikace jsou společné
+       podle zvoleného tlačítka MKDS. Viz mkdsBatch* v JS. -->
+  <div class="confirm-overlay" id="mkdsBatchOverlay">
+    <div class="confirm-box radar-box">
+      <div class="confirm-text" id="mkdsBatchTitle">Dávka</div>
+      <label class="radar-drop" id="mkdsBatchDrop">
+        <input type="file" id="mkdsBatchDirInput" webkitdirectory directory multiple hidden>
+        <span class="radar-drop-main">Přetáhni sem složky vozidel (nebo klikni a vyber nadřazenou složku)</span>
+        <span class="radar-drop-sub">Název složky = RZ a za první mezerou tovární značka · z každé složky se vezme první PDF</span>
+      </label>
+      <div class="radar-table-wrap" id="mkdsBatchTableWrap" style="display:none;">
+        <table class="radar-table">
+          <thead><tr>
+            <th></th><th>RZ</th><th>Tovární značka</th><th>Datum a čas</th><th>PDF</th><th>Poznámka</th>
+          </tr></thead>
+          <tbody id="mkdsBatchTableBody"></tbody>
+        </table>
+      </div>
+      <div class="radar-btn-row">
+        <button class="confirm-btn confirm-yes" id="mkdsBatchCreateBtn" disabled>Založit události</button>
+      </div>
+      <button class="confirm-cancel" id="mkdsBatchBackBtn">← Zpět</button>
     </div>
   </div>
 
@@ -8455,10 +8503,225 @@
     document.getElementById('addEventOverlay').classList.add('open');
   });
   document.getElementById('addEventMkdsChoices').addEventListener('click', (e)=>{
+    const batchBtn = e.target.closest('button[data-batch]');
+    if(batchBtn){ openMkdsBatch(batchBtn.dataset.batch); return; }
     const btn = e.target.closest('button[data-choice]');
     if(!btn) return;
     pickAddEventChoice(btn.dataset.choice);
   });
+
+  // ================== MKDS — dávka ze složek ==================
+  // Každá složka = jedno vozidlo: název "RZ tovární značka" (RZ = vše do
+  // první mezery, značka = zbytek), uvnitř PDF z MKDS. Z každé složky se
+  // vezme PRVNÍ PDF (podle názvu souboru), z něj datum a čas přestupku
+  // (extractDatumCasFromPdf) a při zakládání se převede na JPEG přílohu
+  // (renderPdfToJpegPages, stejně jako v dialogu jedné události).
+  // Přetáhnout jde víc složek najednou, nebo jedna nadřazená složka
+  // s podsložkami — rozhoduje vždy složka, ve které PDF přímo leží.
+  let mkdsBatchChoice = null;
+  let mkdsBatchRows = [];
+
+  function openMkdsBatch(choiceKey){
+    mkdsBatchChoice = choiceKey;
+    mkdsBatchRows = [];
+    document.getElementById('mkdsBatchTitle').textContent = 'Dávka — ' + choiceKey;
+    document.getElementById('mkdsBatchDirInput').value = '';
+    renderMkdsBatchTable();
+    document.getElementById('addEventMkdsOverlay').classList.remove('open');
+    document.getElementById('mkdsBatchOverlay').classList.add('open');
+  }
+
+  // Přetažené položky → [{ file, dir }] (dir = název složky, ve které soubor leží)
+  async function mkdsCollectDropped(items){
+    const out = [];
+    const readAll = reader => new Promise((resolve, reject)=>{
+      const acc = [];
+      const step = ()=> reader.readEntries(batch=>{
+        if(!batch.length) return resolve(acc);
+        acc.push(...batch); step();
+      }, reject);
+      step();
+    });
+    async function walk(entry, parentName){
+      if(entry.isFile){
+        const file = await new Promise((res, rej)=> entry.file(res, rej));
+        out.push({ file, dir: parentName });
+      } else if(entry.isDirectory){
+        const children = await readAll(entry.createReader());
+        for(const ch of children) await walk(ch, entry.name);
+      }
+    }
+    const entries = Array.from(items).map(it => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+    for(const en of entries) await walk(en, '');
+    return out;
+  }
+
+  function mkdsParseFolderName(name){
+    const t = String(name || '').trim();
+    const i = t.indexOf(' ');
+    const plate = (i === -1 ? t : t.slice(0, i)).replace(/[\s-]+/g, '').toUpperCase();
+    let brand = i === -1 ? '' : t.slice(i + 1).trim();
+    if(brand) brand = brand.charAt(0).toLocaleUpperCase('cs') + brand.slice(1);
+    return { plate, brand };
+  }
+
+  async function mkdsBatchAddFiles(list){
+    // Seskupit podle složky, ve které soubor leží; jen PDF.
+    const byDir = new Map();
+    let loose = 0;
+    list.forEach(({ file, dir })=>{
+      if(!/\.pdf$/i.test(file.name)) return;
+      if(!dir){ loose++; return; }
+      if(!byDir.has(dir)) byDir.set(dir, []);
+      byDir.get(dir).push(file);
+    });
+    if(loose) alert(loose + ' PDF ' + (loose === 1 ? 'leží' : 'leží') + ' mimo složku vozidla — tyhle se přeskočí. Přetáhni celé složky "RZ značka".');
+    const dirs = Array.from(byDir.keys()).sort((a, b)=> a.localeCompare(b, 'cs', { numeric: true }));
+    for(const dir of dirs){
+      const pdfs = byDir.get(dir).sort((a, b)=> a.name.localeCompare(b.name, 'cs', { numeric: true }));
+      const { plate, brand } = mkdsParseFolderName(dir);
+      const row = { dir, plate, brand, file: pdfs[0], pdfCount: pdfs.length, ok: false, selected: false, note: 'Čtu PDF…' };
+      const existingIdx = mkdsBatchRows.findIndex(r => r.dir === dir);
+      if(existingIdx !== -1) mkdsBatchRows[existingIdx] = row; else mkdsBatchRows.push(row);
+    }
+    renderMkdsBatchTable();
+    for(const dir of dirs){
+      const row = mkdsBatchRows.find(r => r.dir === dir);
+      if(!row) continue;
+      row.note = '';
+      if(!row.plate){ row.note = 'Z názvu složky nejde přečíst RZ.'; continue; }
+      try{
+        const found = await extractDatumCasFromPdf(row.file);
+        if(!found){ row.note = 'V PDF jsem nenašel "Datum a čas".'; continue; }
+        row.date = found.iso; row.time = found.time;
+        row.ok = true; row.selected = true;
+        const dup = allRecords.some(r => (r.plate || '').replace(/\s+/g, '').toUpperCase() === row.plate && r.date === row.date && r.time === row.time);
+        if(dup){ row.selected = false; row.warn = true; row.note = 'Záznam se stejnou RZ, datem a časem už existuje — nezaškrtnuto.'; }
+        else if(row.pdfCount > 1){ row.note = 'Ve složce je ' + row.pdfCount + ' PDF, použije se první.'; }
+      }catch(e){
+        console.error('Čtení PDF v dávce selhalo:', row.file.name, e);
+        row.note = 'PDF nejde přečíst: ' + e.message;
+      }
+      renderMkdsBatchTable();
+    }
+    renderMkdsBatchTable();
+  }
+
+  function renderMkdsBatchTable(){
+    const wrap = document.getElementById('mkdsBatchTableWrap');
+    const body = document.getElementById('mkdsBatchTableBody');
+    const btn = document.getElementById('mkdsBatchCreateBtn');
+    wrap.style.display = mkdsBatchRows.length ? '' : 'none';
+    body.innerHTML = '';
+    mkdsBatchRows.forEach((r, idx)=>{
+      const tr = document.createElement('tr');
+      const pending = r.note === 'Čtu PDF…';
+      tr.className = (!r.ok && !pending ? 'bad err' : '') + (r.warn ? ' warn' : '');
+      tr.innerHTML =
+        '<td><input type="checkbox" class="mkds-sel" data-idx="' + idx + '"' + (r.selected ? ' checked' : '') + (r.ok ? '' : ' disabled') + '></td>' +
+        '<td class="rz">' + escapeHtml(formatPlate(r.plate) || r.dir) + '</td>' +
+        '<td>' + escapeHtml(r.brand || '—') + '</td>' +
+        '<td>' + (r.date ? escapeHtml(formatDateCz(r.date) + ' ' + r.time) : '—') + '</td>' +
+        '<td class="note" style="color:var(--text);">' + escapeHtml(r.file ? r.file.name : '—') + '</td>' +
+        '<td class="note">' + escapeHtml(r.note || '') + '</td>';
+      body.appendChild(tr);
+    });
+    const n = mkdsBatchRows.filter(r => r.ok && r.selected).length;
+    btn.disabled = n === 0;
+    btn.textContent = n ? ('Založit ' + n + ' ' + (n === 1 ? 'událost' : (n < 5 ? 'události' : 'událostí'))) : 'Založit události';
+  }
+
+  (function(){
+    const drop = document.getElementById('mkdsBatchDrop');
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+    drop.addEventListener('drop', async e => {
+      const list = await mkdsCollectDropped(e.dataTransfer.items);
+      mkdsBatchAddFiles(list);
+    });
+    // Výběr přes dialog — vybere se jedna (nadřazená) složka, prohlížeč
+    // pošle všechny soubory s relativní cestou "nadřazená/RZ značka/x.pdf".
+    document.getElementById('mkdsBatchDirInput').addEventListener('change', e => {
+      const list = Array.from(e.target.files || []).map(file => {
+        const parts = (file.webkitRelativePath || file.name).split('/');
+        return { file, dir: parts.length >= 2 ? parts[parts.length - 2] : '' };
+      });
+      mkdsBatchAddFiles(list);
+    });
+  })();
+  document.getElementById('mkdsBatchTableBody').addEventListener('change', e => {
+    if(!e.target.classList.contains('mkds-sel')) return;
+    const r = mkdsBatchRows[+e.target.dataset.idx];
+    if(r){ r.selected = e.target.checked; renderMkdsBatchTable(); }
+  });
+  document.getElementById('mkdsBatchBackBtn').addEventListener('click', ()=>{
+    document.getElementById('mkdsBatchOverlay').classList.remove('open');
+    document.getElementById('addEventMkdsOverlay').classList.add('open');
+  });
+
+  async function createMkdsBatchRecords(){
+    const rows = mkdsBatchRows.filter(r => r.ok && r.selected);
+    const off = ADD_EVENT_OFFENSES[mkdsBatchChoice];
+    if(!rows.length || !off) return;
+    const btn = document.getElementById('mkdsBatchCreateBtn');
+    btn.disabled = true;
+    let done = 0;
+    const failed = [], bezPrilohy = [];
+    for(const r of rows){
+      btn.textContent = 'Zakládám ' + (done + 1) + ' / ' + rows.length + '…';
+      try{
+        // Příloha: PDF → JPEG (jako v dialogu), při selhání originální PDF.
+        let photos = [], mimes = [];
+        try{
+          const pages = await renderPdfToJpegPages(r.file, 1, 1600);
+          photos = pages; mimes = pages.map(() => 'image/jpeg');
+        }catch(e){
+          try{ photos = [await fileToBase64(r.file)]; mimes = ['application/pdf']; }catch(e2){}
+        }
+        if(photos.reduce((s, p) => s + p.length, 0) > 950000){ photos = []; mimes = []; bezPrilohy.push(formatPlate(r.plate)); }
+        const noticeNumber = await getNextNoticeNumberDesktop();
+        const docRef = db.collection('prestupky').doc();
+        await docRef.set({
+          plate: r.plate,
+          date: r.date,
+          time: r.time,
+          address: off.address || null,
+          offenseLabel: off.label,
+          offenseVerb: off.verb,
+          offenseCitation: off.citation,
+          hasPhotos: photos.length > 0,
+          resolved: false,
+          expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180 * 24 * 60 * 60 * 1000)),
+          submittedBy: auth.currentUser ? auth.currentUser.email : null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          officerName: currentOfficerName() || null,
+          noticeNumber,
+          lat: (typeof off.lat === 'number') ? off.lat : null,
+          lng: (typeof off.lng === 'number') ? off.lng : null,
+          brand: r.brand || null,
+          color: null,
+          docType: 'vyzva',
+          mpmUdalostId: off.mpmId || null,
+          mpmUdalostText: off.mpmText || null,
+          source: 'addEvent',
+          mkdsBatch: { folder: r.dir, pdf: r.file.name }
+        });
+        if(photos.length){
+          await docRef.collection('data').doc('photos').set({ photos, photoMimes: mimes, photoMime: mimes[0] || 'image/jpeg' });
+        }
+        done++;
+      }catch(e){
+        console.error('Založení záznamu z dávky selhalo:', r.dir, e);
+        failed.push(formatPlate(r.plate) + ' (' + e.message + ')');
+      }
+    }
+    document.getElementById('mkdsBatchOverlay').classList.remove('open');
+    alert('Založeno ' + done + ' z ' + rows.length + ' událostí (' + mkdsBatchChoice + '). Najdeš je mezi nevyřešenými.' +
+      (bezPrilohy.length ? '\n\nBez přílohy (PDF bylo příliš velké): ' + bezPrilohy.join(', ') : '') +
+      (failed.length ? '\n\nNezaložilo se:\n' + failed.join('\n') : ''));
+    mkdsBatchRows = [];
+  }
+  document.getElementById('mkdsBatchCreateBtn').addEventListener('click', createMkdsBatchRecords);
   // "Placenky" má (zatím) jen jednu položku ("Parkoviště s parkovacím
   // poplatkem"), takže rovnou přeskočí mezikrok s podnabídkou
   // (addEventPlacenkyOverlay/addEventPlacenkyChoices v HTML nechávám
