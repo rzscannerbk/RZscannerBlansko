@@ -1126,10 +1126,9 @@
     // Obec za čárkou (jinak Blansko), ve tvaru pro "v …" — viz docCityLocative.
     const city = docCityLocative(parts[1]);
     const part = docLocalPart(address);
-    // Stejně jako v Oznámení: "v Blansku v místní části Těchov" (bez čárky,
-    // viz sep — ulice dál "v Blansku, na ulici …").
+    // Bez čárky: "v Blansku v místní části Těchov" / "v Blansku na ulici …".
     if(part) return { city, locationPhrase: 'v místní části ' + part, sep: ' ' };
-    return { city, locationPhrase: 'na ulici ' + first, sep: ', ' };
+    return { city, locationPhrase: 'na ulici ' + first, sep: ' ' };
   }
 
 
@@ -1203,8 +1202,8 @@
     body += docxHeaderTable(
       headerLeft,
       [
-        ['Ginis čj.:', ''],
         { raw: docxPlaceholderFieldPara('MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 20, label: 'Naše čj.:' }) },
+        ['Ginis čj.:', ''],
         ['Vyřizuje:', 'str. ' + officerForDoc],
         ['Tel.:', OZNAMENI_TEL],
         ['E-mail:', OZNAMENI_EMAIL],
@@ -1304,8 +1303,8 @@
     body += docxHeaderTable(
       ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'nám. Republiky 1316/1', '678 01 BLANSKO'],
       [
-        ['Ginis čj.:', ''],
         { raw: docxPlaceholderFieldPara('MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 20, label: 'Naše čj.:' }) },
+        ['Ginis čj.:', ''],
         ['Vyřizuje:', 'str. ' + officerForDoc],
         ['Tel.:', OZNAMENI_TEL],
         ['E-mail:', OZNAMENI_EMAIL],
