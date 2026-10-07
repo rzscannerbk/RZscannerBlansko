@@ -5352,8 +5352,14 @@
     if(record.resolvedMethod === 'prikaz' && record.platba === 'BPN' && MPM_SOLUTION_ID_PBN){
       methodSolutionIds = [MPM_SOLUTION_ID_PBN];
     }
+    // Záznamy založené přímo v přehledu (Přidat událost, dávka MKDS,
+    // radar — source 'addEvent') se do MP Manageru zakládají jako
+    // "Přiděleno ke zpracování" (53158), ne jako lístek za stěrač.
+    const jeZPrehledu = record.source === 'addEvent';
     if(methodSolutionIds){
       solutionIds.push(...methodSolutionIds);
+    } else if(jeZPrehledu){
+      solutionIds.push('53158');
     } else if(!isBoticka){
       // Způsob řešení aplikace ještě nezná (typicky úplně první "MPM"
       // checkpoint u čerstvě založené události, aplikace se tam teprve
@@ -5402,7 +5408,10 @@
       // Bookmarklet "RZ to MP" vybírá volbu podle textu, ne podle value.
       straznikRole: (['prikaz', 'domluva', 'oznameni'].indexOf(record.resolvedMethod) !== -1)
         ? 'doresil'
-        : (record.resolvedMethod === 'vyzva' ? 'resil' : 'hlidka'),
+        : ((record.resolvedMethod === 'vyzva' || jeZPrehledu) ? 'resil' : 'hlidka'),
+      // Doplňovací režim bookmarkletu (uložená událost v MP Manageru) jen
+      // u záznamu, který je v RZ Scanneru opravdu vyřešený.
+      doplnitUlozenou: !!record.resolved,
       // Pro doplnění UŽ ULOŽENÉ události v MP Manageru (bookmarklet "RZ to
       // MP" na EventE.asp?ID=…): jen ID způsobu řešení podle dořešení
       // (bez obecné lustrace) a strážník, který věc v RZ Scanneru dořešil
@@ -5410,7 +5419,12 @@
       // podle straznikRole; ostatní strážníky u události nechá.
       methodSolutionIds: methodSolutionIds || [],
       resolverJmeno: record.resolvedByOfficer || record.officerName || null,
-      resolverCislo: OFFICER_BADGE_NUMBERS[record.resolvedByOfficer || record.officerName] || null
+      resolverCislo: OFFICER_BADGE_NUMBERS[record.resolvedByOfficer || record.officerName] || null,
+      // U záznamů z přehledu se při zakládání NOVÉ události přidá strážník,
+      // který záznam do RZ Scanneru nahrál (podle služebního čísla), místo
+      // "Přidat přihlášeného strážníka".
+      pridatStraznikaCislo: jeZPrehledu ? (OFFICER_BADGE_NUMBERS[record.officerName] || null) : null,
+      pridatStraznikaJmeno: jeZPrehledu ? (record.officerName || null) : null
     };
 
     try{
