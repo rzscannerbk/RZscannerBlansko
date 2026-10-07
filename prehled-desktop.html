@@ -211,6 +211,26 @@
 
   /* ---------- LIST ---------- */
   .list-area{flex:1; min-width:0; display:flex; flex-direction:column; position:relative;}
+  /* Hromadné mazání (admin) — zaškrtávací kolečko u řádku + lišta dole */
+  .bulk-check{
+    position:absolute; left:2px; top:50%; transform:translateY(-50%);
+    width:18px; height:18px; border-radius:5px; border:2px solid var(--line);
+    background:var(--asphalt-2); color:#fff; font-size:12px; font-weight:800;
+    display:flex; align-items:center; justify-content:center; z-index:2;
+  }
+  .record-item.bulk-checked{background:rgba(229,83,75,.10);}
+  .record-item.bulk-checked .bulk-check{background:#E5534B; border-color:#E5534B;}
+  .bulk-bar{
+    display:none; position:absolute; left:50%; bottom:22px; transform:translateX(-50%); z-index:6;
+    gap:10px; align-items:center; padding:10px 14px; border-radius:14px;
+    background:var(--asphalt-2); border:1px solid var(--line); box-shadow:0 10px 30px rgba(0,0,0,.4);
+    font-size:13px; color:var(--text); white-space:nowrap;
+  }
+  .bulk-bar.show{display:flex;}
+  .bulk-bar button{font:inherit; font-size:12.5px; font-weight:600; padding:7px 12px; border-radius:9px; border:1px solid var(--line); background:var(--asphalt-3); color:var(--text); cursor:pointer;}
+  .bulk-bar button.danger{background:#E5534B; border-color:#E5534B; color:#fff;}
+  .bulk-bar button:disabled{opacity:.45; cursor:default;}
+  #bulkCount{font-weight:700; min-width:90px;}
   /* Šipka "zpět na začátek" — světle modrý kruh s bílou šipkou, dole
      uprostřed rolovaného seznamu. */
   .scroll-top-btn{
@@ -1011,6 +1031,7 @@
       <button class="icon-btn" id="fullscreenBtn" title="Celá obrazovka">⛶</button>
       <button class="icon-btn" id="themeToggleBtn" title="Světlý/tmavý režim">☾</button>
       <button class="icon-btn" id="shiftSummaryBtn" title="Svodky" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">Svodky</button>
+      <button class="icon-btn" id="bulkDeleteBtn" title="Hromadné mazání (admin)" style="display:none; width:auto; padding:0 12px; font-size:12px; font-weight:600;">🗑 Mazat více</button>
       <button class="icon-btn" id="addEventBtn" title="Přidat událost" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">+ Přidat událost</button>
 
       <a href="https://rzscannerbk.github.io/RZscannerBlansko/index.html" class="backlink">Zpět na RZ Scanner</a>
@@ -1040,6 +1061,13 @@
           <span class="sortable" data-sort="sent">Vytvořeno</span>
           <span></span>
           <span></span>
+        </div>
+        <div class="bulk-bar" id="bulkBar">
+          <span id="bulkCount">Vybráno 0</span>
+          <button type="button" id="bulkAllBtn">Vybrat vše zobrazené</button>
+          <button type="button" id="bulkNoneBtn">Zrušit výběr</button>
+          <button type="button" class="danger" id="bulkDoBtn" disabled>Smazat vybrané</button>
+          <button type="button" id="bulkExitBtn">Hotovo</button>
         </div>
         <button type="button" class="scroll-top-btn" id="scrollTopBtn" title="Zpět na začátek">↑</button>
         <div id="listBody">
@@ -1792,6 +1820,8 @@
       document.getElementById('shiftName').textContent = name || '—';
       loadRecords();
     } else {
+      if(recordsUnsub){ try{ recordsUnsub(); }catch(e){} recordsUnsub = null; }
+      if(recordsRetryTimer){ clearTimeout(recordsRetryTimer); recordsRetryTimer = null; }
       show('login');
     }
   });
@@ -1870,12 +1900,37 @@
   // apod.), bez nutnosti stránku ručně obnovovat. onSnapshot se navíc
   // jednou zavolá hned na začátku se stávajícími daty, takže nahrazuje
   // i původní jednorázové načtení.
+  // Odolnost živého přenosu: předchozí posluchač se před novým vždy
+  // ukončí (přepnutí účtu), a když posluchač skončí chybou (výpadek
+  // spojení, uspání počítače, odhlášení), po 5 s se sám spustí znovu,
+  // pokud je někdo přihlášený. Bez toho by přehled ukazoval stará data
+  // až do ručního obnovení stránky.
+  let recordsUnsub = null;
+  let recordsRetryTimer = null;
+  function applyRecordsSnapshot(docs){
+    allRecords = docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    rebuildOffenseCatalog();
+    renderRail();
+    renderList(document.getElementById('searchInput').value);
+  }
+  // Jednorázové načtení ze serveru — po hromadném založení (dávka MKDS,
+  // radar), ať jsou nové záznamy vidět hned bez ohledu na stav posluchače.
+  async function reloadRecordsNow(){
+    try{
+      const snap = await db.collection('prestupky').orderBy('createdAt', 'desc').limit(500).get({ source: 'server' });
+      applyRecordsSnapshot(snap.docs);
+    }catch(e){
+      console.error('Znovunačtení přehledu selhalo:', e);
+    }
+  }
   function loadRecords(){
     const statusEl = document.getElementById('listStatus');
     statusEl.style.display = 'block';
     statusEl.textContent = 'Načítám…';
+    if(recordsUnsub){ try{ recordsUnsub(); }catch(e){} recordsUnsub = null; }
+    if(recordsRetryTimer){ clearTimeout(recordsRetryTimer); recordsRetryTimer = null; }
     let first = true;
-    db.collection('prestupky').orderBy('createdAt', 'desc').limit(500)
+    recordsUnsub = db.collection('prestupky').orderBy('createdAt', 'desc').limit(500)
       .onSnapshot(snap=>{
         allRecords = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         console.log('[živý přenos]', first ? 'počáteční načtení' : 'změna dat', '—', allRecords.length, 'záznamů');
@@ -1897,8 +1952,14 @@
         renderList(document.getElementById('searchInput').value);
       }, e=>{
         console.error('Načtení přehledu selhalo:', e);
-        statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
-        statusEl.style.display = 'block';
+        recordsUnsub = null;
+        if(!allRecords.length){
+          statusEl.textContent = 'Načtení se nezdařilo (' + (e && e.message ? e.message : 'chyba sítě') + ').';
+          statusEl.style.display = 'block';
+        }
+        if(auth.currentUser){
+          recordsRetryTimer = setTimeout(()=>{ if(auth.currentUser) loadRecords(); }, 5000);
+        }
       });
   }
 
@@ -6764,6 +6825,73 @@
   ];
   let adminEditRecord = null;
 
+  // ---------- Hromadné mazání (jen admin) ----------
+  // Tlačítko "🗑 Mazat více" zapne režim výběru: klik na řádek ho
+  // zaškrtne, dole se objeví lišta s počtem a "Smazat vybrané". Maže se
+  // záznam i jeho podkolekce s fotkami (prestupky/{id}/data/photos).
+  // Firestore pravidla mazání stejně povolí jen adminovi (isAdmin()).
+  var bulkMode = false;
+  var bulkSelected = new Set();
+  function isAdminNow(){
+    return !!(auth.currentUser && ADMIN_EMAILS.includes(auth.currentUser.email));
+  }
+  function updateBulkBar(){
+    document.getElementById('bulkCount').textContent = 'Vybráno ' + bulkSelected.size;
+    document.getElementById('bulkDoBtn').disabled = bulkSelected.size === 0;
+  }
+  function setBulkMode(on){
+    bulkMode = !!on && isAdminNow();
+    if(!bulkMode) bulkSelected.clear();
+    document.getElementById('bulkBar').classList.toggle('show', bulkMode);
+    document.getElementById('bulkDeleteBtn').classList.toggle('active', bulkMode);
+    updateBulkBar();
+    renderList(document.getElementById('searchInput').value);
+  }
+  auth.onAuthStateChanged(user=>{
+    document.getElementById('bulkDeleteBtn').style.display = isAdminNow() ? '' : 'none';
+    if(!isAdminNow() && bulkMode) setBulkMode(false);
+  });
+  document.getElementById('bulkDeleteBtn').addEventListener('click', ()=> setBulkMode(!bulkMode));
+  document.getElementById('bulkExitBtn').addEventListener('click', ()=> setBulkMode(false));
+  document.getElementById('bulkNoneBtn').addEventListener('click', ()=>{ bulkSelected.clear(); updateBulkBar(); renderList(document.getElementById('searchInput').value); });
+  document.getElementById('bulkAllBtn').addEventListener('click', ()=>{
+    document.querySelectorAll('#listBody .record-item[data-id]').forEach(el => bulkSelected.add(el.dataset.id));
+    updateBulkBar();
+    renderList(document.getElementById('searchInput').value);
+  });
+  document.getElementById('bulkDoBtn').addEventListener('click', async ()=>{
+    if(!isAdminNow() || !bulkSelected.size) return;
+    const ids = Array.from(bulkSelected);
+    const nazvy = ids.slice(0, 8).map(id => {
+      const r = allRecords.find(x => x.id === id);
+      return r ? ((formatPlate(r.plate) || 'bez RZ') + ' (' + (r.noticeNumber || id) + ')') : id;
+    });
+    if(!confirm('Opravdu trvale smazat ' + ids.length + ' ' + (ids.length === 1 ? 'přestupek' : (ids.length < 5 ? 'přestupky' : 'přestupků')) + '?\n\n' +
+      nazvy.join('\n') + (ids.length > 8 ? '\n… a dalších ' + (ids.length - 8) : '') + '\n\nTuhle akci nejde vzít zpět.')) return;
+    const btn = document.getElementById('bulkDoBtn');
+    btn.disabled = true;
+    let done = 0;
+    const failed = [];
+    for(const id of ids){
+      btn.textContent = 'Mažu ' + (done + 1) + ' / ' + ids.length + '…';
+      try{
+        try{ await db.collection('prestupky').doc(id).collection('data').doc('photos').delete(); }catch(e){}
+        await db.collection('prestupky').doc(id).delete();
+        allRecords = allRecords.filter(r => r.id !== id);
+        bulkSelected.delete(id);
+        if(currentDetailRecord && currentDetailRecord.id === id) closeDetailModal();
+        done++;
+      }catch(e){
+        console.error('Hromadné smazání selhalo:', id, e);
+        failed.push(id + ' (' + (e && e.message ? e.message : e) + ')');
+      }
+    }
+    btn.textContent = 'Smazat vybrané';
+    refreshView();
+    updateBulkBar();
+    alert('Smazáno ' + done + ' z ' + ids.length + '.' + (failed.length ? '\n\nNesmazalo se:\n' + failed.join('\n') : ''));
+  });
+
   function openAdminEditGate(record){
     const email = auth.currentUser && auth.currentUser.email;
     if(!email || !ADMIN_EMAILS.includes(email)){
@@ -7400,6 +7528,7 @@
       const stale = isStale(r);
 
       const item = document.createElement('div');
+      item.dataset.id = r.id;
       item.className = 'record-item' + (isBoticka ? ' boticka' : '') + (sKey !== 'pending' ? ' resolved' : '') + (stale ? ' stale' : '') + (r.id === (currentDetailRecord && currentDetailRecord.id) ? ' selected' : '');
 
       const stripe = document.createElement('span');
@@ -7567,7 +7696,24 @@
         item.appendChild(editBtn);
       }
 
+      // Hromadné mazání (admin): v režimu výběru klik na řádek jen
+      // přepne zaškrtnutí, detail se neotevírá.
+      if(bulkMode){
+        item.classList.add('bulk-mode');
+        if(bulkSelected.has(r.id)) item.classList.add('bulk-checked');
+        const chk = document.createElement('span');
+        chk.className = 'bulk-check';
+        chk.textContent = bulkSelected.has(r.id) ? '✓' : '';
+        item.appendChild(chk);
+      }
       item.addEventListener('click', ()=>{
+        if(bulkMode){
+          if(bulkSelected.has(r.id)) bulkSelected.delete(r.id); else bulkSelected.add(r.id);
+          item.classList.toggle('bulk-checked', bulkSelected.has(r.id));
+          item.querySelector('.bulk-check').textContent = bulkSelected.has(r.id) ? '✓' : '';
+          updateBulkBar();
+          return;
+        }
         document.querySelectorAll('.record-item.selected').forEach(el=>el.classList.remove('selected'));
         item.classList.add('selected');
         openDetail(r);
@@ -8850,6 +8996,7 @@
       }
     }
     document.getElementById('mkdsBatchOverlay').classList.remove('open');
+    await reloadRecordsNow();
     alert('Založeno ' + done + ' z ' + rows.length + ' událostí (' + mkdsBatchChoice + '). Najdeš je mezi nevyřešenými.' +
       (bezPrilohy.length ? '\n\nBez přílohy (PDF bylo příliš velké): ' + bezPrilohy.join(', ') : '') +
       (failed.length ? '\n\nNezaložilo se:\n' + failed.join('\n') : ''));
@@ -9182,6 +9329,7 @@
       }
     }
     document.getElementById('addEventRadarOverlay').classList.remove('open');
+    await reloadRecordsNow();
     alert('Založeno ' + done + ' z ' + rows.length + ' událostí z radaru. Najdeš je mezi nevyřešenými.' +
       (failed.length ? '\n\nNezaložilo se:\n' + failed.join('\n') : ''));
     radarResetUi();
