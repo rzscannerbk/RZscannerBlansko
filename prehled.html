@@ -960,8 +960,13 @@
     // spolehlivě (běžná nekonzistence content controlů), zatímco
     // formátování konce odstavce Word skutečně dědí, když nahrazuje
     // placeholder text napsaným.
-    const pPr = '<w:spacing w:before="0" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 20) + '"/><w:rPr><w:sz w:val="' + size + '"/></w:rPr>';
-    const prefixRun = docxRun(prefixText, { size, bold: !!opts.bold });
+    const pPr = (opts.label ? '<w:tabs><w:tab w:val="left" w:pos="' + HDR_TAB + '"/></w:tabs>' : '') +
+      '<w:spacing w:before="0" w:after="' + (opts.spacingAfter != null ? opts.spacingAfter : 20) + '"/>' +
+      (opts.label ? '<w:ind w:left="' + HDR_TAB + '" w:hanging="' + HDR_TAB + '"/>' : '') +
+      '<w:rPr><w:sz w:val="' + size + '"/></w:rPr>';
+    // opts.label → popisek + tabulátor na HDR_TAB (pravý blok záhlaví).
+    const prefixRun = (opts.label ? docxRun(opts.label, { size }) + '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="' + size + '"/></w:rPr><w:tab/></w:r>' : '') +
+      docxRun(prefixText, { size, bold: !!opts.bold });
     const sdtId = Math.floor(Math.random() * 2000000000) + 1;
     const sdt = '<w:sdt><w:sdtPr>' +
       '<w:alias w:val="Číslo jednací"/>' +
@@ -977,21 +982,40 @@
     return '<w:p><w:pPr>' + pPr + '</w:pPr>' + prefixRun + sdt + '</w:p>';
   }
 
-  function docxHeaderTable(leftLines, rightLines, leftBold){
-    // Mezisloupec (gutter) mezi adresou úřadu a blokem s č.j. — bez něj by
-    // sloupce splývaly těsně vedle sebe. Pravý blok tak začíná výrazně
-    // víc vpravo, blíž k pravému okraji stránky.
-    const leftW = 3600, gutterW = 2200, rightW = 3226;
-    const cell = (lines, w, bold) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' +
-      lines.map(t => (t && typeof t === 'object' && t.raw) ? t.raw : docxPara(t, { size: 19, spacingAfter: 20, bold: !!bold })).join('') + '</w:tc>';
-    const emptyCell = (w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' + docxPara('', { size: 19 }) + '</w:tc>';
+  // Záhlaví dopisu — vlevo adresát (Arial 11 normální), vpravo blok
+  // "Ginis čj. / Naše čj. / Vyřizuje / Tel. / E-mail / Datum" (Arial 10
+  // normální), kde hodnoty za dvojtečkou začínají pod sebou: tabulátor
+  // na pozici HDR_TAB a předsazení stejné šířky, takže i zalomená
+  // hodnota pokračuje ve stejném sloupci. Položky pravé strany:
+  // [popisek, hodnota] | '' (prázdný řádek) | { raw: hotový odstavec }.
+  const HDR_TAB = 1150;
+  function docxHeaderRightPara(label, valueXml){
+    const tabRun = '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="20"/><w:szCs w:val="20"/></w:rPr><w:tab/></w:r>';
+    return '<w:p><w:pPr><w:tabs><w:tab w:val="left" w:pos="' + HDR_TAB + '"/></w:tabs>' +
+      '<w:spacing w:before="0" w:after="20"/><w:ind w:left="' + HDR_TAB + '" w:hanging="' + HDR_TAB + '"/>' +
+      '<w:rPr><w:sz w:val="20"/></w:rPr></w:pPr>' +
+      docxRun(label, { size: 20 }) + tabRun + (valueXml || '') + '</w:p>';
+  }
+  function docxHeaderTable(leftLines, rightLines){
+    // Mezisloupec (gutter) mezi adresátem a pravým blokem.
+    const leftW = 3600, gutterW = 1300, rightW = 4126;
+    const leftCell = '<w:tc><w:tcPr><w:tcW w:w="' + leftW + '" w:type="dxa"/></w:tcPr>' +
+      leftLines.map(t => (t && typeof t === 'object' && t.raw) ? t.raw : docxPara(t, { size: 22, spacingAfter: 0 })).join('') + '</w:tc>';
+    const rightCell = '<w:tc><w:tcPr><w:tcW w:w="' + rightW + '" w:type="dxa"/></w:tcPr>' +
+      rightLines.map(t => {
+        if(t && typeof t === 'object' && t.raw) return t.raw;
+        if(Array.isArray(t)) return docxHeaderRightPara(t[0], t[1] ? docxRun(t[1], { size: 20 }) : '');
+        return docxPara(t || '', { size: 20, spacingAfter: 20 });
+      }).join('') + '</w:tc>';
+    const emptyCell = (w) => '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/></w:tcPr>' + docxPara('', { size: 20 }) + '</w:tc>';
     return '<w:tbl><w:tblPr><w:tblW w:w="9026" w:type="dxa"/><w:tblBorders>' +
       '<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>' +
       '<w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>' +
       '<w:tblLayout w:type="fixed"/></w:tblPr>' +
       '<w:tblGrid><w:gridCol w:w="' + leftW + '"/><w:gridCol w:w="' + gutterW + '"/><w:gridCol w:w="' + rightW + '"/></w:tblGrid>' +
-      '<w:tr>' + cell(leftLines, leftW, leftBold) + emptyCell(gutterW) + cell(rightLines, rightW, false) + '</w:tr></w:tbl>';
+      '<w:tr>' + leftCell + emptyCell(gutterW) + rightCell + '</w:tr></w:tbl>';
   }
+
 
   function docxNarrowBoxTable(widthMm, innerXml){
     const w = mmToTwips(widthMm);
@@ -1179,14 +1203,14 @@
     body += docxHeaderTable(
       headerLeft,
       [
-        { raw: docxPlaceholderFieldPara('Naše  č. j.: MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 }) },
-        'Vyřizuje: str. ' + officerForDoc,
-        'Tel.: ' + OZNAMENI_TEL,
-        'E-mail: ' + OZNAMENI_EMAIL,
+        ['Ginis čj.:', ''],
+        { raw: docxPlaceholderFieldPara('MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 20, label: 'Naše čj.:' }) },
+        ['Vyřizuje:', 'str. ' + officerForDoc],
+        ['Tel.:', OZNAMENI_TEL],
+        ['E-mail:', OZNAMENI_EMAIL],
         '',
-        'Datum: ' + todayCz()
-      ],
-      true
+        ['Datum:', todayCz()]
+      ]
     );
     body += docxPara('', { size: 20 });
     body += docxPara('VÝZVA', { bold: true, size: 28, align: 'center', spacingAfter: 200 });
@@ -1280,12 +1304,13 @@
     body += docxHeaderTable(
       ['Městský úřad Blansko', 'Odbor dopravy', 'Oddělení dopravních přestupků', 'nám. Republiky 1316/1', '678 01 BLANSKO'],
       [
-        { raw: docxPlaceholderFieldPara('Naše  č. j.: MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 19 }) },
-        'Vyřizuje: str. ' + officerForDoc,
-        'Tel.: ' + OZNAMENI_TEL,
-        'E-mail: ' + OZNAMENI_EMAIL,
+        ['Ginis čj.:', ''],
+        { raw: docxPlaceholderFieldPara('MP ' + new Date().getFullYear() + '/', 'doplň Č.j.:', { size: 20, label: 'Naše čj.:' }) },
+        ['Vyřizuje:', 'str. ' + officerForDoc],
+        ['Tel.:', OZNAMENI_TEL],
+        ['E-mail:', OZNAMENI_EMAIL],
         '',
-        'Datum: ' + todayCz()
+        ['Datum:', todayCz()]
       ]
     );
     body += docxPara('', { size: 20 });
