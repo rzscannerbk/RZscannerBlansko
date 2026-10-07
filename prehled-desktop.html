@@ -5385,7 +5385,15 @@
       // Bookmarklet "RZ to MP" vybírá volbu podle textu, ne podle value.
       straznikRole: (['prikaz', 'domluva', 'oznameni'].indexOf(record.resolvedMethod) !== -1)
         ? 'doresil'
-        : (record.resolvedMethod === 'vyzva' ? 'resil' : 'hlidka')
+        : (record.resolvedMethod === 'vyzva' ? 'resil' : 'hlidka'),
+      // Pro doplnění UŽ ULOŽENÉ události v MP Manageru (bookmarklet "RZ to
+      // MP" na EventE.asp?ID=…): jen ID způsobu řešení podle dořešení
+      // (bez obecné lustrace) a strážník, který věc v RZ Scanneru dořešil
+      // — bookmarklet ho dohledá podle služebního čísla a dá mu roli
+      // podle straznikRole; ostatní strážníky u události nechá.
+      methodSolutionIds: methodSolutionIds || [],
+      resolverJmeno: record.resolvedByOfficer || record.officerName || null,
+      resolverCislo: OFFICER_BADGE_NUMBERS[record.resolvedByOfficer || record.officerName] || null
     };
 
     try{

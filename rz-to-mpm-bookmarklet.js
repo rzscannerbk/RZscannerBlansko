@@ -15,14 +15,160 @@
   // selhat kvůli přesměrování na URL s ?ID=... po uložení.
   var eventIdEl = document.getElementById('EventID');
   var eventId = eventIdEl ? eventIdEl.value : '0';
+
+  // Výběr role strážníka podle textu volby (bez diakritiky, přesná shoda
+  // — "řešil" se nesplete s "dořešil"); u hlídky záloha value="6".
+  var roleLabels = { doresil: 'dořešil', resil: 'řešil', hlidka: 'hlídka' };
+  function normTxt(x){ return (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase(); }
+  function setRole(sel, wanted){
+    var val = null;
+    for(var ri = 0; ri < sel.options.length; ri++){
+      if(normTxt(sel.options[ri].text) === wanted){ val = sel.options[ri].value; break; }
+    }
+    if(val === null && wanted === 'hlidka') val = '6';
+    if(val === null) return false;
+    sel.value = val;
+    var idx = parseInt((sel.name || '').replace(/\D+/g, ''), 10) || 0;
+    try{ SetHiddenTypy(sel.value, 'tTypyStr', idx); }catch(e){}
+    return true;
+  }
+
   if(eventId && eventId !== '0'){
+    // Uložená událost: když je ve schránce JSON z MPM s dořešením (role
+    // jiná než hlídka a známý strážník), přepne se do DOPLŇOVACÍHO
+    // režimu (doplnitUlozenou). Jinak jako dřív jen "Ověřit v RSV".
+    navigator.clipboard.readText().then(function(t){
+      var dd = null;
+      try{ dd = JSON.parse(t); }catch(e){}
+      if(dd && typeof dd === 'object' && dd.straznikRole && dd.straznikRole !== 'hlidka' && dd.resolverCislo){
+        doplnitUlozenou(dd);
+      } else {
+        overitRsv();
+      }
+    }, overitRsv);
+    return;
+  }
+
+  function overitRsv(){
     var rsvBtn = document.getElementById('tFindRSV');
     if(rsvBtn){
       rsvBtn.click();
     } else {
       alert('Událost je už uložená (RZ Scanner data byla vyplněna dřív) — tlačítko "Ověřit v RSV" jsem na téhle stránce nenašel, zkontroluj ručně.');
     }
-    return;
+  }
+
+  // Doplnění uložené události o dořešení z RZ Scanneru:
+  //  1) strážník, který dořešil (dle sl. čísla) — je-li už u události,
+  //     jen se mu změní role; jinak se vyhledá (tStraznikSC + Najít),
+  //     přidá kliknutím na nalezený záznam "1255 - Příjmení Jméno"
+  //     a nastaví se mu role. Ostatní strážníci zůstávají.
+  //     Strážník jde PRVNÍ: kdyby "Najít" stránku znovu načetl, druhé
+  //     spuštění záložky už nalezený záznam jen přidá a doplní zbytek.
+  //  2) Způsob řešení (jen pokud ještě není), pokuta, způsob platby.
+  function doplnitUlozenou(d){
+    var cislo = String(d.resolverCislo);
+    var role = d.straznikRole;
+    var roleNazev = roleLabels[role] || role;
+    var reRow = new RegExp('(^|\\D)' + cislo + '\\s*-');
+
+    function najdiRadekStraznika(){
+      var sels = document.querySelectorAll('select[name^="tTypyStrL"]');
+      for(var i = 0; i < sels.length; i++){
+        var tr = sels[i].closest('tr');
+        if(tr && reRow.test(tr.textContent)) return sels[i];
+      }
+      return null;
+    }
+    function najdiVysledekHledani(){
+      var all = document.querySelectorAll('a, span, td, div, li, font');
+      var best = null;
+      for(var i = 0; i < all.length; i++){
+        var el = all[i];
+        if(el.closest('tr') && el.closest('tr').querySelector('select[name^="tTypyStrL"]')) continue;
+        var txt = (el.textContent || '').trim();
+        if(!new RegExp('^' + cislo + '\\s*-\\s*\\S').test(txt) || txt.length > 80) continue;
+        var clickable = el.closest('a, [onclick]') || el.querySelector('a, [onclick]');
+        if(clickable) return clickable;
+        if(!best) best = el;
+      }
+      return best;
+    }
+    function pockej(test, ms, done){
+      var start = Date.now();
+      (function tick(){
+        var r = test();
+        if(r) return done(r);
+        if(Date.now() - start > ms) return done(null);
+        setTimeout(tick, 250);
+      })();
+    }
+
+    var zprava = [];
+    function zbytek(){
+      // Způsob řešení — přidat jen ID, které u události ještě není (pozná
+      // se podle skrytých polí se seznamem ID oddělených čárkou).
+      var hiddenVals = Array.prototype.map.call(document.querySelectorAll('input[type="hidden"]'), function(h){ return ',' + (h.value || '') + ','; }).join('|');
+      (d.methodSolutionIds || []).forEach(function(id){
+        if(hiddenVals.indexOf(',' + id + ',') !== -1){ zprava.push('Způsob řešení ' + id + ' už u události je.'); return; }
+        try{ AddItem(id, 'Rej'); zprava.push('Přidán způsob řešení.'); }catch(e){ zprava.push('Způsob řešení se nepodařilo přidat — doplň ručně.'); }
+      });
+      var pen = document.getElementById('tPenalty');
+      if(pen && d.penalty){ pen.value = d.penalty; zprava.push('Pokuta: ' + d.penalty + ' Kč.'); }
+      var pay = document.getElementById('tPayType');
+      if(pay && d.payType){ pay.value = d.payType; zprava.push('Způsob platby: ' + (d.payType === 'H' ? 'hotově' : 'kartou') + '.'); }
+      window.__rzScannerMPMFilled = true;
+      alert('Doplněno z RZ Scanneru:\n\n' + zprava.join('\n') + '\n\nZkontroluj formulář a ulož ho.');
+    }
+
+    var existujici = najdiRadekStraznika();
+    if(existujici){
+      zprava.push(setRole(existujici, role)
+        ? 'Strážník ' + cislo + ' už u události byl — role změněna na "' + roleNazev + '".'
+        : 'Roli "' + roleNazev + '" jsem v nabídce nenašel — nastav ji strážníkovi ' + cislo + ' ručně.');
+      return zbytek();
+    }
+
+    function pridejZVysledku(vysledek){
+      vysledek.click();
+      pockej(najdiRadekStraznika, 6000, function(sel){
+        if(!sel){
+          zprava.push('Strážníka ' + cislo + ' se nepodařilo přidat — přidej ho ručně a nastav mu roli "' + roleNazev + '".');
+        } else {
+          zprava.push(setRole(sel, role)
+            ? 'Přidán strážník ' + cislo + (d.resolverJmeno ? ' (' + d.resolverJmeno + ')' : '') + ' s rolí "' + roleNazev + '".'
+            : 'Strážník ' + cislo + ' přidán, ale roli "' + roleNazev + '" nastav ručně.');
+        }
+        zbytek();
+      });
+    }
+
+    var uzNalezeny = najdiVysledekHledani();
+    if(uzNalezeny) return pridejZVysledku(uzNalezeny);
+
+    var sc = document.getElementById('tStraznikSC');
+    if(!sc){
+      zprava.push('Pole pro hledání strážníka jsem nenašel — přidej strážníka ' + cislo + ' ručně s rolí "' + roleNazev + '".');
+      return zbytek();
+    }
+    sc.value = cislo;
+    var tab = sc.closest('table') || document;
+    var najit = null;
+    Array.prototype.forEach.call(tab.querySelectorAll('input[type="button"], input[type="submit"], button'), function(b){
+      if(!najit && /naj[ií]t/i.test(b.value || b.textContent || '')) najit = b;
+    });
+    if(!najit){
+      zprava.push('Tlačítko "Najít" u strážníků jsem nenašel — vyhledej strážníka ' + cislo + ' ručně a nastav mu roli "' + roleNazev + '".');
+      return zbytek();
+    }
+    najit.click();
+    pockej(najdiVysledekHledani, 8000, function(vysledek){
+      if(!vysledek){
+        zprava.push('Po hledání jsem nenašel strážníka ' + cislo + ' — přidej ho ručně s rolí "' + roleNazev + '".');
+        return zbytek();
+      }
+      pridejZVysledku(vysledek);
+    });
   }
 
   if(window.__rzScannerMPMFilled){
