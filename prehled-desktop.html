@@ -10950,7 +10950,7 @@
     document.getElementById('prikazVyzvaCasField').style.display = showVyzvaTermin ? '' : 'none';
     document.getElementById('prikazVyzvaDatum')._setDatePickerIso('');
     document.getElementById('prikazVyzvaCasOd').value = '08:00';
-    document.getElementById('prikazVyzvaCasDo').value = '16:00';
+    document.getElementById('prikazVyzvaCasDo').value = '17:00';
     const note = document.getElementById('prikazScanNote');
     note.style.display = 'none';
     note.style.color = '';
@@ -11853,7 +11853,7 @@
     else if(prikazIsClickParkEvent && (prikazMode === 'prikaz' || prikazMode === 'domluva' || prikazMode === 'oznameni') && prikazCisloDomuInput.value.trim()) focusField(document.getElementById('prikazEventActionBtn'));
   });
 
-  // Datum → Čas od → Čas do (Čas od/do mají už přednastavené 8:00/16:00 —
+  // Datum → Čas od → Čas do (Čas od/do mají už přednastavené 8:00/17:00 —
   // viz reset v openPrikazModal — takže tady stačí jen zvolit, a je to
   // poslední krok řetězce, po němž aplikace nechává jen vizuální kontrolu
   // celého dialogu.
