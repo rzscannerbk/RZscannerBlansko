@@ -685,7 +685,7 @@
   .confirm-btns-col{flex-direction:column;}
   /* Okno "Rychlost — soubory z radaru" — širší než běžné potvrzovací
      okno, kvůli kontrolní tabulce. */
-  .confirm-box.radar-box{max-width:min(1080px, 94vw);}
+  .confirm-box.radar-box{max-width:min(1080px, 94vw); max-height:94vh; overflow-y:auto;}
   .radar-drop{
     display:flex; flex-direction:column; gap:6px; align-items:center; justify-content:center;
     padding:22px 16px; margin-bottom:16px; border:2px dashed var(--line); border-radius:12px;
@@ -703,6 +703,15 @@
   .radar-table tr.bad td{opacity:.55;}
   .radar-table tr.warn td.note{color:var(--amber);}
   .radar-table tr.err td.note{color:#E5534B; opacity:1;}
+  /* Dávka MKDS — termín dostavení (dva měsíce vedle sebe + čas) */
+  .mkds-termin{margin:0 0 16px; padding:12px; border:1px solid var(--line); border-radius:12px;}
+  .mkds-termin-title{font-size:13.5px; font-weight:600; color:var(--text); margin-bottom:10px; text-align:center;}
+  .mkds-termin-title span{font-weight:400; color:var(--muted); font-size:12px;}
+  .mkds-cal{display:flex; flex-direction:column; align-items:center; gap:8px;}
+  .mkds-cal-nav{display:flex; gap:8px; justify-content:center;}
+  .mkds-cal-nav button{font:inherit; font-size:12px; padding:4px 10px; border-radius:7px; border:1px solid var(--line); background:var(--asphalt-3); color:var(--text); cursor:pointer;}
+  .mkds-termin-times{display:flex; gap:18px; justify-content:center; margin-top:10px; font-size:13px; color:var(--muted);}
+  .mkds-termin-times select{font:inherit; margin-left:6px; padding:4px 6px; border-radius:7px; border:1px solid var(--line); background:var(--asphalt-2); color:var(--text);}
   /* Menu MKDS: vedle každé položky čtvercové tlačítko "dávka" */
   .mkds-row{display:flex; gap:8px; align-items:stretch;}
   .mkds-row .confirm-btn{flex:1;}
@@ -1216,6 +1225,14 @@
         <span class="radar-drop-main">Přetáhni sem složky vozidel (nebo klikni a vyber nadřazenou složku)</span>
         <span class="radar-drop-sub">Název složky = RZ a za první mezerou tovární značka · z každé složky se vezme první PDF</span>
       </label>
+      <div class="mkds-termin">
+        <div class="mkds-termin-title">Dostavit se dne <span>— platí pro všechny události z dávky (nepovinné)</span></div>
+        <div class="mkds-cal" id="mkdsBatchCal"></div>
+        <div class="mkds-termin-times">
+          <label>Čas od <select id="mkdsBatchCasOd"></select></label>
+          <label>Čas do <select id="mkdsBatchCasDo"></select></label>
+        </div>
+      </div>
       <div class="radar-table-wrap" id="mkdsBatchTableWrap" style="display:none;">
         <table class="radar-table">
           <thead><tr>
@@ -8555,9 +8572,70 @@
   let mkdsBatchChoice = null;
   let mkdsBatchRows = [];
 
+  // Termín dostavení pro celou dávku — vlastní malý kalendář přímo
+  // v okně (aktuální + následující měsíc, víc dní najednou), vzhled
+  // převzatý z kalendáře v dialogu Výzvy. Uloží se do každého záznamu
+  // jako dostaveniPlan a dialog Výzvy ho pak předvyplní.
+  let mkdsBatchDays = new Set();
+  let mkdsCalBase = null;
+  function renderMkdsBatchCal(){
+    const today = new Date();
+    if(!mkdsCalBase) mkdsCalBase = { y: today.getFullYear(), m: today.getMonth() };
+    const pad2 = n => String(n).padStart(2, '0');
+    const isoOf = (y, m, d) => y + '-' + pad2(m + 1) + '-' + pad2(d);
+    const todayIso = isoOf(today.getFullYear(), today.getMonth(), today.getDate());
+    const month = (y, m) => {
+      let h = '<div class="prikaz-multi-month"><div class="prikaz-multi-month-label">' + DP_MONTHS_CS[m] + ' ' + y + '</div><div class="prikaz-datepicker-grid">';
+      DP_DOW_CS.forEach(d => { h += '<div class="prikaz-datepicker-dow">' + d + '</div>'; });
+      const lead = (new Date(y, m, 1).getDay() + 6) % 7;
+      const days = new Date(y, m + 1, 0).getDate();
+      for(let i = 0; i < lead; i++) h += '<div class="prikaz-datepicker-day is-empty"></div>';
+      for(let d = 1; d <= days; d++){
+        const iso = isoOf(y, m, d);
+        h += '<div class="prikaz-datepicker-day' + (iso === todayIso ? ' is-today' : '') + (mkdsBatchDays.has(iso) ? ' is-selected-multi' : '') + '" data-iso="' + iso + '">' + d + '</div>';
+      }
+      return h + '</div></div>';
+    };
+    let ny = mkdsCalBase.y, nm = mkdsCalBase.m + 1;
+    if(nm > 11){ nm = 0; ny++; }
+    const cal = document.getElementById('mkdsBatchCal');
+    cal.innerHTML =
+      '<div class="mkds-cal-nav"><button type="button" data-nav="-1">‹ Dřív</button><button type="button" data-nav="0">Dnes</button><button type="button" data-nav="1">Později ›</button><button type="button" data-nav="clear">Vymazat</button></div>' +
+      '<div class="prikaz-multi-months">' + month(mkdsCalBase.y, mkdsCalBase.m) + month(ny, nm) + '</div>';
+  }
+  document.getElementById('mkdsBatchCal').addEventListener('click', e => {
+    const day = e.target.closest('.prikaz-datepicker-day[data-iso]');
+    if(day){
+      const iso = day.dataset.iso;
+      if(mkdsBatchDays.has(iso)) mkdsBatchDays.delete(iso); else mkdsBatchDays.add(iso);
+      return renderMkdsBatchCal();
+    }
+    const nav = e.target.closest('button[data-nav]');
+    if(!nav) return;
+    const v = nav.dataset.nav;
+    if(v === 'clear') mkdsBatchDays.clear();
+    else if(v === '0'){ const t = new Date(); mkdsCalBase = { y: t.getFullYear(), m: t.getMonth() }; }
+    else {
+      let m = mkdsCalBase.m + Number(v), y = mkdsCalBase.y;
+      if(m < 0){ m = 11; y--; } if(m > 11){ m = 0; y++; }
+      mkdsCalBase = { y, m };
+    }
+    renderMkdsBatchCal();
+  });
+  (function(){
+    // Volby času převzaté z dialogu Výzvy (stejný seznam hodin).
+    const src = document.getElementById('prikazVyzvaCasOd');
+    ['mkdsBatchCasOd', 'mkdsBatchCasDo'].forEach(id => { document.getElementById(id).innerHTML = src ? src.innerHTML : ''; });
+  })();
+
   function openMkdsBatch(choiceKey){
     mkdsBatchChoice = choiceKey;
     mkdsBatchRows = [];
+    mkdsBatchDays = new Set();
+    mkdsCalBase = null;
+    renderMkdsBatchCal();
+    document.getElementById('mkdsBatchCasOd').value = '08:00';
+    document.getElementById('mkdsBatchCasDo').value = '17:00';
     document.getElementById('mkdsBatchTitle').textContent = 'Dávka — ' + choiceKey;
     document.getElementById('mkdsBatchDirInput').value = '';
     renderMkdsBatchTable();
@@ -8701,6 +8779,13 @@
     btn.disabled = true;
     let done = 0;
     const failed = [], bezPrilohy = [];
+    // Společný termín dostavení (jen když je vybraný aspoň jeden den).
+    const dniDavky = Array.from(mkdsBatchDays).sort();
+    const dostaveniPlan = dniDavky.length ? {
+      datumyIso: dniDavky,
+      casOd: document.getElementById('mkdsBatchCasOd').value || null,
+      casDo: document.getElementById('mkdsBatchCasDo').value || null
+    } : null;
     for(const r of rows){
       btn.textContent = 'Zakládám ' + (done + 1) + ' / ' + rows.length + '…';
       try{
@@ -8738,7 +8823,8 @@
           mpmUdalostId: off.mpmId || null,
           mpmUdalostText: off.mpmText || null,
           source: 'addEvent',
-          mkdsBatch: { folder: r.dir, pdf: r.file.name }
+          mkdsBatch: { folder: r.dir, pdf: r.file.name },
+          dostaveniPlan: dostaveniPlan
         });
         if(photos.length){
           await docRef.collection('data').doc('photos').set({ photos, photoMimes: mimes, photoMime: mimes[0] || 'image/jpeg' });
@@ -10959,6 +11045,14 @@
     document.getElementById('prikazVyzvaDatum')._setDatePickerIso('');
     document.getElementById('prikazVyzvaCasOd').value = '08:00';
     document.getElementById('prikazVyzvaCasDo').value = '17:00';
+    // Termín dostavení nastavený předem u dávky MKDS (record.dostaveniPlan)
+    // se u Výzvy rovnou předvyplní — dny i čas od/do.
+    const planRec = (!prikazIsNewEvent && currentDetailRecord) ? currentDetailRecord.dostaveniPlan : null;
+    if(showVyzvaTermin && planRec && Array.isArray(planRec.datumyIso) && planRec.datumyIso.length){
+      document.getElementById('prikazVyzvaDatum')._setDatePickerIsoList(planRec.datumyIso);
+      if(planRec.casOd) document.getElementById('prikazVyzvaCasOd').value = planRec.casOd;
+      if(planRec.casDo) document.getElementById('prikazVyzvaCasDo').value = planRec.casDo;
+    }
     const note = document.getElementById('prikazScanNote');
     note.style.display = 'none';
     note.style.color = '';
@@ -11549,6 +11643,11 @@
     input._openDatePicker = open;
     input._setDatePickerIso = function(iso){
       selected = iso ? new Set([iso]) : new Set();
+      saveSelected();
+    };
+    // Víc dní najednou (předvyplnění termínu z dávky MKDS).
+    input._setDatePickerIsoList = function(list){
+      selected = new Set((list || []).filter(Boolean));
       saveSelected();
     };
     return { open, close };
