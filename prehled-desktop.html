@@ -296,7 +296,11 @@
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; cursor:help;
   }
 
-  .record-pachatel{font-size:12px; color:var(--muted); line-height:1.35; padding-top:4px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .record-pachatel{font-size:12px; color:var(--muted); line-height:1.35; padding-top:4px; text-align:center; overflow:hidden; display:flex; flex-direction:column; align-items:center; min-width:0;}
+  .record-pachatel span{max-width:100%; overflow:hidden; text-overflow:ellipsis;}
+  .record-pachatel .rp-name{color:var(--text); white-space:nowrap;}
+  .record-pachatel .rp-sub{font-family:'Roboto Mono',monospace; font-size:11px; color:var(--muted); white-space:nowrap;}
+  .record-pachatel .rp-addr{font-size:11px; color:var(--faint); line-height:1.3;}
   .record-castka{font-family:'Roboto Mono',monospace; font-size:12.5px; color:var(--text); padding-top:4px; text-align:center; white-space:nowrap;}
 
   .record-status{display:flex; flex-direction:column; align-items:center; text-align:center; gap:2px; padding-top:5px; font-size:12px; color:var(--muted); cursor:pointer;}
@@ -7480,7 +7484,14 @@
   function recordOsoby(r){
     const has = p => p && (p.jmeno || p.prijmeni || p.firma);
     if(has(r.prestupce) || has(r.provozovatel)){
-      return { prestupce: has(r.prestupce) ? r.prestupce : null, provozovatel: has(r.provozovatel) ? r.provozovatel : null };
+      let prov = has(r.provozovatel) ? r.provozovatel : null;
+      const pres = has(r.prestupce) ? r.prestupce : null;
+      // U dřív uložených záznamů: tatáž osoba → adresa provozovatele
+      // z identifikace (přestupce), viz parseProvozovatelText.
+      if(prov && pres && stejnaOsoba(prov, pres) && (pres.ulice || pres.mesto)){
+        prov = Object.assign({}, prov, { ulice: pres.ulice || null, cisloDomu: pres.cisloDomu || null, mesto: pres.mesto || null });
+      }
+      return { prestupce: pres, provozovatel: prov };
     }
     if(!has(r.pachatel)) return { prestupce: null, provozovatel: null };
     const jeProvozovatel = r.resolvedMethod === 'vyzva' || (r.resolvedMethod === 'oznameni' && !r.oznameniAsPrestupce);
@@ -7624,11 +7635,28 @@
       // Sloupce Provozovatel a Přestupce (viz recordOsoby) — každý
       // s tooltipem s datem narození / číslem dokladu / IČO.
       const osoby = recordOsoby(r);
+      // Pod jménem datum narození (u firmy IČO) a pod tím adresa —
+      // ulice a č.p. (u obcí bez ulic obec a č.p.), na dalším řádku
+      // PSČ a obec (uložené jako "PSČ, Obec").
       [osoby.provozovatel, osoby.prestupce].forEach(p=>{
         const cell = document.createElement('span');
         cell.className = 'record-pachatel';
         const name = osobaDisplayName(p);
-        cell.textContent = name || '—';
+        if(!name){
+          cell.textContent = '—';
+        } else {
+          const radek1 = pachatelBydlisteRadek1(p);
+          const mestoTxt = (p.mesto || '').replace(/,\s*/, ' ').trim();
+          const lines = [
+            '<span class="rp-name">' + escapeHtml(name) + '</span>',
+            p.firma
+              ? (p.ico ? '<span class="rp-sub">IČO ' + escapeHtml(p.ico) + '</span>' : '')
+              : (p.datumNarozeni ? '<span class="rp-sub">' + escapeHtml(p.datumNarozeni) + '</span>' : ''),
+            radek1 ? '<span class="rp-addr">' + escapeHtml(radek1) + '</span>' : '',
+            mestoTxt ? '<span class="rp-addr">' + escapeHtml(mestoTxt) + '</span>' : ''
+          ];
+          cell.innerHTML = lines.filter(Boolean).join('');
+        }
         if(name){
           cell.title = name +
             (p.datumNarozeni ? ' · nar. ' + p.datumNarozeni : '') +
@@ -13043,7 +13071,31 @@
     }
 
     extractAddress(parts, result);
+    // Provozovatel z lustrace RSV mívá neúplnou adresu (např. "98, 67801
+    // Blansko" bez místní části), identifikace obyvatel ji má celou
+    // ("Horní Lhota 98, 67801 Blansko"). Je-li přestupce tatáž osoba
+    // (stejné jméno, příjmení a datum narození), převezme provozovatel
+    // jeho adresu.
+    if(result.prestupce && stejnaOsoba(result, result.prestupce)){
+      ['ulice', 'cisloDomu', 'psc', 'obec'].forEach(k => { result[k] = result.prestupce[k] || null; });
+    }
     return result;
+  }
+  // Shoda osob podle jména, příjmení (bez ohledu na velikost písmen
+  // a diakritiku) a data narození — data v libovolném tvaru (ISO nebo
+  // DD.MM.RRRR) se porovnají jako den/měsíc/rok.
+  function stejnaOsoba(a, b){
+    if(!a || !b || a.firma || b.firma) return false;
+    const n = x => (x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    const dn = x => {
+      if(!x) return '';
+      let m = String(x).match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+      if(m) return +m[3] + '.' + +m[2] + '.' + m[1];
+      m = String(x).match(/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/);
+      return m ? (+m[1] + '.' + +m[2] + '.' + m[3]) : '';
+    };
+    const da = dn(a.narozeniIso || a.datumNarozeni), db = dn(b.narozeniIso || b.datumNarozeni);
+    return !!(n(a.jmeno) && n(a.prijmeni) && n(a.jmeno) === n(b.jmeno) && n(a.prijmeni) === n(b.prijmeni) && da && da === db);
   }
 
   // Přepne dialog mezi režimem "osoba" (Jméno/Příjmení/Datum narození/
