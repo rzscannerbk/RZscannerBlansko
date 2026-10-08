@@ -435,6 +435,9 @@
   .detail-rail-actions .btn{width:100%;}
   .detail-rail-doclinks{display:flex; gap:6px;}
   .detail-rail-doclinks .doc-link-btn{flex:1;}
+  /* Oznámení bodů čeká na vygenerování — pulzuje oranžově */
+  @keyframes docLinkBlink{0%,100%{border-color:var(--line); background:transparent; box-shadow:none;} 50%{border-color:var(--amber); background:var(--amber-glow, rgba(245,166,35,.18)); box-shadow:0 0 0 3px rgba(245,166,35,.25);}}
+  .doc-link-btn.blink{animation:docLinkBlink 1.2s ease-in-out infinite;}
   .detail-main{flex:1; display:flex; flex-direction:column; min-width:0; overflow:hidden;}
   .detail-tabs{display:flex; gap:4px; padding:14px 22px 0; border-bottom:1px solid var(--line); flex:0 0 auto;}
   .detail-tab{
@@ -1244,6 +1247,17 @@
         <button class="confirm-btn confirm-yes" id="addEventPlacenkyPrikazBtn">Příkaz na místě</button>
         <button class="confirm-btn confirm-no" id="addEventPlacenkyDomluvaBtn">Domluva</button>
         <button class="confirm-cancel" id="addEventPlacenkyModeCancelBtn">Zrušit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dotaz při zavření karty: bodovaný příkaz bez oznámení bodů -->
+  <div class="confirm-overlay" id="bodyAskOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text" id="bodyAskText">Vygenerovat oznámení bodů?</div>
+      <div class="confirm-btns">
+        <button class="confirm-btn confirm-no" id="bodyAskNoBtn">Ne</button>
+        <button class="confirm-btn confirm-yes" id="bodyAskYesBtn">Ano</button>
       </div>
     </div>
   </div>
@@ -10035,6 +10049,13 @@
     'Porušení zákazu vjezdu do pěší zóny (IZ 5a)': 'do 1 500 Kč',
     'Stání na parkovišti s parkovacím kotoučem bez viditelně nastaveného kotouče (IP 13c)': 'do 1 500 Kč',
     'Stání na vyhrazeném stání K+R (Kiss & Ride) mimo dovolený účel': 'do 1 500 Kč',
+    // Přestupky z "Přidat událost" (rychlost, placenky) a ZTP z katalogu
+    // terénní aplikace — částky příkazem na místě podle tabulky BESIP.
+    'Neoprávněné užití ZTP průkazu nebo stání na vyhrazeném parkovišti': '2 500–3 500 Kč',
+    'Stání bez zaplacení parkovacího poplatku': 'do 1 500 Kč',
+    'Překročení nejvyšší dovolené rychlosti o méně než 10 km/h': 'do 1 500 Kč',
+    'Překročení rychlosti o 10+ km/h': '1 500–2 000 Kč',
+    'Překročení rychlosti v obci 20+ km/h nebo mimo obec 30+ km/h': '2 500–3 500 Kč',
   };
   function getOffensePenaltyText(record){
     const penalty = record && record.offenseLabel ? OFFENSE_PENALTIES[record.offenseLabel] : null;
@@ -10731,6 +10752,8 @@
     if(bodyLink){
       const jedn = bodovaneJednani(record);
       bodyLink.style.display = maOznameniBodu(record) ? '' : 'none';
+      // Bliká, dokud oznámení bodů k příkazu nebylo vygenerováno.
+      bodyLink.classList.toggle('blink', maOznameniBodu(record) && !record.bodyOznameniAt);
       if(jedn) document.getElementById('docLinkBodyLabel').textContent = 'Oznámení bodů (' + jedn.body + ' b)';
     }
   }
@@ -11375,6 +11398,9 @@
       document.getElementById('prikazUlice').placeholder = startSnap.mesto ? 'ulice (nepovinné)' : 'nejdřív vyber obec';
     }
     // Termín dostavení se — jen u Výzvy, jinde se pole vůbec nezobrazí.
+    // Pole Částka ukazuje rozmezí pokuty pro daný přestupek (OFFENSE_PENALTIES).
+    const penaltyRange = currentDetailRecord && currentDetailRecord.offenseLabel ? OFFENSE_PENALTIES[currentDetailRecord.offenseLabel] : null;
+    document.getElementById('prikazCastka').placeholder = penaltyRange ? penaltyRange : 'např. 1500';
     const showVyzvaTermin = (prikazMode === 'vyzva');
     document.getElementById('prikazVyzvaDatumField').style.display = showVyzvaTermin ? '' : 'none';
     document.getElementById('prikazVyzvaCasField').style.display = showVyzvaTermin ? '' : 'none';
@@ -12715,7 +12741,7 @@
           }
           if(pachatel) extra.pachatel = pachatel;
           await markResolved(record, prikazMode, Object.keys(extra).length ? extra : undefined);
-          if(prikazIsNewEvent) closeDetailModal();
+          if(prikazIsNewEvent) requestCloseDetail();
         } else {
           // Dokument aplikace generuje podle způsobu — Výzva má navíc termín
           // dostavení (Dostavit se dne aplikace zobrazuje jen u ní, viz
@@ -13681,9 +13707,12 @@
     const filename = buildDocFilename('Výzva', record, record.pachatel);
     await exportVyzva(record, record.pachatel, filename, null);
   });
-  document.getElementById('docLinkBody').addEventListener('click', async ()=>{
-    const record = currentDetailRecord;
-    if(!record || !maOznameniBodu(record)) return;
+  document.getElementById('docLinkBody').addEventListener('click', ()=> generujOznameniBodu(currentDetailRecord));
+  // Vygeneruje a stáhne oznámení bodů; po úspěchu uloží k záznamu
+  // bodyOznameniAt (tlačítko přestane blikat a karta se při zavření už
+  // neptá). Vrací true/false.
+  async function generujOznameniBodu(record){
+    if(!record || !maOznameniBodu(record)) return false;
     try{
       if(typeof JSZip === 'undefined'){ alert('Chybí knihovna JSZip — zkontroluj připojení k internetu.'); return; }
       const osoba = recordOsoby(record).prestupce || record.pachatel || {};
@@ -13691,12 +13720,39 @@
       const blob = await buildBodyOznameniDocx(record);
       const filename = buildDocFilename('Oznámení bodů', record, osoba);
       downloadBlobWithFilename(blob, filename);
+      try{
+        await db.collection('prestupky').doc(record.id).update({ bodyOznameniAt: firebase.firestore.FieldValue.serverTimestamp() });
+      }catch(e){ console.error('Uložení příznaku oznámení bodů selhalo:', e); }
+      record.bodyOznameniAt = new Date();
+      if(currentDetailRecord && currentDetailRecord.id === record.id) renderResolutionHistory(record);
       if(!orp) alert('Úřad ORP pro trvalý pobyt přestupce se nepodařilo dohledat — adresáta doplň v dokumentu ručně.');
       else if(orp.overeno === false) alert('Adresa úřadu ' + orp.urad + ' není v tabulce ORP ověřená — před odesláním ji prosím zkontroluj.');
+      return true;
     }catch(e){
       console.error('Oznámení bodů selhalo:', e);
       alert('Vytvoření dokumentu se nezdařilo (' + e.message + ').');
+      return false;
     }
+  }
+
+  // Zavření karty strážníkem (křížek, klik mimo, Escape, i automatické
+  // zavření po příkazu u "Přidat událost"): když jde o bodovaný příkaz
+  // bez vygenerovaného oznámení bodů, nejdřív se zeptá Ano/Ne.
+  function requestCloseDetail(){
+    const record = currentDetailRecord;
+    if(!record || !maOznameniBodu(record) || record.bodyOznameniAt){ closeDetailModal(); return; }
+    const jedn = bodovaneJednani(record);
+    document.getElementById('bodyAskText').textContent = 'Oznámení bodů (' + jedn.body + ' b) pro ' + (formatPlate(record.plate) || 'tento přestupek') + ' zatím nebylo vygenerováno. Vygenerovat oznámení bodů?';
+    document.getElementById('bodyAskOverlay').classList.add('open');
+  }
+  document.getElementById('bodyAskYesBtn').addEventListener('click', async ()=>{
+    document.getElementById('bodyAskOverlay').classList.remove('open');
+    await generujOznameniBodu(currentDetailRecord);
+    closeDetailModal();
+  });
+  document.getElementById('bodyAskNoBtn').addEventListener('click', ()=>{
+    document.getElementById('bodyAskOverlay').classList.remove('open');
+    closeDetailModal();
   });
   document.getElementById('docLinkOznameni').addEventListener('click', async ()=>{
     const record = currentDetailRecord;
@@ -13939,12 +13995,16 @@
     document.getElementById('detailFullscreenBtn').title = isFullscreen ? 'Zmenšit' : 'Zobrazit na celou obrazovku';
   });
 
-  document.getElementById('detailCloseBtn').addEventListener('click', closeDetailModal);
+  document.getElementById('detailCloseBtn').addEventListener('click', requestCloseDetail);
   document.getElementById('detailModalOverlay').addEventListener('click', (e)=>{
-    if(e.target.id === 'detailModalOverlay') closeDetailModal();
+    if(e.target.id === 'detailModalOverlay') requestCloseDetail();
   });
   document.addEventListener('keydown', (e)=>{
-    if(e.key === 'Escape' && document.getElementById('detailModalOverlay').classList.contains('open')) closeDetailModal();
+    if(e.key === 'Escape' && document.getElementById('detailModalOverlay').classList.contains('open')){
+      if(document.getElementById('bodyAskOverlay').classList.contains('open')) return;
+      if(document.querySelector('.confirm-overlay.open')) return;
+      requestCloseDetail();
+    }
   });
 
 })();
