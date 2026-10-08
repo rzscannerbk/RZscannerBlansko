@@ -1037,6 +1037,7 @@
 
       <button class="icon-btn" id="fullscreenBtn" title="Celá obrazovka">⛶</button>
       <button class="icon-btn" id="themeToggleBtn" title="Světlý/tmavý režim">☾</button>
+      <button class="icon-btn" id="docFolderBtn" title="Složka pro ukládání dokumentů" style="display:none; width:auto; max-width:200px; padding:0 12px; font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">📁 Složka</button>
       <button class="icon-btn" id="shiftSummaryBtn" title="Svodky" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">Svodky</button>
       <button class="icon-btn" id="bulkDeleteBtn" title="Hromadné mazání (admin)" style="display:none; width:auto; padding:0 12px; font-size:12px; font-weight:600;">🗑 Mazat více</button>
       <button class="icon-btn" id="addEventBtn" title="Přidat událost" style="width:auto; padding:0 12px; font-size:12px; font-weight:600;">+ Přidat událost</button>
@@ -6496,6 +6497,172 @@
     setTimeout(()=> URL.revokeObjectURL(url), 60000);
   }
 
+  // ===== Ukládání dokumentů do zvolené složky v počítači =====
+  // File System Access API (Chrome/Edge na PC). Handle složky si aplikace
+  // drží v IndexedDB, takže výběr přežije zavření prohlížeče; prohlížeč se
+  // může jednou za čas znovu zeptat na povolení. Bez zvolené složky nebo
+  // v prohlížeči bez této funkce se dokument stáhne jako dřív.
+  const DOC_FOLDER_SUPPORTED = typeof window.showDirectoryPicker === 'function';
+  let docFolderHandle = null;
+  function docFolderDb(){
+    return new Promise((resolve, reject)=>{
+      const req = indexedDB.open('rzscanner-docfolder', 1);
+      req.onupgradeneeded = ()=> req.result.createObjectStore('kv');
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+  async function docFolderStore(handle){
+    const dbi = await docFolderDb();
+    await new Promise((resolve, reject)=>{
+      const tx = dbi.transaction('kv', 'readwrite');
+      if(handle) tx.objectStore('kv').put(handle, 'dir'); else tx.objectStore('kv').delete('dir');
+      tx.oncomplete = resolve; tx.onerror = ()=> reject(tx.error);
+    });
+  }
+  async function docFolderLoad(){
+    const dbi = await docFolderDb();
+    return new Promise((resolve, reject)=>{
+      const req = dbi.transaction('kv', 'readonly').objectStore('kv').get('dir');
+      req.onsuccess = ()=> resolve(req.result || null);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+  function updateDocFolderBtn(){
+    const btn = document.getElementById('docFolderBtn');
+    if(!btn) return;
+    if(!DOC_FOLDER_SUPPORTED){ btn.style.display = 'none'; return; }
+    btn.style.display = '';
+    if(docFolderHandle){
+      btn.textContent = '📁 ' + docFolderHandle.name;
+      btn.title = 'Dokumenty se ukládají do složky „' + docFolderHandle.name + '“ — klikni pro změnu';
+    }else{
+      btn.textContent = '📁 Složka';
+      btn.title = 'Vybrat složku, kam se budou ukládat vygenerované dokumenty';
+    }
+  }
+  async function pickDocFolder(){
+    try{
+      const h = await window.showDirectoryPicker({ id: 'rzscanner-docs', mode: 'readwrite' });
+      docFolderHandle = h;
+      try{ await docFolderStore(h); }catch(e){ console.error('Uložení složky selhalo:', e); }
+      updateDocFolderBtn();
+      return true;
+    }catch(e){
+      if(e && e.name !== 'AbortError') alert('Složku se nepodařilo vybrat (' + e.message + ').');
+      return false;
+    }
+  }
+  async function ensureDocFolderPermission(h){
+    const opts = { mode: 'readwrite' };
+    try{
+      if((await h.queryPermission(opts)) === 'granted') return true;
+      return (await h.requestPermission(opts)) === 'granted';
+    }catch(e){
+      console.warn('Povolení ke složce se nepodařilo získat:', e);
+      return false;
+    }
+  }
+  // Když už soubor stejného jména ve složce je, aplikace ho nepřepíše,
+  // ale přidá " (2)", " (3)"…
+  async function uniqueFileName(dir, filename){
+    const dot = filename.lastIndexOf('.');
+    const base = dot > 0 ? filename.slice(0, dot) : filename;
+    const ext = dot > 0 ? filename.slice(dot) : '';
+    for(let i = 1; i < 100; i++){
+      const name = i === 1 ? filename : (base + ' (' + i + ')' + ext);
+      try{ await dir.getFileHandle(name); }
+      catch(e){ if(e && e.name === 'NotFoundError') return name; throw e; }
+    }
+    return base + ' (' + Date.now() + ')' + ext;
+  }
+  function showSaveToast(text){
+    let t = document.getElementById('docSaveToast');
+    if(!t){
+      t = document.createElement('div');
+      t.id = 'docSaveToast';
+      t.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1f7a3f;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:100000;transition:opacity .3s;max-width:90vw;';
+      document.body.appendChild(t);
+    }
+    t.textContent = text;
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(()=>{ t.style.opacity = '0'; }, 3500);
+  }
+  // Název složky nesmí obsahovat znaky, které Windows ve jménech zakazuje.
+  function safeFolderName(name){
+    return String(name || '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
+  }
+  // Podsložka přihlášeného strážníka: jméno z OFFICER_BADGE_NUMBERS,
+  // jinak část e-mailu před zavináčem.
+  function docFolderOfficerName(){
+    let n = '';
+    try{ n = currentOfficerName(); }catch(e){}
+    if(!n){
+      const email = (auth.currentUser && auth.currentUser.email) || '';
+      n = email.split('@')[0];
+    }
+    return safeFolderName(n) || 'Nezařazeno';
+  }
+  // Společné uložení vygenerovaného dokumentu: zvolená složka (do
+  // podsložky <strážník>/<typ>) → jinak sdílení (mobil) → jinak běžné
+  // stažení. typeFolder: 'Výzva', 'Oznámení', 'Body', 'Svodky'.
+  async function saveDocBlob(blob, filename, typeFolder){
+    if(DOC_FOLDER_SUPPORTED && docFolderHandle){
+      try{
+        if(await ensureDocFolderPermission(docFolderHandle)){
+          const parts = [docFolderOfficerName()];
+          if(typeFolder) parts.push(safeFolderName(typeFolder));
+          let dir = docFolderHandle;
+          for(const part of parts){
+            dir = await dir.getDirectoryHandle(part, { create: true });
+          }
+          const name = await uniqueFileName(dir, filename);
+          const fh = await dir.getFileHandle(name, { create: true });
+          const w = await fh.createWritable();
+          await w.write(blob);
+          await w.close();
+          showSaveToast('Uloženo do „' + [docFolderHandle.name].concat(parts).join(' › ') + '“: ' + name);
+          return;
+        }
+      }catch(e){
+        console.error('Uložení do složky selhalo, stahuji normálně:', e);
+      }
+      downloadBlobWithFilename(blob, filename);
+      return;
+    }
+    try{
+      const file = new File([blob], filename, { type: blob.type });
+      if(navigator.canShare && navigator.canShare({ files: [file] })){
+        await navigator.share({ files: [file] });
+        return;
+      }
+    }catch(e){
+      // Sdílení zrušeno nebo nedostupné — stáhneme normálně.
+    }
+    downloadBlobWithFilename(blob, filename);
+  }
+  (async ()=>{
+    if(DOC_FOLDER_SUPPORTED){
+      try{ docFolderHandle = await docFolderLoad(); }catch(e){ docFolderHandle = null; }
+    }
+    updateDocFolderBtn();
+    const btn = document.getElementById('docFolderBtn');
+    if(btn) btn.addEventListener('click', async ()=>{
+      if(docFolderHandle){
+        if(!confirm('Dokumenty se ukládají do složky „' + docFolderHandle.name + '“.\n\nOK = vybrat jinou složku\nZrušit = ponechat')) {
+          if(confirm('Chceš ukládání do složky vypnout (dokumenty se budou zase stahovat do Stažených souborů)?')){
+            docFolderHandle = null;
+            try{ await docFolderStore(null); }catch(e){}
+            updateDocFolderBtn();
+          }
+          return;
+        }
+      }
+      await pickDocFolder();
+    });
+  })();
+
   async function exportOznameni(record, pachatel, filenameOverride){
     try{
       if(typeof JSZip === 'undefined'){
@@ -6527,17 +6694,7 @@
         : (photosB64 || []);
       const blob = await buildOznameniDocx(record, photosForDocx, pachatel, !!record.oznameniAsPrestupce);
       const filename = filenameOverride || ('Oznameni_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx');
-      try{
-        const file = new File([blob], filename, { type: blob.type });
-        if(navigator.canShare && navigator.canShare({ files: [file] })){
-          await navigator.share({ files: [file] });
-          return true;
-        }
-      }catch(e){
-        // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
-        // stažení pod skutečným názvem, stejně jako u ukládání fotek.
-      }
-      downloadBlobWithFilename(blob, filename);
+      await saveDocBlob(blob, filename, 'Oznámení');
       return true;
     }catch(e){
       console.error('Export Oznámení selhal:', e);
@@ -9866,16 +10023,7 @@
         totalCols: 4
       });
       const filename = shiftSummaryXlsxFilename(win, label);
-      try{
-        const file = new File([blob], filename, { type: blob.type });
-        if(navigator.canShare && navigator.canShare({ files: [file] })){
-          await navigator.share({ files: [file] });
-          return;
-        }
-      }catch(e){
-        // Sdílení zrušeno/nedostupné — spadneme na otevření v nové kartě.
-      }
-      downloadBlobWithFilename(blob, filename);
+      await saveDocBlob(blob, filename, 'Svodky');
     }catch(e){
       console.error('Export svodky do Excelu selhal:', e);
       alert('Vytvoření Excelu se nezdařilo (' + e.message + ').');
@@ -9894,16 +10042,7 @@
       }
       const blob = await buildShiftSummaryDocxForWindow(win, records, label);
       const filename = shiftSummaryFilename(win, label);
-      try{
-        const file = new File([blob], filename, { type: blob.type });
-        if(navigator.canShare && navigator.canShare({ files: [file] })){
-          await navigator.share({ files: [file] });
-          return;
-        }
-      }catch(e){
-        // Sdílení zrušeno/nedostupné — spadneme na otevření v nové kartě.
-      }
-      downloadBlobWithFilename(blob, filename);
+      await saveDocBlob(blob, filename, 'Svodky');
     }catch(e){
       console.error('Export souhrnu směny selhal:', e);
       alert('Vytvoření dokumentu se nezdařilo (' + e.message + ').');
@@ -13670,17 +13809,7 @@
       }
       const blob = await buildVyzvaDopisDocx(record, pachatel, dostaveniTermin);
       const filename = filenameOverride || ('Vyzva_' + (record.plate || 'prestupek').replace(/\s+/g,'') + '.docx');
-      try{
-        const file = new File([blob], filename, { type: blob.type });
-        if(navigator.canShare && navigator.canShare({ files: [file] })){
-          await navigator.share({ files: [file] });
-          return true;
-        }
-      }catch(e){
-        // Uživatel sdílení zrušil nebo API není k dispozici — spadneme na
-        // otevření v nové kartě, stejně jako u Oznámení.
-      }
-      downloadBlobWithFilename(blob, filename);
+      await saveDocBlob(blob, filename, 'Výzva');
       return true;
     }catch(e){
       console.error('Export Výzvy selhal:', e);
@@ -13719,7 +13848,7 @@
       const orp = lookupOrpAddress(osoba.mesto || '');
       const blob = await buildBodyOznameniDocx(record);
       const filename = buildDocFilename('Oznámení bodů', record, osoba);
-      downloadBlobWithFilename(blob, filename);
+      await saveDocBlob(blob, filename, 'Body');
       try{
         await db.collection('prestupky').doc(record.id).update({ bodyOznameniAt: firebase.firestore.FieldValue.serverTimestamp() });
       }catch(e){ console.error('Uložení příznaku oznámení bodů selhalo:', e); }
