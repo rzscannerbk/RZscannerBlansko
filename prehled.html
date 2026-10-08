@@ -1220,7 +1220,7 @@
     const vehicleBoldPart = (record.brand ? (record.brand + ', ') : '') + 'RZ ' + (record.plate || '');
     let vyzvaRuns = docxRun('Žádáme Vás, abyste se dostavil(a) dne ', { size: 20 }) +
       docxRun(dostaveniDatumCasText, { size: 20, bold: true }) +
-      docxRun(' na Městskou policii Blansko, Sadová č. 2, k podání vysvětlení podle § 11 odst. 1 zákona č. 553/1991 Sb., ' +
+      docxRun(' na Městskou policii Blansko, Sadová 2, k podání vysvětlení podle § 11 odst. 1 zákona č. 553/1991 Sb., ' +
         'o obecní policii, ve znění pozdějších předpisů, ve věci objasnění skutečností důležitých pro odhalení pachatele ' +
         'přestupku podle ' + skutekBaseCite + ', kterého se dne ' + formatDateCz(record.date) + ' v ' + (record.time || '—') +
         ' hodin dopustil dosud neustanovený řidič vozidla ', { size: 20 }) +
