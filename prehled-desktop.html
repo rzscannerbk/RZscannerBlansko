@@ -12492,14 +12492,68 @@
     return y + '-' + m.padStart(2, '0') + '-' + d.padStart(2, '0');
   }
 
-  // Jméno souboru: "Výzva/Oznámení rr-mm-dd - číslo přestupku - spz - příjmení"
+  // Jméno souboru: "Výzva/Oznámení rr-mm-dd - č. j. MP (jinak číslo přestupku) - druh - spz - příjmení"
   // (datum = den vygenerování dokumentu, ne den přestupku).
+  // Zkratka druhu přestupku do názvu souboru (B2/B28/F3/F4/K/clickpark/ZTP a terénní katalog).
+  // Primárně podle mpmUdalostId z katalogu "Přidat událost", jinak podle
+  // názvu/citace přestupku (záznamy z terénu).
+  const DOC_TAG_BY_MPM_ID = { '51977': 'B2', '51984': 'B28', '51957': 'F3', '53734': 'F4', '54735': 'K', '51989': 'clickpark', '51965': 'ZTP' };
+  function docOffenseTag(record){
+    if(!record) return '';
+    const byId = DOC_TAG_BY_MPM_ID[String(record.mpmUdalostId || '')];
+    if(byId) return byId;
+    const label = String(record.offenseLabel || '');
+    const cit = String(record.offenseCitation || '');
+    // Nejdřív podle názvu — položky, které sdílejí stejný paragraf
+    // (§ 124 odst. 15 písm. a), § 4 písm. c)) se jinak rozlišit nedají.
+    if(/parkovac[ií]ho poplatku|clickpark/i.test(label)) return 'clickpark';
+    if(/\bZTP\b/.test(label) || /písm\.\s*f\)\s*bod\s*11\b/.test(cit)) return 'ZTP';
+    if(/\bB\s?28\b/.test(label)) return 'B28';
+    if(/\bB\s?29\b/.test(label)) return 'B29';
+    if(/\bB\s?2\b/.test(label)) return 'B2';
+    if(/\bB\s?1\b/.test(label)) return 'B1';
+    if(/zákazu zastavení\s*[—-]\s*vodorovné/i.test(label)) return 'V12c';
+    if(/zákazu stání\s*[—-]\s*vodorovné/i.test(label)) return 'V12e';
+    if(/IZ\s?5a|pěší zón/i.test(label)) return 'IZ5a';
+    if(/IP\s?13c|parkovacím kotoučem/i.test(label)) return 'Kotouč';
+    if(/K\+R|Kiss/i.test(label)) return 'K+R';
+    if(/překážk/i.test(label)) return 'Překážka';
+    if(/písm\.\s*f\)\s*bod\s*3\b/.test(cit)) return 'F3';
+    if(/písm\.\s*f\)\s*bod\s*4\b/.test(cit)) return 'F4';
+    if(/o méně než 10 km\/h/i.test(label)) return 'K';
+    // Pak podle paragrafu v citaci (terénní katalog § 27, § 25, § 53 …).
+    let m = cit.match(/§\s*27\s*odst\.\s*1\s*písm\.\s*([a-s])\)/);
+    if(m){
+      const t = { a:'Zatáčka', b:'Vrchol', c:'Přechod', d:'Křižovatka', e:'Pruh', f:'Zastávka', g:'Přejezd', h:'Značka', i:'vyhr_pruh', j:'levý_pruh', k:'5m', l:'Most', m:'Tunel', n:'na_vjezdu', o:'Vyhrazené', p:'Tramvaj', r:'Zeleň', s:'Ohrožení' }[m[1]];
+      if(t) return t;
+    }
+    m = cit.match(/§\s*27\s*odst\.\s*([234])(?!\d)/);
+    if(m) return { '2':'Tram3,5', '3':'MimoObec', '4':'Okruh' }[m[1]];
+    m = cit.match(/§\s*25\s*odst\.\s*1\s*písm\.\s*([ab])\)/);
+    if(m) return m[1] === 'a' ? 'Protisměr' : 'Řada';
+    if(/§\s*25\s*odst\.\s*3(?!\d)/.test(cit)) return '3m';
+    if(/§\s*53\s*odst\.\s*2(?!\d)/.test(cit) || /na chodníku/i.test(label)) return 'Chodník';
+    if(/§\s*5\s*odst\.\s*1\s*písm\.\s*g\)/.test(cit) || /zábor/i.test(label)) return 'Zábor';
+    if(/§\s*124\s*odst\.\s*15\s*písm\.\s*b\)/.test(cit) || /obecná kategorie/i.test(label)) return 'Stání';
+    return '';
+  }
+  // Č. j. z MP Manageru ("2026/02724" nebo "MP 2026/02724") → "MP_2026_02724".
+  function docCjForFilename(record){
+    const raw = String((record && record.mpmCisloJednaci) || '').trim().replace(/^MP[\s_]*/i, '');
+    if(!raw) return '';
+    return 'MP_' + raw.replace(/[\/\s]+/g, '_');
+  }
   function buildDocFilename(prefix, record, pachatel){
     const now = new Date();
     const pad = n => String(n).padStart(2, '0');
     const rrMmDd = pad(now.getFullYear() % 100) + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
     const bits = [];
-    if(record.noticeNumber) bits.push(record.noticeNumber);
+    // Místo pořadového čísla z RZ Scanneru č. j. z MP Manageru
+    // (MP_2026_02724) + druh přestupku; bez č. j. zůstává pořadové číslo.
+    const cj = docCjForFilename(record);
+    if(cj) bits.push(cj); else if(record.noticeNumber) bits.push(record.noticeNumber);
+    const tag = docOffenseTag(record);
+    if(tag) bits.push(tag);
     if(record.plate) bits.push(record.plate);
     // "přestupce" se do názvu vloží jen u Oznámení vygenerovaného
     // v režimu PŘESTUPCE (viz record.oznameniAsPrestupce, nastavuje se
