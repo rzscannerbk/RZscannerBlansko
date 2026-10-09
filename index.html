@@ -923,6 +923,17 @@
     </div>
   </div>
 
+  <div class="confirm-overlay" id="sharePhotosOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text">Odeslat fotky e-mailem?</div>
+      <div class="printer-check-note" id="sharePhotosNote"></div>
+      <div class="confirm-btns">
+        <button class="confirm-btn confirm-no" id="sharePhotosSkipBtn">Přeskočit</button>
+        <button class="confirm-btn confirm-yes" id="sharePhotosYesBtn">Sdílet</button>
+      </div>
+    </div>
+  </div>
+
   <div class="confirm-overlay" id="copyPrintOverlay">
     <div class="confirm-box">
       <div class="confirm-text">Tisk kopie?</div>
@@ -1423,6 +1434,12 @@
           : 'Odesláno, ale bez čísla výzvy/jména strážníka (je potřeba upravit Firestore pravidla).';
       }
 
+      // Režim bez RZ: nejdřív nabídnout poslání fotek e-mailem, pak tisk.
+      if(submittedRecord.noPlate){
+        btn.textContent = 'Sdílení fotek…';
+        await offerSharePhotos(submittedRecord);
+      }
+
       let reachable = false;
       if(!opts.skipPrint){
         reachable = await pingPrinter();
@@ -1448,6 +1465,61 @@
       btn.textContent = originalText;
       btn.disabled = false;
     }
+  }
+
+  // Režim bez RZ: po odeslání do přehledu (a před tiskem) nabídne poslat
+  // fotky přestupku přes systémové sdílení (typicky Mail) s předvyplněným
+  // textem. Safari dovolí sdílení jen přímo z klepnutí — proto dialog
+  // s tlačítkem "Sdílet", ne automatické otevření po odeslání. Adresu
+  // příjemce sdílení předvyplnit neumí (iOS ji nabídne z naposledy
+  // použitých).
+  function buildShareText(rec){
+    const lines = [
+      'Přestupek č. ' + (rec.noticeNumber || '—'),
+      'RZ: ' + (rec.plate || '—'),
+      'Datum a čas: ' + formatDateCz(rec.date) + ' ' + (rec.time || ''),
+      'Místo: ' + (rec.address || '—'),
+      'Přestupek: ' + (rec.offenseLabel || '—')
+    ];
+    if(rec.officerName) lines.push('Strážník: ' + rec.officerName);
+    lines.push('', 'Fotodokumentace v příloze.');
+    return lines.join('\n');
+  }
+  function offerSharePhotos(rec){
+    return new Promise((resolve)=>{
+      const photos = rec.photos || [];
+      if(!photos.length || !navigator.share){ resolve(false); return; }
+      const files = photos.map((b64, i)=>{
+        const bin = atob(b64);
+        const arr = new Uint8Array(bin.length);
+        for(let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+        return new File([arr], 'prestupek_' + (rec.noticeNumber || 'foto') + '_' + (i + 1) + '.jpg', { type: 'image/jpeg' });
+      });
+      if(navigator.canShare && !navigator.canShare({ files })){ resolve(false); return; }
+      const title = 'Přestupek ' + (rec.noticeNumber || '') + (rec.plate ? ' – ' + rec.plate : '');
+      const text = buildShareText(rec);
+      const overlay = document.getElementById('sharePhotosOverlay');
+      const yesBtn = document.getElementById('sharePhotosYesBtn');
+      const skipBtn = document.getElementById('sharePhotosSkipBtn');
+      const note = document.getElementById('sharePhotosNote');
+      note.textContent = files.length + (files.length === 1 ? ' fotka' : (files.length < 5 ? ' fotky' : ' fotek'));
+      function cleanup(r){
+        overlay.classList.remove('open');
+        yesBtn.removeEventListener('click', onYes);
+        skipBtn.removeEventListener('click', onSkip);
+        resolve(r);
+      }
+      function onYes(){
+        // navigator.share musí být zavolané synchronně v tomhle klepnutí.
+        navigator.share({ files, title, text })
+          .then(()=> cleanup(true))
+          .catch(()=> cleanup(false));
+      }
+      function onSkip(){ cleanup(false); }
+      yesBtn.addEventListener('click', onYes);
+      skipBtn.addEventListener('click', onSkip);
+      overlay.classList.add('open');
+    });
   }
 
   // Dotaz "Tisk kopie?" — resolve(true) = Ano.
