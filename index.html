@@ -626,7 +626,7 @@
           <div class="shutter-btn" id="captureBtn">
             <svg viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="#241a00" stroke-width="1.8"/><circle cx="12" cy="13" r="3.4" stroke="#241a00" stroke-width="1.8"/></svg>
           </div>
-          <button type="button" class="noplate-toggle" id="noPlateToggle" aria-pressed="false" title="Bez RZ — vytiskne výzvu/oznámení s prázdným rámečkem pro dopsání, nic se neodesílá"><span class="np-box"></span>bez RZ</button>
+          <button type="button" class="noplate-toggle" id="noPlateToggle" aria-pressed="false" title="Bez RZ — přestupek se odešle normálně s pořadovým číslem, RZ se jen vytiskne (i na kopii), do přehledu/Firebase se neukládá"><span class="np-box"></span>bez RZ</button>
           <button class="btn btn-primary" id="batchStartBtn" title="Dávka (více aut)" aria-label="Dávka (více aut)" style="position:absolute; left:calc(50% + 76px); top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center; flex:none; width:48px; height:48px; padding:0; pointer-events:all;">
             <svg viewBox="0 0 24 24" fill="none" style="width:24px; height:24px;">
               <rect x="2" y="9" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.5"/>
@@ -1097,9 +1097,10 @@
   // návratu na úvodní obrazovku, a Náhled se už neptá znovu na typ
   // dokumentu (ten se vybírá jednou pro celou dávku).
   let batchCapturing = false;
-  // Režim "bez RZ" (zaškrtávátko vlevo od spouště): značka se neskenuje,
-  // nic se neodesílá do přehledu ani do Firebase — jen se vytiskne výzva/
-  // oznámení s prázdným rámečkem na RZ k ručnímu dopsání (+ volitelně kopie).
+  // Režim "bez RZ" (zaškrtávátko vlevo od spouště): značka se načte,
+  // přestupek se odešle normálně (pořadové číslo, přehled), jen RZ se do
+  // Firebase NEUKLÁDÁ — je jen na výtisku (+ dotaz na kopii). Prázdná RZ
+  // se tiskne jako rámeček k dopsání.
   // noPlateMode = stav zaškrtávátka, currentNoPlate = aktuální záznam
   // vznikl v tomhle režimu.
   let noPlateMode = false;
@@ -1210,8 +1211,6 @@
   // Při chybě rovnou vyhazuje výjimku — volající si řeší svoje vlastní
   // UI (tlačítko/poznámku), tahle funkce žádné prvky obrazovky nezná.
   async function submitPrestupekToFirestore(docType){
-    // Pojistka: záznam z režimu bez RZ se nikdy nesmí dostat do Firestore.
-    if(lastGeneratedPdf && lastGeneratedPdf.noPlate) throw new Error('Režim bez RZ se neodesílá.');
     docType = docType || 'vyzva';
     // Firestore documents are capped at ~1 MiB; leave headroom for the
     // other fields. The stored value IS the base64 string, so the check
@@ -1249,7 +1248,9 @@
       }
     }
     const baseData = {
-      plate: lastGeneratedPdf.plate,
+      // Režim "bez RZ": přestupek se odešle normálně (s pořadovým číslem),
+      // jen RZ se do přehledu/Firebase neukládá — zůstane jen na výtisku.
+      plate: lastGeneratedPdf.noPlate ? null : lastGeneratedPdf.plate,
       date: lastGeneratedPdf.date,
       time: lastGeneratedPdf.time,
       address: lastGeneratedPdf.address,
@@ -1330,11 +1331,6 @@
     if(!lastGeneratedPdf){
       show('result');
       setSubmitNote('Nejdřív zobrazte náhled.', 'err');
-      return;
-    }
-    if(lastGeneratedPdf.noPlate){
-      document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
-      printNoPlateFromPreview();
       return;
     }
     if(!lastGeneratedPdf.photos || lastGeneratedPdf.photos.length === 0){
@@ -1435,7 +1431,12 @@
         }
         if(reachable){
           btn.textContent = 'Tiskne se…';
-          await printViaEpson(submittedRecord);
+          const printed = await printViaEpson(submittedRecord);
+          // Režim bez RZ: po úspěšném tisku nabídnout kopii.
+          if(printed && submittedRecord.noPlate && await askPrintCopy()){
+            btn.textContent = 'Tiskne se kopie…';
+            await printViaEpson(submittedRecord);
+          }
         }
       }
       setTimeout(()=>{ finishBatchItemOrGoHome(); }, reachable ? 1000 : 0);
@@ -1467,44 +1468,6 @@
       noBtn.addEventListener('click', onNo);
       overlay.classList.add('open');
     });
-  }
-
-  // Režim bez RZ: NIC se neodesílá (žádný Firestore, žádné číslo jednací,
-  // žádná historie) — jen tisk s prázdným rámečkem na RZ a po úspěšném
-  // tisku dotaz na kopii. Když strážník tisk zruší nebo selže, zůstane na
-  // Kontrole údajů a může to zkusit znovu.
-  async function printNoPlateFromPreview(){
-    const btn = document.getElementById('pdfPreviewPrintBtn');
-    const note = document.getElementById('pdfPreviewPrinterNote');
-    const report = (text, kind)=>{
-      note.style.display = text ? 'block' : 'none';
-      note.style.color = kind === 'err' ? 'var(--bad)' : '';
-      note.textContent = text || '';
-    };
-    btn.disabled = true;
-    btn.textContent = 'Tiskne se…';
-    report('', '');
-    let reachable = await pingPrinter();
-    if(!reachable) reachable = await showPrinterOfflineDialog();
-    if(!reachable){
-      btn.disabled = false;
-      btn.textContent = 'Vytisknout';
-      return;
-    }
-    const ok = await printViaEpson(lastGeneratedPdf, report);
-    if(!ok){
-      btn.disabled = false;
-      btn.textContent = 'Vytisknout';
-      return;
-    }
-    if(await askPrintCopy()){
-      btn.textContent = 'Tiskne se kopie…';
-      await printViaEpson(lastGeneratedPdf, report);
-    }
-    // Zaškrtávátko "bez RZ" zůstává, jak ho strážník nechal — vypíná se
-    // jen ručně na kameře.
-    currentNoPlate = false;
-    setTimeout(()=>{ finishBatchItemOrGoHome(); }, 800);
   }
 
   document.getElementById('loginCancelBtn').addEventListener('click', ()=>{
@@ -1999,42 +1962,6 @@
     document.getElementById('thumb').src = cropDataUrl;
     show('processing');
 
-    // Dávka bez RZ: fotka jde rovnou do fronty bez rozpoznávání, jen
-    // s dohledaným místem, a foťák se hned otevře na další auto.
-    if(batchCapturing && batchNoPlate){
-      const location = await getLocationAndAddress();
-      const now = new Date();
-      const pad2 = n => String(n).padStart(2,'0');
-      batchQueue.push({
-        id: 'b' + Date.now() + Math.random().toString(36).slice(2, 7),
-        fullShotDataUrl,
-        date: now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate()),
-        time: now.toTimeString().slice(0,5),
-        recognizedText: '', confidence: 0, ocrErrorMessage: null,
-        brand: null, color: null, locallyDetectedColor: null, locallyDetectedBrand: null,
-        location,
-        offense: batchOffense,
-        docType: batchDocType,
-        noPlate: true,
-        done: false
-      });
-      updateBatchCounterUI();
-      openCamera();
-      return;
-    }
-
-    // Bez RZ: žádné rozpoznávání značky (ani značky/barvy vozidla) — jen
-    // dohledání místa, pak rovnou kontrolní obrazovka.
-    if(noPlateMode && !batchCapturing){
-      const label = document.getElementById('processingLabel');
-      label.textContent = 'Zjišťuji místo…';
-      const location = await getLocationAndAddress();
-      label.textContent = 'Rozpoznávám značku…';
-      populateResult('', 0, null, location);
-      applyNoPlateResultUI();
-      show('result');
-      return;
-    }
 
     let recognizedText = '';
     let confidence = 0;
@@ -2104,6 +2031,7 @@
         location,
         offense: batchOffense,
         docType: batchDocType,
+        noPlate: batchNoPlate,
         done: false
       });
       updateBatchCounterUI();
@@ -2158,24 +2086,13 @@
       t.querySelector('.np-box').textContent = noPlateMode ? '✓' : '';
     }
     const hint = document.querySelector('.cam-hint');
-    if(hint) hint.textContent = noPlateMode ? 'BEZ RZ — VYFOŤ VOZIDLO' : 'SROVNEJ ZNAČKU DO RÁMEČKU';
+    if(hint) hint.textContent = noPlateMode ? 'BEZ RZ — RZ SE NEODEŠLE' : 'SROVNEJ ZNAČKU DO RÁMEČKU';
     updateBatchCounterUI();
   }
   document.getElementById('noPlateToggle').addEventListener('click', ()=>{
     noPlateMode = !noPlateMode;
     updateNoPlateUI();
   });
-  // Kontrolní obrazovka v režimu bez RZ — pole RZ je prázdné a zamčené.
-  function applyNoPlateResultUI(){
-    currentNoPlate = true;
-    const pi = document.getElementById('plateInput');
-    pi.value = '';
-    pi.readOnly = true;
-    pi.placeholder = 'BEZ RZ';
-    const dup = document.getElementById('duplicateWarning');
-    dup.style.display = 'none';
-    dup.textContent = '';
-  }
 
   async function startBatchAfterOffensePicked(){
     // V dávce se aplikace na typ dokumentu neptá — hromadné botičky se
@@ -2207,13 +2124,13 @@
       info.className = 'history-info';
       const plateEl = document.createElement('div');
       plateEl.className = 'history-plate';
-      plateEl.textContent = item.noPlate ? 'BEZ RZ' : (item.recognizedText ? formatPlateDisplay(item.recognizedText) : '(SPZ nerozpoznána)');
+      plateEl.textContent = item.recognizedText ? formatPlateDisplay(item.recognizedText) : '(SPZ nerozpoznána)';
       info.appendChild(plateEl);
       const statusEl = document.createElement('div');
       if(item.done){
         statusEl.className = 'batch-queue-status ok';
-        statusEl.textContent = item.noPlate ? '✓ Vytištěno' : '✓ Odesláno';
-      } else if(!item.recognizedText && !item.noPlate){
+        statusEl.textContent = '✓ Odesláno';
+      } else if(!item.recognizedText){
         statusEl.className = 'batch-queue-status warn';
         statusEl.textContent = '⚠ Zkontrolovat ručně';
       } else {
@@ -2258,11 +2175,7 @@
     document.getElementById('timeInput').value = item.time;
     selectedOffense = item.offense;
     updateOffenseDisplay();
-    if(item.noPlate){
-      applyNoPlateResultUI();
-      show('result');
-      return;
-    }
+    currentNoPlate = !!item.noPlate;
     applyRecognizedBrandColor(item.brand, item.color);
     applyDetectedColor(item.locallyDetectedColor);
     if(!item.brand) applyDetectedBrand(item.locallyDetectedBrand);
@@ -2822,11 +2735,10 @@
   });
 
   function populateResult(text, confidence, ocrErrorMessage, location){
-    currentNoPlate = false;
-    const plateInputEl = document.getElementById('plateInput');
-    plateInputEl.readOnly = false;
-    plateInputEl.placeholder = '';
-    plateInputEl.value = formatPlateDisplay(text);
+    // Režim "bez RZ" = jen tisk, nic se neodesílá. Položka z dávky si ho
+    // pak přepíše podle sebe (viz openBatchItemForReview).
+    currentNoPlate = noPlateMode;
+    document.getElementById('plateInput').value = formatPlateDisplay(text);
     const now = new Date();
     const pad2 = n => String(n).padStart(2,'0');
     document.getElementById('dateInput').value = now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate());
@@ -3027,7 +2939,7 @@
         <div class="notice-subtitle${isBoticka ? ' notice-subtitle-boticka' : ''}">${isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku'}</div>
         ${numberBlock}
         <div class="notice-label">Registrační značka</div>
-        ${record.noPlate ? '<div class="notice-platebox notice-platebox-empty">&nbsp;</div>' : `<div class="notice-platebox">${escapeHtml(record.plate || '')}</div>`}
+        ${(record.noPlate && !record.plate) ? '<div class="notice-platebox notice-platebox-empty">&nbsp;</div>' : `<div class="notice-platebox">${escapeHtml(record.plate || '')}</div>`}
         ${vehicleBlock}
         <div class="notice-datetime">Datum: ${escapeHtml(formatDateCz(record.date))}&nbsp;&nbsp;&nbsp;Čas: ${escapeHtml(record.time || '—')}</div>
         ${addressBlock}
@@ -3184,7 +3096,7 @@
       x += textEl(record.noticeNumber + '\n', { align: 'center', em: true, width: 2, height: 2 });
     }
     x += textEl('\nREGISTRAČNÍ ZNAČKA\n', { align: 'center' });
-    if(record.noPlate){
+    if(record.noPlate && !record.plate){
       // Prázdný rámeček na ruční dopsání RZ.
       x += textEl('\n+--------------------------+\n', { align: 'center' });
       x += textEl('|                          |\n', { align: 'center', height: 2 });
@@ -3530,7 +3442,10 @@
 
 
   document.getElementById('makePdfBtn').addEventListener('click', async ()=>{
-    const plate = currentNoPlate ? '' : (document.getElementById('plateInput').value.trim() || 'NEZNÁMÁ SPZ');
+    const plateRaw = document.getElementById('plateInput').value.trim();
+    // V režimu bez odesílání se prázdná RZ vytiskne jako prázdný rámeček
+    // k dopsání (viz buildEposPrintXml), jinak jako dřív "NEZNÁMÁ SPZ".
+    const plate = plateRaw || (currentNoPlate ? '' : 'NEZNÁMÁ SPZ');
     const date = document.getElementById('dateInput').value;
     const time = document.getElementById('timeInput').value;
     const address = document.getElementById('addressInput').value.trim();
@@ -3617,7 +3532,7 @@
       // všechny přestupky, ne nová pro každý).
       const submitBtn = document.getElementById('pdfPreviewPrintBtn');
       submitBtn.disabled = false;
-      submitBtn.textContent = currentNoPlate ? 'Vytisknout' : 'Odeslat';
+      submitBtn.textContent = 'Odeslat';
       const printerNote = document.getElementById('pdfPreviewPrinterNote');
       printerNote.style.display = 'none';
       printerNote.style.color = '';
@@ -3629,7 +3544,7 @@
       document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5');
       show('pdfPreview');
 
-      if(!currentNoPlate) saveCurrentToHistory({ plate, date, time, address, offense: selectedOffense });
+      saveCurrentToHistory({ plate, date, time, address, offense: selectedOffense });
     }catch(e){
       console.error('Příprava náhledu selhala:', e);
       alert('Příprava náhledu se nezdařila (' + (e && e.message ? e.message : 'neznámá chyba') + '). Zkuste to prosím znovu.');
