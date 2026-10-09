@@ -155,6 +155,18 @@
   }
   .cam-bottom{position:relative; display:flex; align-items:center; justify-content:center; padding:0 0 calc(env(safe-area-inset-bottom,0px) + 30px);}
   .cam-bottom .shutter-btn{pointer-events:all;}
+  /* Zaškrtávátko "bez RZ" vlevo od spouště (zrcadlově k tlačítku Dávka) */
+  .noplate-toggle{position:absolute; right:calc(50% + 76px); top:50%; transform:translateY(-50%);
+    width:48px; height:48px; border-radius:12px; padding:0; pointer-events:all; cursor:pointer;
+    background:rgba(0,0,0,.45); border:2px solid var(--amber); color:#fff;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    font-family:'Roboto Mono',monospace; font-weight:700; font-size:9px; letter-spacing:.02em; line-height:1;
+    -webkit-user-select:none; user-select:none;}
+  .noplate-toggle .np-box{width:16px; height:16px; border:2px solid var(--amber); border-radius:4px;
+    display:flex; align-items:center; justify-content:center; font-size:12px; line-height:1;}
+  .noplate-toggle.on{background:var(--amber); color:#241a00;}
+  .noplate-toggle.on .np-box{border-color:#241a00;}
+  .notice-platebox-empty{min-width:200px; min-height:40px; box-sizing:border-box;}
 
   /* ---------- SCREEN: PROCESSING ---------- */
   #processingScreen{align-items:center; justify-content:center; background:var(--asphalt);}
@@ -614,6 +626,7 @@
           <div class="shutter-btn" id="captureBtn">
             <svg viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="#241a00" stroke-width="1.8"/><circle cx="12" cy="13" r="3.4" stroke="#241a00" stroke-width="1.8"/></svg>
           </div>
+          <button type="button" class="noplate-toggle" id="noPlateToggle" aria-pressed="false" title="Bez RZ — vytiskne výzvu/oznámení s prázdným rámečkem pro dopsání, nic se neodesílá"><span class="np-box"></span>bez RZ</button>
           <button class="btn btn-primary" id="batchStartBtn" title="Dávka (více aut)" aria-label="Dávka (více aut)" style="position:absolute; left:calc(50% + 76px); top:50%; transform:translateY(-50%); display:flex; align-items:center; justify-content:center; flex:none; width:48px; height:48px; padding:0; pointer-events:all;">
             <svg viewBox="0 0 24 24" fill="none" style="width:24px; height:24px;">
               <rect x="2" y="9" width="13" height="10" rx="1.6" stroke="#241a00" stroke-width="1.5"/>
@@ -910,6 +923,16 @@
     </div>
   </div>
 
+  <div class="confirm-overlay" id="copyPrintOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text">Tisk kopie?</div>
+      <div class="confirm-btns">
+        <button class="confirm-btn confirm-no" id="copyPrintNoBtn">Ne</button>
+        <button class="confirm-btn confirm-yes" id="copyPrintYesBtn">Ano</button>
+      </div>
+    </div>
+  </div>
+
   <div class="photo-lightbox-overlay" id="photoLightboxOverlay">
     <img id="photoLightboxImg" alt="Fotodokumentace">
     <button type="button" id="photoLightboxBlurBtn" class="photo-lightbox-blur-btn" title="Rozmazat obličeje/cizí značky">◐ Rozmazat</button>
@@ -1074,6 +1097,15 @@
   // návratu na úvodní obrazovku, a Náhled se už neptá znovu na typ
   // dokumentu (ten se vybírá jednou pro celou dávku).
   let batchCapturing = false;
+  // Režim "bez RZ" (zaškrtávátko vlevo od spouště): značka se neskenuje,
+  // nic se neodesílá do přehledu ani do Firebase — jen se vytiskne výzva/
+  // oznámení s prázdným rámečkem na RZ k ručnímu dopsání (+ volitelně kopie).
+  // noPlateMode = stav zaškrtávátka, currentNoPlate = aktuální záznam
+  // vznikl v tomhle režimu.
+  let noPlateMode = false;
+  let currentNoPlate = false;
+  // Režim bez RZ zafixovaný pro právě focenou dávku (při startu dávky).
+  let batchNoPlate = false;
   let pickingOffenseForBatch = false;
   let batchOffense = null;
   let batchDocType = null;
@@ -1178,6 +1210,8 @@
   // Při chybě rovnou vyhazuje výjimku — volající si řeší svoje vlastní
   // UI (tlačítko/poznámku), tahle funkce žádné prvky obrazovky nezná.
   async function submitPrestupekToFirestore(docType){
+    // Pojistka: záznam z režimu bez RZ se nikdy nesmí dostat do Firestore.
+    if(lastGeneratedPdf && lastGeneratedPdf.noPlate) throw new Error('Režim bez RZ se neodesílá.');
     docType = docType || 'vyzva';
     // Firestore documents are capped at ~1 MiB; leave headroom for the
     // other fields. The stored value IS the base64 string, so the check
@@ -1298,6 +1332,11 @@
       setSubmitNote('Nejdřív zobrazte náhled.', 'err');
       return;
     }
+    if(lastGeneratedPdf.noPlate){
+      document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
+      printNoPlateFromPreview();
+      return;
+    }
     if(!lastGeneratedPdf.photos || lastGeneratedPdf.photos.length === 0){
       const note = document.getElementById('pdfPreviewPrinterNote');
       note.style.display = 'block';
@@ -1408,6 +1447,64 @@
       btn.textContent = originalText;
       btn.disabled = false;
     }
+  }
+
+  // Dotaz "Tisk kopie?" — resolve(true) = Ano.
+  function askPrintCopy(){
+    return new Promise((resolve)=>{
+      const overlay = document.getElementById('copyPrintOverlay');
+      const yesBtn = document.getElementById('copyPrintYesBtn');
+      const noBtn = document.getElementById('copyPrintNoBtn');
+      function cleanup(r){
+        overlay.classList.remove('open');
+        yesBtn.removeEventListener('click', onYes);
+        noBtn.removeEventListener('click', onNo);
+        resolve(r);
+      }
+      function onYes(){ cleanup(true); }
+      function onNo(){ cleanup(false); }
+      yesBtn.addEventListener('click', onYes);
+      noBtn.addEventListener('click', onNo);
+      overlay.classList.add('open');
+    });
+  }
+
+  // Režim bez RZ: NIC se neodesílá (žádný Firestore, žádné číslo jednací,
+  // žádná historie) — jen tisk s prázdným rámečkem na RZ a po úspěšném
+  // tisku dotaz na kopii. Když strážník tisk zruší nebo selže, zůstane na
+  // Kontrole údajů a může to zkusit znovu.
+  async function printNoPlateFromPreview(){
+    const btn = document.getElementById('pdfPreviewPrintBtn');
+    const note = document.getElementById('pdfPreviewPrinterNote');
+    const report = (text, kind)=>{
+      note.style.display = text ? 'block' : 'none';
+      note.style.color = kind === 'err' ? 'var(--bad)' : '';
+      note.textContent = text || '';
+    };
+    btn.disabled = true;
+    btn.textContent = 'Tiskne se…';
+    report('', '');
+    let reachable = await pingPrinter();
+    if(!reachable) reachable = await showPrinterOfflineDialog();
+    if(!reachable){
+      btn.disabled = false;
+      btn.textContent = 'Vytisknout';
+      return;
+    }
+    const ok = await printViaEpson(lastGeneratedPdf, report);
+    if(!ok){
+      btn.disabled = false;
+      btn.textContent = 'Vytisknout';
+      return;
+    }
+    if(await askPrintCopy()){
+      btn.textContent = 'Tiskne se kopie…';
+      await printViaEpson(lastGeneratedPdf, report);
+    }
+    // Zaškrtávátko "bez RZ" zůstává, jak ho strážník nechal — vypíná se
+    // jen ručně na kameře.
+    currentNoPlate = false;
+    setTimeout(()=>{ finishBatchItemOrGoHome(); }, 800);
   }
 
   document.getElementById('loginCancelBtn').addEventListener('click', ()=>{
@@ -1902,6 +1999,43 @@
     document.getElementById('thumb').src = cropDataUrl;
     show('processing');
 
+    // Dávka bez RZ: fotka jde rovnou do fronty bez rozpoznávání, jen
+    // s dohledaným místem, a foťák se hned otevře na další auto.
+    if(batchCapturing && batchNoPlate){
+      const location = await getLocationAndAddress();
+      const now = new Date();
+      const pad2 = n => String(n).padStart(2,'0');
+      batchQueue.push({
+        id: 'b' + Date.now() + Math.random().toString(36).slice(2, 7),
+        fullShotDataUrl,
+        date: now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate()),
+        time: now.toTimeString().slice(0,5),
+        recognizedText: '', confidence: 0, ocrErrorMessage: null,
+        brand: null, color: null, locallyDetectedColor: null, locallyDetectedBrand: null,
+        location,
+        offense: batchOffense,
+        docType: batchDocType,
+        noPlate: true,
+        done: false
+      });
+      updateBatchCounterUI();
+      openCamera();
+      return;
+    }
+
+    // Bez RZ: žádné rozpoznávání značky (ani značky/barvy vozidla) — jen
+    // dohledání místa, pak rovnou kontrolní obrazovka.
+    if(noPlateMode && !batchCapturing){
+      const label = document.getElementById('processingLabel');
+      label.textContent = 'Zjišťuji místo…';
+      const location = await getLocationAndAddress();
+      label.textContent = 'Rozpoznávám značku…';
+      populateResult('', 0, null, location);
+      applyNoPlateResultUI();
+      show('result');
+      return;
+    }
+
     let recognizedText = '';
     let confidence = 0;
     let ocrErrorMessage = null;
@@ -2011,6 +2145,36 @@
       finishBtn.style.display = 'none';
       if(startBtn) startBtn.style.display = 'flex';
     }
+    const npToggle = document.getElementById('noPlateToggle');
+    if(npToggle) npToggle.style.display = batchCapturing ? 'none' : 'flex';
+  }
+
+  // ---------- Režim bez RZ ----------
+  function updateNoPlateUI(){
+    const t = document.getElementById('noPlateToggle');
+    if(t){
+      t.classList.toggle('on', noPlateMode);
+      t.setAttribute('aria-pressed', noPlateMode ? 'true' : 'false');
+      t.querySelector('.np-box').textContent = noPlateMode ? '✓' : '';
+    }
+    const hint = document.querySelector('.cam-hint');
+    if(hint) hint.textContent = noPlateMode ? 'BEZ RZ — VYFOŤ VOZIDLO' : 'SROVNEJ ZNAČKU DO RÁMEČKU';
+    updateBatchCounterUI();
+  }
+  document.getElementById('noPlateToggle').addEventListener('click', ()=>{
+    noPlateMode = !noPlateMode;
+    updateNoPlateUI();
+  });
+  // Kontrolní obrazovka v režimu bez RZ — pole RZ je prázdné a zamčené.
+  function applyNoPlateResultUI(){
+    currentNoPlate = true;
+    const pi = document.getElementById('plateInput');
+    pi.value = '';
+    pi.readOnly = true;
+    pi.placeholder = 'BEZ RZ';
+    const dup = document.getElementById('duplicateWarning');
+    dup.style.display = 'none';
+    dup.textContent = '';
   }
 
   async function startBatchAfterOffensePicked(){
@@ -2019,6 +2183,7 @@
     batchDocType = 'vyzva';
     batchQueue = [];
     currentBatchIndex = null;
+    batchNoPlate = noPlateMode;
     batchCapturing = true;
     updateBatchCounterUI();
     openCamera();
@@ -2042,13 +2207,13 @@
       info.className = 'history-info';
       const plateEl = document.createElement('div');
       plateEl.className = 'history-plate';
-      plateEl.textContent = item.recognizedText ? formatPlateDisplay(item.recognizedText) : '(SPZ nerozpoznána)';
+      plateEl.textContent = item.noPlate ? 'BEZ RZ' : (item.recognizedText ? formatPlateDisplay(item.recognizedText) : '(SPZ nerozpoznána)');
       info.appendChild(plateEl);
       const statusEl = document.createElement('div');
       if(item.done){
         statusEl.className = 'batch-queue-status ok';
-        statusEl.textContent = '✓ Odesláno';
-      } else if(!item.recognizedText){
+        statusEl.textContent = item.noPlate ? '✓ Vytištěno' : '✓ Odesláno';
+      } else if(!item.recognizedText && !item.noPlate){
         statusEl.className = 'batch-queue-status warn';
         statusEl.textContent = '⚠ Zkontrolovat ručně';
       } else {
@@ -2093,6 +2258,11 @@
     document.getElementById('timeInput').value = item.time;
     selectedOffense = item.offense;
     updateOffenseDisplay();
+    if(item.noPlate){
+      applyNoPlateResultUI();
+      show('result');
+      return;
+    }
     applyRecognizedBrandColor(item.brand, item.color);
     applyDetectedColor(item.locallyDetectedColor);
     if(!item.brand) applyDetectedBrand(item.locallyDetectedBrand);
@@ -2652,7 +2822,11 @@
   });
 
   function populateResult(text, confidence, ocrErrorMessage, location){
-    document.getElementById('plateInput').value = formatPlateDisplay(text);
+    currentNoPlate = false;
+    const plateInputEl = document.getElementById('plateInput');
+    plateInputEl.readOnly = false;
+    plateInputEl.placeholder = '';
+    plateInputEl.value = formatPlateDisplay(text);
     const now = new Date();
     const pad2 = n => String(n).padStart(2,'0');
     document.getElementById('dateInput').value = now.getFullYear() + '-' + pad2(now.getMonth()+1) + '-' + pad2(now.getDate());
@@ -2853,7 +3027,7 @@
         <div class="notice-subtitle${isBoticka ? ' notice-subtitle-boticka' : ''}">${isBoticka ? 'o použití technického prostředku k zabránění odjezdu vozidla' : 'pro nepřítomného pachatele přestupku'}</div>
         ${numberBlock}
         <div class="notice-label">Registrační značka</div>
-        <div class="notice-platebox">${escapeHtml(record.plate || '')}</div>
+        ${record.noPlate ? '<div class="notice-platebox notice-platebox-empty">&nbsp;</div>' : `<div class="notice-platebox">${escapeHtml(record.plate || '')}</div>`}
         ${vehicleBlock}
         <div class="notice-datetime">Datum: ${escapeHtml(formatDateCz(record.date))}&nbsp;&nbsp;&nbsp;Čas: ${escapeHtml(record.time || '—')}</div>
         ${addressBlock}
@@ -3010,7 +3184,15 @@
       x += textEl(record.noticeNumber + '\n', { align: 'center', em: true, width: 2, height: 2 });
     }
     x += textEl('\nREGISTRAČNÍ ZNAČKA\n', { align: 'center' });
-    x += textEl((record.plate || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
+    if(record.noPlate){
+      // Prázdný rámeček na ruční dopsání RZ.
+      x += textEl('\n+--------------------------+\n', { align: 'center' });
+      x += textEl('|                          |\n', { align: 'center', height: 2 });
+      x += textEl('|                          |\n', { align: 'center', height: 2 });
+      x += textEl('+--------------------------+\n\n', { align: 'center' });
+    } else {
+      x += textEl((record.plate || '') + '\n', { align: 'center', width: 3, height: 3, em: true });
+    }
     if(record.brand || record.color){
       x += textEl([record.brand, record.color].filter(Boolean).join(', ') + '\n', { align: 'center' });
     }
@@ -3348,7 +3530,7 @@
 
 
   document.getElementById('makePdfBtn').addEventListener('click', async ()=>{
-    const plate = document.getElementById('plateInput').value.trim() || 'NEZNÁMÁ SPZ';
+    const plate = currentNoPlate ? '' : (document.getElementById('plateInput').value.trim() || 'NEZNÁMÁ SPZ');
     const date = document.getElementById('dateInput').value;
     const time = document.getElementById('timeInput').value;
     const address = document.getElementById('addressInput').value.trim();
@@ -3415,7 +3597,8 @@
         mpmUdalostText: selectedOffense ? (selectedOffense.mpmText || null) : null,
         lat: lastResolvedGps ? lastResolvedGps.lat : null,
         lng: lastResolvedGps ? lastResolvedGps.lng : null,
-        photos: allPhotoDataUrls.map(u => u.split(',')[1])
+        photos: allPhotoDataUrls.map(u => u.split(',')[1]),
+        noPlate: currentNoPlate
       };
       setSubmitNote('', '');
 
@@ -3434,7 +3617,7 @@
       // všechny přestupky, ne nová pro každý).
       const submitBtn = document.getElementById('pdfPreviewPrintBtn');
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Odeslat';
+      submitBtn.textContent = currentNoPlate ? 'Vytisknout' : 'Odeslat';
       const printerNote = document.getElementById('pdfPreviewPrinterNote');
       printerNote.style.display = 'none';
       printerNote.style.color = '';
@@ -3446,7 +3629,7 @@
       document.getElementById('viewportMeta').setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5');
       show('pdfPreview');
 
-      saveCurrentToHistory({ plate, date, time, address, offense: selectedOffense });
+      if(!currentNoPlate) saveCurrentToHistory({ plate, date, time, address, offense: selectedOffense });
     }catch(e){
       console.error('Příprava náhledu selhala:', e);
       alert('Příprava náhledu se nezdařila (' + (e && e.message ? e.message : 'neznámá chyba') + '). Zkuste to prosím znovu.');
