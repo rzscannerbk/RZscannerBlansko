@@ -190,8 +190,19 @@
       const ul = norm((D.ulice || '').replace(/\s*\d.*$/, ''));
       const cp = ((D.ulice || '').match(/\d+/) || [''])[0];
       const ob = norm(D.obec);
+      /* text celého řádku podle výšky na obrazovce (grid může mít sloupce v oddělených částech) */
+      const radekText = r => {
+        const b = r.getBoundingClientRect(), y0 = b.top + 2, y1 = b.bottom - 2;
+        const grid = r.closest('.js-gridKartoteka') || r.ownerDocument.body;
+        const kusy = [...grid.querySelectorAll('*')].filter(e => {
+          if (e.children.length || !visible(e)) return false;
+          const q = e.getBoundingClientRect(), c = (q.top + q.bottom) / 2;
+          return c >= y0 && c <= y1;
+        }).map(e => e.textContent);
+        return norm(r.textContent + ' ' + kusy.join(' '));
+      };
       const sc = rows.map(r => {
-        const t = norm(r.textContent);
+        const t = radekText(r);
         let s = 0;
         if (ul && t.includes(ul)) s += 2;
         if (cp && new RegExp('(^|\\D)' + cp + '(\\D|$)').test(t)) s += 1;
@@ -199,7 +210,7 @@
         return s;
       });
       const max = Math.max(...sc);
-      if (max > 0 && sc.filter(x => x === max).length === 1) vyber = rows[sc.indexOf(max)];
+      if (max > 0) vyber = rows[sc.indexOf(max)]; /* při shodě více stejných řádků bere první */
     }
     /* víc shod a adresa v řádcích není → upřesnit hledání podle obce */
     let hh = h;
