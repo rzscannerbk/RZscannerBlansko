@@ -201,8 +201,28 @@
       const max = Math.max(...sc);
       if (max > 0 && sc.filter(x => x === max).length === 1) vyber = rows[sc.indexOf(max)];
     }
+    /* víc shod a adresa v řádcích není → upřesnit hledání podle obce */
+    let hh = h;
+    if (!vyber && rows.length > 1 && D.obec) {
+      const hledej = async obec => {
+        click(await waitFor(() => find('a.js-vsechny-podminky'), 'odkaz Všechny podmínky'));
+        fill(await waitFor(() => find('[data-field="obec"] input'), 'pole Obec v rozšířených podmínkách'), obec);
+        await sleep(200);
+        click(await waitFor(() => find(nacSel), 'tlačítko Načíst'));
+        await sleep(1500);
+        try { return await waitFor(() => { const x = hits(); return x.length ? x : null; }, 'výsledek', 6000); } catch (e) { return []; }
+      };
+      try {
+        stav('Našel jsem ' + rows.length + ' záznamy, upřesňuji podle obce ' + D.obec + '…');
+        const h2 = await hledej(D.obec);
+        const r2 = [...new Set(h2.map(rowOf))];
+        if (r2.length === 1) { vyber = r2[0]; hh = h2; }
+        else if (!r2.length) { stav('Podle obce nic, vracím původní hledání…'); hh = await hledej(''); }
+        else hh = h2;
+      } catch (e) {}
+    }
     if (vyber) {
-      click(h.find(e => vyber.contains(e)) || vyber);
+      click(hh.find(e => vyber.contains(e)) || vyber);
       await sleep(400);
     } else if (!await rucne('Našel jsem ' + rows.length + ' záznamy „' + nazev + '“ a podle adresy nepoznám, který je správný (' + (D.ulice || '') + ', ' + (D.obec || '') + '). Klikni na správný řádek a pak na Pokračovat.')) {
       konec();
@@ -217,32 +237,32 @@
     stav('Spouštím ověření v ISDS…');
     const ov = await waitFor(() => find('button[data-param-id="_Ovit"]'), 'tlačítko Ověřit v detailu');
     await sleep(500);
-    /* položka ISDS: hledá se v rozbalené nabídce pod tlačítkem Ověřit (ne štítky ISDS u polí) */
-    const najdiIsds = () => {
-      const b = ov.getBoundingClientRect();
-      const kand = all('body *').filter(e => visible(e) && !box.contains(e) && !ov.contains(e)
-        && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim() === 'ISDS'));
-      const vMenu = kand.filter(e => e.closest('[role="menu"],[role="menuitem"],.ui-menu,.g-menu,.gmenu,[class*="ctmenu"],[class*="menu"]'));
-      const pod = kand.filter(e => {
-        const r = e.getBoundingClientRect();
-        return r.top >= b.bottom - 5 && r.top <= b.bottom + 300 && r.left >= b.left - 80 && r.left <= b.right + 300;
-      });
-      const t = vMenu.find(e => pod.includes(e)) || pod[0] || vMenu[0];
-      return t ? (t.closest('[role="menuitem"],a,li,button') || t) : null;
+    /* položka ISDS: akce je navázaná na div.item__center s třídou g_action_actOveritISDS */
+    const isdsSel = '[class*="g_action_actOveritISDS"]';
+    const najdi = () => {
+      const v = all(isdsSel).filter(visible);
+      return v.find(e => e.classList.contains('item__center')) || v[0] || null;
     };
     let item = null;
     for (let pokus = 0; pokus < 2 && !item; pokus++) {
-      if (pokus) { click(ov); }
-      try { item = await waitFor(najdiIsds, 'položku ISDS', 4000); } catch (e) {}
+      if (pokus) click(ov);
+      try { item = await waitFor(najdi, 'položku ISDS', 4000); } catch (e) {}
     }
-    if (!item) {
-      console.log('[GINIS ISDS] kandidáti s textem ISDS:', all('body *').filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim() === 'ISDS')));
-      throw 'nenašel jsem položku ISDS v nabídce Ověřit';
-    }
+    if (!item) throw 'nenašel jsem položku ISDS v nabídce Ověřit';
     const W = item.ownerDocument.defaultView;
-    for (const t of ['mouseover', 'mouseenter', 'mousemove']) item.dispatchEvent(new W.MouseEvent(t, { bubbles: true, view: W }));
+    const r = item.getBoundingClientRect();
+    const xy = { bubbles: true, cancelable: true, view: W, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, button: 0 };
+    for (const t of ['mouseover', 'mouseenter', 'mousemove']) item.dispatchEvent(new W.MouseEvent(t, xy));
     await sleep(150);
-    click(item);
+    for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) item.dispatchEvent(new (t.startsWith('pointer') ? W.PointerEvent : W.MouseEvent)(t, { ...xy, buttons: t.endsWith('down') ? 1 : 0 }));
+    item.click();
+    await sleep(800);
+    if (visible(item)) {
+      const cap = item.querySelector('.item__caption');
+      if (cap) cap.click();
+      await sleep(800);
+    }
+    if (visible(item)) throw 'GINIS nereaguje na ISDS – klikni na něj ručně (nabídka je otevřená)';
 
     stav('Hotovo – spuštěno ověření v ISDS.', '#2e7d32');
     setTimeout(konec, 4000);
