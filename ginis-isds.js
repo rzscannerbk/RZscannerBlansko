@@ -217,14 +217,31 @@
     stav('Spouštím ověření v ISDS…');
     const ov = await waitFor(() => find('button[data-param-id="_Ovit"]'), 'tlačítko Ověřit v detailu');
     await sleep(500);
-    click(ov);
-    const item = await waitFor(() => {
-      const id = ov.getAttribute('aria-owns');
-      const menu = id && ov.ownerDocument.getElementById(id);
-      const pool = menu ? [...menu.querySelectorAll('*')] : all('[role="menu"] *, .ui-menu *');
-      const t = pool.find(e => !e.children.length && visible(e) && e.textContent.trim() === 'ISDS');
+    /* položka ISDS: hledá se v rozbalené nabídce pod tlačítkem Ověřit (ne štítky ISDS u polí) */
+    const najdiIsds = () => {
+      const b = ov.getBoundingClientRect();
+      const kand = all('body *').filter(e => visible(e) && !box.contains(e) && !ov.contains(e)
+        && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim() === 'ISDS'));
+      const vMenu = kand.filter(e => e.closest('[role="menu"],[role="menuitem"],.ui-menu,.g-menu,.gmenu,[class*="ctmenu"],[class*="menu"]'));
+      const pod = kand.filter(e => {
+        const r = e.getBoundingClientRect();
+        return r.top >= b.bottom - 5 && r.top <= b.bottom + 300 && r.left >= b.left - 80 && r.left <= b.right + 300;
+      });
+      const t = vMenu.find(e => pod.includes(e)) || pod[0] || vMenu[0];
       return t ? (t.closest('[role="menuitem"],a,li,button') || t) : null;
-    }, 'položku ISDS v nabídce Ověřit', 5000);
+    };
+    let item = null;
+    for (let pokus = 0; pokus < 2 && !item; pokus++) {
+      if (pokus) { click(ov); }
+      try { item = await waitFor(najdiIsds, 'položku ISDS', 4000); } catch (e) {}
+    }
+    if (!item) {
+      console.log('[GINIS ISDS] kandidáti s textem ISDS:', all('body *').filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim() === 'ISDS')));
+      throw 'nenašel jsem položku ISDS v nabídce Ověřit';
+    }
+    const W = item.ownerDocument.defaultView;
+    for (const t of ['mouseover', 'mouseenter', 'mousemove']) item.dispatchEvent(new W.MouseEvent(t, { bubbles: true, view: W }));
+    await sleep(150);
     click(item);
 
     stav('Hotovo – spuštěno ověření v ISDS.', '#2e7d32');
