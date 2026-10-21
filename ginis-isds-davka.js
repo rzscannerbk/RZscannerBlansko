@@ -235,16 +235,30 @@
   };
 
   /* zavře vše otevřené a vrátí se na úvodní stránku */
+  /* křížek v drobečkové navigaci – jen u kartotéky/detailu/výsledku, NIKDY u Úvodní stránky */
+  const krizekKart = () => all(S.zavritKart).find(a => {
+    if (!visible(a) || box.contains(a)) return false;
+    const li = a.closest('li') || a.parentElement;
+    const t = norm(li.textContent);
+    return !/uvodni stranka/.test(t) && /kartoteka|detail|vysledek|rejstrik/.test(t);
+  });
+  const nacita = () => all('body *').some(e => !e.children.length && visible(e) && /Nahrávají se data/i.test(e.textContent));
+  async function pockejNaNacteni() {
+    const t0 = Date.now();
+    await sleep(500);
+    while (nacita() && Date.now() - t0 < 30000) await sleep(300);
+  }
   async function domu() {
     let zavirano = false;
     for (let i = 0; i < 10; i++) {
-      const b = find(S.msgOk) || find(S.neprevzit) || find(S.zavrit) || find(S.zavritKart);
+      const b = find(S.msgOk) || find(S.neprevzit) || find(S.zavrit) || krizekKart();
       if (!b) break;
       click(b);
       zavirano = true;
       await sleep(1200);
     }
-    /* úvodní stránka po zavření kartotéky ještě načítá – počkat */
+    /* úvodní stránka po zavření kartotéky ještě načítá – počkat na data + 3 s */
+    await pockejNaNacteni();
     await sleep(zavirano ? 3000 : 300);
     if (find(S.nazev) || find(S.detail)) throw 'nepodařilo se vrátit na úvodní stránku';
   }
