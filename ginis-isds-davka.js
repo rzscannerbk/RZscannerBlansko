@@ -164,8 +164,17 @@
     + (necit.length ? '• nečitelné (zůstanou na místě): ' + necit.length + '\n' : '')
     + '\nSpustit dávku?')) { konec(); return; }
 
+  /* cílové složky: najde i „Název (počet)“ z minulé dávky */
+  const reEsc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const slozky = {};
+  async function slozkaH(zaklad) {
+    if (slozky[zaklad]) return slozky[zaklad];
+    const re = new RegExp('^' + reEsc(zaklad) + '( \\(\\d+\\))?$');
+    for await (const [n, h] of root.entries()) if (h.kind === 'directory' && re.test(n)) return (slozky[zaklad] = h);
+    return (slozky[zaklad] = await root.getDirectoryHandle(zaklad, { create: true }));
+  }
   async function presun(p, slozka, blob) {
-    const sub = await root.getDirectoryHandle(slozka, { create: true });
+    const sub = await slozkaH(slozka);
     const fh = await sub.getFileHandle(p.soubor, { create: true });
     const w = await fh.createWritable();
     await w.write(blob || p.buf);
@@ -259,7 +268,7 @@
     }
     /* úvodní stránka po zavření kartotéky ještě načítá – počkat na data + 3 s */
     await pockejNaNacteni();
-    await sleep(zavirano ? 3000 : 300);
+    await sleep(zavirano ? 1000 : 300);
     if (find(S.nazev) || find(S.detail)) throw 'nepodařilo se vrátit na úvodní stránku';
   }
 
@@ -434,6 +443,31 @@
       zastavit = true;
       await sleep(2000);
     }
+  }
+
+  /* ---------- počty souborů do názvů složek ---------- */
+  stav('Doplňuji počty souborů do názvů složek…');
+  for (const zaklad of [SL_DS, SL_BEZ, SL_PO_DS, SL_PO_BEZ]) {
+    const re = new RegExp('^' + reEsc(zaklad) + '( \\(\\d+\\))?$');
+    let h = null;
+    try { for await (const [n, x] of root.entries()) if (x.kind === 'directory' && re.test(n)) { h = x; break; } } catch (e) {}
+    if (!h) continue;
+    try {
+      const soubory = [];
+      for await (const [n, x] of h.entries()) if (x.kind === 'file') soubory.push([n, x]);
+      const cil = zaklad + ' (' + soubory.length + ')';
+      if (h.name === cil) continue;
+      let hotovo = false;
+      if (typeof h.move === 'function') { try { await h.move(cil); hotovo = true; } catch (e) {} }
+      if (!hotovo) {
+        const nova = await root.getDirectoryHandle(cil, { create: true });
+        for (const [n, x] of soubory) {
+          const w = await (await nova.getFileHandle(n, { create: true })).createWritable();
+          await w.write(await x.getFile()); await w.close();
+        }
+        await root.removeEntry(h.name, { recursive: true });
+      }
+    } catch (e) { console.log('[GINIS dávka] přejmenování složky', zaklad, e); }
   }
 
   /* ---------- přehled ---------- */
