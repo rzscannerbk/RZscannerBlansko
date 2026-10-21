@@ -386,7 +386,8 @@
       const ok = find(S.msgOk);
       if (ok) {
         const dlg = ok.closest('.ui-dialog') || ok.closest('[role="dialog"]') || ok.parentElement.parentElement;
-        return { typ: 'msg', text: (dlg.textContent || '').replace(/\s+/g, ' ').replace(/\bOK\b\s*$/, '').trim() };
+        const obsah = dlg.querySelector('.ui-dialog-content') || dlg;
+        return { typ: 'msg', text: (obsah.textContent || '').replace(/\s+/g, ' ').replace(/^Upozornění\s*/i, '').replace(/\s*OK\s*$/, '').trim() };
       }
       const bunka = all('.row .cell, [role="row"] [role="gridcell"]').find(e => visible(e) && e.textContent.trim() === 'IDDS');
       if (bunka) {
@@ -399,8 +400,18 @@
     }, 'výsledek ověření v ISDS', 45000);
 
     if (vysledek.typ === 'msg') {
-      if (/nebyl nalezen/i.test(norm(vysledek.text))) return { ds: null };
-      throw 'GINIS hlásí: ' + vysledek.text.replace(/^Upozorn\S*\s*/i, '');
+      const t = norm(vysledek.text);
+      if (/nebyl nalezen/.test(t)) return { ds: null };
+      if (/shodn/.test(t)) {
+        /* karta už má schránku shodnou s ISDS – ID DS přečíst z pole v detailu, jinak z výzvy */
+        const lbl = all('label').find(l => visible(l) && /^ID DS:?$/i.test(l.textContent.trim()));
+        const row = lbl && (lbl.closest('.gform-row') || lbl.parentElement);
+        const inp = row && row.querySelector('input');
+        const id = (inp && inp.value.trim()) || (row && (row.textContent.match(/\b[a-z0-9]{7}\b/i) || [''])[0]) || D.dsVyzva || '';
+        if (/^[a-z0-9]{6,8}$/i.test(id)) return { ds: id, shoda: true };
+        throw 'karta je shodná s ISDS, ale ID DS se nepodařilo přečíst';
+      }
+      throw 'GINIS hlásí: ' + vysledek.text;
     }
     if (vysledek.typ === 'ds' && vysledek.id && vysledek.id !== 'IDDS' && /^[a-z0-9]{6,8}$/i.test(vysledek.id)) return { ds: vysledek.id };
     throw 'výsledek ISDS bez čitelného ID schránky';
@@ -426,7 +437,7 @@
       const v = await lustruj(p.D);
       const slDs = po ? SL_PO_DS : SL_DS, slBez = po ? SL_PO_BEZ : SL_BEZ;
       if (v.ds) {
-        const pozn = p.D.dsVyzva && p.D.dsVyzva !== v.ds ? 'ID DS ve výzvě (' + p.D.dsVyzva + ') opraveno podle GINIS' : p.D.dsVyzva ? 'ID DS ve výzvě souhlasí' : 'ID DS doplněno';
+        const pozn = v.shoda && !p.D.dsVyzva ? 'karta GINIS shodná s ISDS, ID DS doplněno' : p.D.dsVyzva && p.D.dsVyzva !== v.ds ? 'ID DS ve výzvě (' + p.D.dsVyzva + ') opraveno podle GINIS' : p.D.dsVyzva ? 'ID DS ve výzvě souhlasí' : 'ID DS doplněno';
         await presun(p, slDs, await docxSDs(p.buf, v.ds));
         zapis(p, 'má DS', v.ds, pozn + ', přesunuto do ' + slDs);
       } else {
