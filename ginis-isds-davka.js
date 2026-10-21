@@ -4,7 +4,7 @@
      se schránkou → doplnit „ID DS: …“ a přesunout do „FO datová schránka“,
      bez schránky → „FO bez datové schránky“, chyby zůstávají na místě. */
   if (window.__ginisDavkaBezi) return;
-  const SL_ICO = 'IČO', SL_DS = 'FO datová schránka', SL_BEZ = 'FO bez datové schránky';
+  const SL_DS = 'FO datová schránka', SL_BEZ = 'FO bez datové schránky', SL_PO_DS = 'PO datová schránka', SL_PO_BEZ = 'PO bez datové schránky';
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
 
@@ -69,13 +69,19 @@
       .map(p => ent((p.match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('')).replace(/\s+/g, ' ').trim());
     const tc = xml.match(/<w:tc>[\s\S]*?<\/w:tc>/);
     if (!tc) throw 'blok adresáta nenalezen';
-    const lines = paras(tc[0]).filter(l => l && !/^ID DS:/i.test(l));
-    const d = { nazev: lines[0] || '' };
+    const d = {};
+    const lines = paras(tc[0]).filter(l => {
+      if (!l) return false;
+      const ds = /^ID\s?DS:?\s*(\S+)/i.exec(l);
+      if (ds) { d.dsVyzva = ds[1]; return false; }
+      return true;
+    });
+    const ii = lines.findIndex(l => /^(IČO?:?)?\d{8}$/i.test(l.replace(/\s/g, '')));
+    if (ii >= 0) d.ico = lines.splice(ii, 1)[0].replace(/\D/g, '');
+    d.nazev = lines[0] || '';
     const rest = lines.slice(1);
     const di = rest.findIndex(l => /^\d{1,2}\.\s?\d{1,2}\.\s?\d{4}$/.test(l));
     if (di >= 0) d.narozeni = rest.splice(di, 1)[0].replace(/\s/g, '');
-    const ii = rest.findIndex(l => /^(IČO?:?)?\d{8}$/i.test(l.replace(/\s/g, '')));
-    if (ii >= 0) d.ico = rest.splice(ii, 1)[0].replace(/\D/g, '');
     const last = rest.pop() || '';
     const m = /^(\d{3}\s?\d{2}),?\s*(.+)$/.exec(last);
     if (m) { d.psc = m[1].replace(/\s/g, ''); d.obec = m[2].trim(); } else d.obec = last;
@@ -88,7 +94,10 @@
     const m = xml.match(/<w:tc>[\s\S]*?<\/w:tc>/);
     if (!m) throw 'blok adresáta nenalezen';
     const cell = m[0];
-    if (/ID DS:/.test(cell)) return xml;
+    if (/ID DS:/.test(cell)) {
+      const nc = cell.replace(/(ID DS:\s*)[^<]*/, '$1' + xmlEsc(ds));
+      return xml.slice(0, m.index) + nc + xml.slice(m.index + cell.length);
+    }
     const ps = cell.match(/<w:p[ >][\s\S]*?<\/w:p>/g) || [];
     if (!ps.length) throw 'adresa ve výzvě je prázdná';
     const last = ps[ps.length - 1];
@@ -150,8 +159,8 @@
   const firmy = polozky.filter(p => p.D && p.D.ico), osoby = polozky.filter(p => p.D && !p.D.ico), necit = polozky.filter(p => !p.D);
   if (!polozky.length) { stav('Ve složce nejsou žádné výzvy .docx.', '#c62828'); setTimeout(konec, 6000); return; }
   if (!confirm('Ve složce „' + root.name + '“ je ' + polozky.length + ' výzev:\n\n'
-    + '• osoby k lustraci v ISDS: ' + osoby.length + '\n'
-    + '• firmy (přesun do „' + SL_ICO + '“): ' + firmy.length + '\n'
+    + '• osoby (FO) k lustraci: ' + osoby.length + '\n'
+    + '• firmy (IČO) k lustraci: ' + firmy.length + '\n'
     + (necit.length ? '• nečitelné (zůstanou na místě): ' + necit.length + '\n' : '')
     + '\nSpustit dávku?')) { konec(); return; }
 
@@ -215,6 +224,7 @@
     datNar: '[data-field="dat_nar"] input',
     obec: '[data-field="obec"] input',
     nacist: 'button[class*="g_action_actvyhledatDet"]',
+    nacistHorni: 'button[class*="g_action_actMaskaVyhledat"]',
     detail: 'button[data-param-id="actDetailEx"]',
     overit: 'button[data-param-id="_Ovit"]',
     isds: '[class*="g_action_actOveritISDS"]',
@@ -226,20 +236,24 @@
 
   /* zavře vše otevřené a vrátí se na úvodní stránku */
   async function domu() {
+    let zavirano = false;
     for (let i = 0; i < 10; i++) {
       const b = find(S.msgOk) || find(S.neprevzit) || find(S.zavrit) || find(S.zavritKart);
       if (!b) break;
       click(b);
+      zavirano = true;
       await sleep(1200);
     }
-    await sleep(300);
+    /* úvodní stránka po zavření kartotéky ještě načítá – počkat */
+    await sleep(zavirano ? 3000 : 300);
     if (find(S.nazev) || find(S.detail)) throw 'nepodařilo se vrátit na úvodní stránku';
   }
 
   /* ---------- lustrace jedné osoby ---------- */
   async function lustruj(D) {
-    const nazev = (D.prijmeni + ' ' + D.jmeno).trim();
-    if (!D.narozeni) throw 've výzvě chybí datum narození';
+    const firma = !!D.ico;
+    const nazev = firma ? D.nazev : (D.prijmeni + ' ' + D.jmeno).trim();
+    if (!firma && !D.narozeni) throw 've výzvě chybí datum narození';
 
     /* 1–3) Ostatní úlohy → Externí subjekty → OK */
     let ext = find(S.ext);
@@ -256,18 +270,29 @@
     const nIn = await waitFor(() => find(S.nazev), 'pole Název v kartotéce');
     await sleep(400);
     fill(nIn, nazev);
-    const ico = find('[data-field="ico"] input');
-    if (ico && ico.value) fill(ico, '');
-    click(await waitFor(() => find(S.podminky), 'odkaz Všechny podmínky'));
-    fill(await waitFor(() => find(S.datNar), 'pole Datum narození'), D.narozeni);
-    const ob = find(S.obec);
-    if (ob && ob.value) fill(ob, '');
-    await sleep(300);
-    click(await waitFor(() => find(S.nacist), 'tlačítko Načíst'));
+    const icoIn = await waitFor(() => find('[data-field="ico"] input'), 'pole Ičo');
+    fill(icoIn, firma ? D.ico : '');
+    const ob0 = find(S.obec);
+    if (ob0 && ob0.value) fill(ob0, '');
+    const nacistHorni = async () => {
+      const b = find(S.nacistHorni) || all('button[aria-label="Načíst"]').find(e => visible(e) && !box.contains(e) && !/actvyhledatDet/.test(e.className));
+      if (!b) throw 'nenašel jsem tlačítko Načíst v kartotéce';
+      await sleep(300);
+      click(b);
+    };
+    if (firma) await nacistHorni();
+    else {
+      click(await waitFor(() => find(S.podminky), 'odkaz Všechny podmínky'));
+      fill(await waitFor(() => find(S.datNar), 'pole Datum narození'), D.narozeni);
+      const ob = find(S.obec);
+      if (ob && ob.value) fill(ob, '');
+      await sleep(300);
+      click(await waitFor(() => find(S.nacist), 'tlačítko Načíst'));
+    }
 
-    /* 9) výběr řádku */
+    /* 9) výběr řádku (firma podle IČO, osoba podle jména) */
     await sleep(1000);
-    const key = norm(nazev);
+    const key = firma ? D.ico : norm(nazev);
     const hits = () => {
       const grid = all('.js-gridKartoteka').filter(visible);
       const pool = grid.length ? grid.flatMap(g => [...g.querySelectorAll('*')]) : all('body *').filter(e => !e.closest('.gform,.gcontrolbox'));
@@ -275,7 +300,14 @@
     };
     let h = [];
     try { h = await waitFor(() => { const x = hits(); return x.length ? x : null; }, 'výsledek', 15000); } catch (e) {}
-    if (!h.length) throw 'osoba nenalezena v kartotéce';
+    if (!h.length && firma) {
+      /* název firmy se v GINIS může psát jinak – zkusit jen podle IČO */
+      fill(await waitFor(() => find(S.nazev), 'pole Název'), '');
+      await nacistHorni();
+      await sleep(1000);
+      try { h = await waitFor(() => { const x = hits(); return x.length ? x : null; }, 'výsledek', 15000); } catch (e) {}
+    }
+    if (!h.length) throw (firma ? 'firma' : 'osoba') + ' nenalezena v kartotéce';
     const rowOf = e => e.closest('tr,[role="row"],.row') || e.parentElement;
     const rows = [...new Set(h.map(rowOf))];
     let vyber = rows[0];
@@ -353,30 +385,30 @@
 
   /* ---------- dávka ---------- */
   const log = [];
-  const zapis = (p, vysl, ds, pozn) => log.push({ soubor: p.soubor, osoba: p.D ? (p.D.ico ? p.D.nazev : (p.D.prijmeni + ' ' + p.D.jmeno).trim()) : '', narozeni: p.D && p.D.narozeni || '', ico: p.D && p.D.ico || '', vysl, ds: ds || '', pozn: pozn || '' });
+  const zapis = (p, vysl, ds, pozn) => log.push({ soubor: p.soubor, osoba: p.D ? (p.D.ico ? p.D.nazev + ' (IČO ' + p.D.ico + ')' : (p.D.prijmeni + ' ' + p.D.jmeno).trim()) : '', narozeni: p.D && p.D.narozeni || '', ico: p.D && p.D.ico || '', vysl, ds: ds || '', pozn: pozn || '' });
 
   for (const p of necit) zapis(p, 'chyba', '', p.chyba);
-  for (const p of firmy) {
-    try { await presun(p, SL_ICO); zapis(p, 'firma', '', 'přesunuto do ' + SL_ICO); }
-    catch (e) { zapis(p, 'chyba', '', 'přesun selhal: ' + e); }
-  }
+  const fronta = osoby.concat(firmy);
 
   tlacitka(stopBtn);
   let i = 0;
-  for (const p of osoby) {
+  for (const p of fronta) {
     if (zastavit) { zapis(p, 'nezpracováno', '', 'dávka zastavena'); continue; }
     i++;
-    const jm = (p.D.prijmeni + ' ' + p.D.jmeno).trim();
-    stav(i + '/' + osoby.length + ' – ' + jm + (zastavit ? ' (zastavím po této výzvě)' : ''));
+    const po = !!p.D.ico;
+    const jm = po ? p.D.nazev + ' (IČO ' + p.D.ico + ')' : (p.D.prijmeni + ' ' + p.D.jmeno).trim();
+    stav(i + '/' + fronta.length + ' – ' + jm + (zastavit ? ' (zastavím po této výzvě)' : ''));
     try {
       await domu();
       const v = await lustruj(p.D);
+      const slDs = po ? SL_PO_DS : SL_DS, slBez = po ? SL_PO_BEZ : SL_BEZ;
       if (v.ds) {
-        await presun(p, SL_DS, await docxSDs(p.buf, v.ds));
-        zapis(p, 'má DS', v.ds, 'ID DS doplněno, přesunuto do ' + SL_DS);
+        const pozn = p.D.dsVyzva && p.D.dsVyzva !== v.ds ? 'ID DS ve výzvě (' + p.D.dsVyzva + ') opraveno podle GINIS' : p.D.dsVyzva ? 'ID DS ve výzvě souhlasí' : 'ID DS doplněno';
+        await presun(p, slDs, await docxSDs(p.buf, v.ds));
+        zapis(p, 'má DS', v.ds, pozn + ', přesunuto do ' + slDs);
       } else {
-        await presun(p, SL_BEZ);
-        zapis(p, 'bez DS', '', 'přesunuto do ' + SL_BEZ);
+        await presun(p, slBez);
+        zapis(p, 'bez DS', '', (p.D.dsVyzva ? 'pozor: výzva uvádí ID DS ' + p.D.dsVyzva + ', ' : '') + 'přesunuto do ' + slBez);
       }
     } catch (e) {
       zapis(p, 'chyba', '', String(e));
@@ -414,7 +446,7 @@
   const barvy = { 'má DS': '#2e7d32', 'bez DS': '#555', 'firma': '#1d5fbf', 'chyba': '#c62828', 'nezpracováno': '#b26a00' };
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
   karta.innerHTML = '<div style="padding:16px 20px;border-bottom:1px solid #ddd"><b style="font-size:17px">Dávka ISDS dokončena</b><div style="margin-top:6px">'
-    + '<b style="color:#2e7d32">má DS: ' + pocet('má DS') + '</b> · bez DS: ' + pocet('bez DS') + ' · firmy: ' + pocet('firma')
+    + '<b style="color:#2e7d32">má DS: ' + pocet('má DS') + '</b> · bez DS: ' + pocet('bez DS')
     + ' · <span style="color:#c62828">chyby: ' + pocet('chyba') + '</span>' + (pocet('nezpracováno') ? ' · nezpracováno: ' + pocet('nezpracováno') : '')
     + '</div><div style="margin-top:4px;color:#666">' + esc(ulozeno) + '</div></div>'
     + '<div style="overflow:auto;padding:0 20px"><table style="border-collapse:collapse;width:100%;margin:10px 0">'
