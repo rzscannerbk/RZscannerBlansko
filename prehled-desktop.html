@@ -5383,11 +5383,15 @@
   // (52126), Vykázání z místa (51771).
   const KONTROLA_MPM_SOLUTION_IDS = ['51776', '52126', '51771'];
   function buildKontrolaMpmData(record){
-    const { town, street } = parseAddressForMPM(record.address);
+    const parsedAddr = parseAddressForMPM(record.address);
+    const town = parsedAddr.town;
+    // Adresa jen "Blansko" (bez ulice) — do pole Ulice nic neposílat.
+    const street = (parsedAddr.street && parsedAddr.street.trim().toLowerCase() !== String(town || '').trim().toLowerCase()) ? parsedAddr.street : '';
     const osoby = (Array.isArray(record.osoby) && record.osoby.length) ? record.osoby : (record.prestupce ? [record.prestupce] : []);
     const desc = [];
+    // Popis: nahoře samotný důvod kontroly, prázdný řádek, pak údaje.
+    if(record.duvodKontroly){ desc.push(record.duvodKontroly); desc.push(''); }
     desc.push('Kontrola osob' + (osoby.length > 1 ? ' (' + osoby.length + ')' : '') + ' — RZ Scanner č. ' + (record.noticeNumber || ''));
-    if(record.duvodKontroly) desc.push('Důvod kontroly: ' + record.duvodKontroly);
     osoby.forEach((o, i)=>{
       desc.push((osoby.length > 1 ? (i + 1) + '. ' : '') +
         [o.jmeno, o.prijmeni].filter(Boolean).join(' ') +
