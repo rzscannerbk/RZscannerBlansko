@@ -107,37 +107,102 @@
         // Krátká rezerva, ať je seznam výsledků celý.
         setTimeout(function(){
           var odkazy = Array.prototype.slice.call(vysl.querySelectorAll('a[onclick*="AddPerson"]'));
-          var vyber = null;
-          if(odkazy.length === 1) vyber = odkazy[0];
-          else if(odkazy.length > 1){
-            var pr = bezDiakritiky(o.prijmeni), dn = (o.datumNarozeni || '').trim();
-            var shoda = odkazy.filter(function(a){ var t = bezDiakritiky(a.textContent); return (!pr || t.indexOf(pr) !== -1) && (!dn || t.indexOf(dn) !== -1); });
-            if(shoda.length === 1) vyber = shoda[0];
-          }
-          if(!vyber){
-            ulozIdx(i + 1);
-            konec('Osoba ' + (i + 1) + ' (' + jm + '): ' + (odkazy.length ? 'nalezeno ' + odkazy.length + ' záznamů — vyber správný ručně' : 'v evidenci nenalezena — přidej ji ručně (Nový kontakt)') +
-              '.' + (i + 1 < d.osoby.length ? '\n\nPak spusť záložku znovu — pokračuje další osobou (a ručně přidané osobě nastaví roli).' : ''));
-            try{ vysl.scrollIntoView({ block: 'center' }); }catch(e){}
-            return;
-          }
-          var pred = roleKontaktuSelecty().length;
-          vyber.click();
-          cekej(function(){ var sel = roleKontaktuSelecty(); return sel.length > pred ? sel : null; }, 10000, function(sel){
-            if(!sel){ ulozIdx(i + 1); konec('Osoba ' + (i + 1) + ' (' + jm + ') se nepřidala do seznamu kontaktů — zkontroluj ji ručně.'); return; }
-            var novy = sel[sel.length - 1];
-            if(!nastavRoliKontrolovana(novy)){
-              ulozIdx(i + 1);
-              konec('Osobu ' + jm + ' jsem přidal, ale roli „kontrolovaná osoba“ jsem v nabídce nenašel — nastav ji ručně.');
-              return;
-            }
-            pridano.push(jm);
-            i++;
-            ulozIdx(i);
-            setTimeout(dalsi, 400);
-          });
+          if(!odkazy.length && zrTlacitko()){ hledejVZR(); return; }
+          var vyber = vyberOdkaz(odkazy);
+          if(!vyber){ rucne(odkazy.length ? 'nalezeno ' + odkazy.length + ' záznamů — vyber správný ručně' : 'v evidenci nenalezena — přidej ji ručně (Nový kontakt)'); return; }
+          pridejARole(vyber);
         }, 400);
       });
+
+      // Vybere jednoznačný odkaz (jediný, nebo jediný se shodou příjmení + data narození).
+      function vyberOdkaz(odkazy){
+        if(odkazy.length === 1) return odkazy[0];
+        if(odkazy.length > 1){
+          var pr = bezDiakritiky(o.prijmeni), dn = (o.datumNarozeni || '').trim();
+          var shoda = odkazy.filter(function(a){ var t = bezDiakritiky(a.textContent); return (!pr || t.indexOf(pr) !== -1) && (!dn || t.indexOf(dn) !== -1); });
+          if(shoda.length === 1) return shoda[0];
+        }
+        return null;
+      }
+      function rucne(proc){
+        ulozIdx(i + 1);
+        konec('Osoba ' + (i + 1) + ' (' + jm + '): ' + proc + '.' +
+          (i + 1 < d.osoby.length ? '\n\nPak spusť záložku znovu — pokračuje další osobou (a ručně přidané osobě nastaví roli).' : '\n\nRoli „kontrolovaná osoba“ jí nastaví další spuštění záložky.'));
+        try{ vysl.scrollIntoView({ block: 'center' }); }catch(e){}
+      }
+      function zrTlacitko(){
+        return document.getElementById('tSubmitC') || document.getElementsByName('tSubmitC')[0] || null;
+      }
+
+      // Osoba není v evidenci MP Manageru → "Najít v ZR" (základní registry).
+      function hledejVZR(){
+        var btn = zrTlacitko();
+        function setZ(id, v){ var el = document.getElementById(id); if(el && v && !el.value){ el.value = v; } }
+        setZ('tJmeno', o.jmeno); setZ('tPrijmeni', o.prijmeni); setZ('tNarozeniDtm', o.datumNarozeni);
+        // Bez data narození, ale s dokladem → hledat podle čísla dokladu.
+        if(!o.datumNarozeni && o.cisloDokladu){
+          var box = btn.closest ? (btn.closest('table') || vysl) : vysl;
+          Array.prototype.slice.call(vysl.querySelectorAll('input[type=radio]')).forEach(function(r){
+            var t = normTxt((r.nextSibling && r.nextSibling.textContent) || (r.parentNode && r.parentNode.textContent) || '');
+            if(t.indexOf('dokladu') !== -1 && t.indexOf('narozeni') === -1){ r.click(); }
+          });
+          setZ('tPapers', o.cisloDokladu);
+        }
+        // Důvod lustrace: když není vybraný, dát §12 odst. 2) písm. a).
+        Array.prototype.slice.call(vysl.querySelectorAll('select')).forEach(function(sel){
+          if(sel.id === 'tPaperType' || sel.value) return;
+          for(var k = 0; k < sel.options.length; k++){
+            var t = normTxt(sel.options[k].text);
+            if(t.indexOf('12 odst. 2') !== -1 && t.indexOf('pism. a') !== -1){ sel.value = sel.options[k].value; try{ sel.dispatchEvent(new Event('change', { bubbles: true })); }catch(e){} break; }
+          }
+        });
+        var vysledky = function(){
+          var box = document.getElementById('xKontaktResult') || vysl;
+          return Array.prototype.slice.call(box.querySelectorAll('a[onclick*="AddZRToDB"]'));
+        };
+        var predZR = vysledky().length;
+        try{ btn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }catch(e){}
+        btn.click();
+        cekej(function(){ var x = vysledky(); return x.length && x.length !== predZR ? x : (x.length && predZR === 0 ? x : null); }, 20000, function(zr){
+          if(!zr){ rucne('nenalezena v evidenci ani v základních registrech — zkontroluj údaje a přidej ji ručně'); return; }
+          setTimeout(function(){
+            zr = vysledky();
+            var vyber = vyberOdkaz(zr);
+            if(!vyber){ rucne('v základních registrech nalezeno ' + zr.length + ' záznamů — vyber správný ručně'); return; }
+            pridejARole(vyber, true);
+          }, 400);
+        });
+      }
+
+      // Klik na výsledek → počkat na nový řádek kontaktu → role "kontrolovaná osoba".
+      function pridejARole(odkaz, zeZR){
+        var pred = roleKontaktuSelecty().length;
+        var klikNaPerson = !zeZR, start = Date.now();
+        odkaz.click();
+        cekej(function(){
+          var sel = roleKontaktuSelecty();
+          if(sel.length > pred) return sel;
+          // Po převzetí ze ZR může MP Manager osobu jen nabídnout v seznamu — přidat ji.
+          if(!klikNaPerson && Date.now() - start > 2500){
+            var ap = Array.prototype.slice.call(vysl.querySelectorAll('a[onclick*="AddPerson"]'));
+            var v = vyberOdkaz(ap.filter(function(a){ return a !== odkaz; }));
+            if(v){ klikNaPerson = true; v.click(); }
+          }
+          return null;
+        }, 15000, function(sel){
+          if(!sel){ rucne('se nepřidala do seznamu kontaktů — zkontroluj ji ručně'); return; }
+          var novy = sel[sel.length - 1];
+          if(!nastavRoliKontrolovana(novy)){
+            ulozIdx(i + 1);
+            konec('Osobu ' + jm + ' jsem přidal, ale roli „kontrolovaná osoba“ jsem v nabídce nenašel — nastav ji ručně.');
+            return;
+          }
+          pridano.push(jm);
+          i++;
+          ulozIdx(i);
+          setTimeout(dalsi, 400);
+        });
+      }
     }
     doplnPrazdneRole();
     dalsi();
