@@ -1108,6 +1108,7 @@
             <button class="btn btn-ghost" id="mpmExportBtn" title="Zkopírovat údaje pro MP Manager">MPM</button>
             <button class="btn btn-ghost" id="detailPasteMpBtn" title="Vložit provozovatele, přestupce a číslo jednací zkopírované bookmarkletem MP to RZ">Vložit z MP</button>
             <button class="btn btn-primary" id="resolveMenuBtn">Dořešit</button>
+            <button class="btn btn-primary" id="zavadaOznamitBtn" style="display:none;">Oznámit</button>
             <div class="detail-rail-doclinks">
               <button class="doc-link-btn" id="docLinkVyzva" style="display:none;" title="Znovu stáhnout Výzvu">
                 <span class="doc-link-icon">📄</span><span class="doc-link-label">Výzva</span>
@@ -1158,6 +1159,15 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Závada → Oznámit: komu byla závada oznámena (uloží se k záznamu
+       jako oznamenoKomu, stav "Oznámeno"). -->
+  <div class="confirm-overlay" id="zavadaMenuOverlay">
+    <div class="confirm-box">
+      <div class="confirm-text">Oznámit závadu — komu?</div>
+      <div class="confirm-btns confirm-btns-col" id="zavadaMenuBtns"></div>
     </div>
   </div>
 
@@ -6873,9 +6883,9 @@
       x += textEl((zav ? 'Místo závady' : 'Místo kontroly') + '\n', { align: 'center', em: true });
       x += textEl(wrapWords(record.address) + '\n\n', { align: 'center' });
     }
-    if(zav && record.popisZavady){
+    if(zav && zavadaPopis(record)){
       x += textEl('Popis závady\n', { align: 'center', em: true });
-      x += textEl(wrapWords(record.popisZavady) + '\n\n', { align: 'center' });
+      x += textEl(wrapWords(zavadaPopis(record)) + '\n\n', { align: 'center' });
     }
     if(record.duvodKontroly){
       x += textEl('Důvod kontroly\n', { align: 'center', em: true });
@@ -7647,7 +7657,14 @@
   // Závada (Služební záležitosti → Závada): fotky + popis + místo,
   // ukládá se rovnou uzavřená, mimo počty přestupků.
   function isZavada(r){
-    return !!r && (r.docType === 'zavada' || r.source === 'zavada' || r.resolvedMethod === 'zavada');
+    return !!r && (r.docType === 'zavada' || r.source === 'zavada' || r.resolvedMethod === 'zavada' ||
+      (!r.plate && /^Závada(:|$)/.test(String(r.offenseLabel || '').trim())));
+  }
+  // Popis závady — u záznamu uloženého bez extra polí je v offenseLabel "Závada: …".
+  function zavadaPopis(r){
+    if(r && r.popisZavady) return r.popisZavady;
+    const m = String((r && r.offenseLabel) || '').match(/^Závada:\s*(.+)$/s);
+    return m ? m[1] : '';
   }
   function isSluzebni(r){ return isKontrola(r) || isZavada(r); }
   function docTypeKey(r){
@@ -7655,8 +7672,10 @@
     if(isKontrola(r)) return 'kontrola';
     return (r.docType || 'vyzva') === 'boticka' ? 'boticka' : 'vyzva';
   }
+  // Závada: dokud není oznámená, je "Nevyřešeno"; po Oznámit → "Oznámeno".
+  function zavadaOznamena(r){ return !!r && r.resolved && r.resolvedMethod === 'zavadaOznamena'; }
   function recordStatusKey(r){
-    if(isZavada(r)) return 'zavada';
+    if(isZavada(r)) return zavadaOznamena(r) ? 'oznameni' : 'pending';
     if(isKontrola(r)) return 'kontrola';
     if(!r.resolved) return 'pending';
     if(r.resolvedMethod === 'oznameni') return 'oznameni';
@@ -7693,7 +7712,7 @@
   function renderRail(){
     const rail = document.getElementById('rail');
     const base = allRecords; // počty vždy z celé sady, ne z aktuálně filtrovaného pohledu
-    const statusCounts = { pending:0, oznameni:0, vyzva:0, prikaz:0, domluva:0, kontrola:0, zavada:0 };
+    const statusCounts = { pending:0, oznameni:0, vyzva:0, prikaz:0, domluva:0, kontrola:0 };
     const typeCounts = { vyzva:0, boticka:0, kontrola:0, zavada:0 };
     const officerCounts = {};
     base.forEach(r=>{
@@ -8053,8 +8072,8 @@
 
       const offense = document.createElement('span');
       offense.className = 'record-offense';
-      offense.textContent = (isZavada(r) && r.popisZavady) ? r.popisZavady : (shortOffenseLabel(r.offenseLabel) || '—');
-      if(isZavada(r) && r.popisZavady) offense.title = r.popisZavady;
+      offense.textContent = (isZavada(r) && zavadaPopis(r)) ? zavadaPopis(r) : (shortOffenseLabel(r.offenseLabel) || '—');
+      if(isZavada(r) && zavadaPopis(r)) offense.title = zavadaPopis(r);
       else if(r.offenseLabel) offense.title = r.offenseLabel;
       item.appendChild(offense);
 
@@ -8120,12 +8139,14 @@
       const subOfficerStr = subOfficerName ? officerShortLabel(subOfficerName) : '';
       if(subDateStr) statusHtml += '<span class="record-status-sub">' + escapeHtml(subDateStr) + '</span>';
       if(subOfficerStr) statusHtml += '<span class="record-status-sub">' + escapeHtml(subOfficerStr) + '</span>';
+      if(isZavada(r) && zavadaOznamena(r) && r.oznamenoKomu) statusHtml += '<span class="record-status-sub">→ ' + escapeHtml(r.oznamenoKomu) + '</span>';
       status.innerHTML = statusHtml;
-      status.title = 'Klikni pro změnu způsobu řešení';
+      status.title = isZavada(r) ? 'Klikni pro oznámení závady' : 'Klikni pro změnu způsobu řešení';
       status.addEventListener('click', (e)=>{
         e.stopPropagation();
         openDetail(r);
-        document.getElementById('resolveMenuOverlay').classList.add('open');
+        if(isZavada(r)) openZavadaMenu();
+        else if(!isKontrola(r)) document.getElementById('resolveMenuOverlay').classList.add('open');
       });
       item.appendChild(status);
 
@@ -10634,7 +10655,9 @@
 
     const line2 = [];
     if(record.offenseLabel) line2.push(detailHeadClickable('offense', record.offenseLabel, record.offenseLabel));
-    const methodLabel = record.resolved ? (UNDO_METHOD_LABEL[record.resolvedMethod] || 'Dořešeno') : 'Nevyřešeno';
+    const methodLabel = isZavada(record)
+      ? (zavadaOznamena(record) ? 'Oznámeno' + (record.oznamenoKomu ? ' — ' + record.oznamenoKomu : '') : 'Nevyřešeno')
+      : record.resolved ? (UNDO_METHOD_LABEL[record.resolvedMethod] || 'Dořešeno') : 'Nevyřešeno';
     line2.push('<span class="detail-head-meta">' + escapeHtml(methodLabel) + '</span>');
     if(record.pachatel && (record.pachatel.jmeno || record.pachatel.prijmeni)){
       const key = pachatelMatchKey(record.pachatel);
@@ -10717,7 +10740,10 @@
     document.getElementById('detailRailPlate').textContent = record.plate ? formatPlate(record.plate) : (isZavada(record) ? 'ZÁVADA' : isKontrola(record) ? 'OSOBA' : 'NEZNÁMÁ SPZ');
 
     const badge = document.getElementById('detailRailBadge');
-    if(record.resolved){
+    if(isZavada(record)){
+      badge.textContent = zavadaOznamena(record) ? 'Oznámeno' + (record.oznamenoKomu ? ' — ' + record.oznamenoKomu : '') : 'Nevyřešeno';
+      badge.className = 'detail-rail-badge ' + (zavadaOznamena(record) ? 'is-resolved' : 'is-unresolved');
+    } else if(record.resolved){
       badge.textContent = UNDO_METHOD_LABEL[record.resolvedMethod] || 'Dořešeno';
       badge.className = 'detail-rail-badge is-resolved';
     } else {
@@ -10817,7 +10843,7 @@
     html += detailInfoField('Číslo pokuty (ClickPark)', record.clickParkCisloPokuty);
     html += '</div></div>';
     if(zav){
-      html += '<div class="detail-info-section"><h4>Popis závady</h4><div class="detail-info-fields"><div class="detail-info-field" style="grid-column:1/-1"><div class="v" style="white-space:pre-wrap">' + escapeHtml(record.popisZavady || '—') + '</div></div></div></div>';
+      html += '<div class="detail-info-section"><h4>Popis závady</h4><div class="detail-info-fields"><div class="detail-info-field" style="grid-column:1/-1"><div class="v" style="white-space:pre-wrap">' + escapeHtml(zavadaPopis(record) || '—') + '</div></div></div></div>';
       return html;
     }
     html += '<div class="detail-info-section"><h4>Vozidlo</h4><div class="detail-info-fields">';
@@ -11020,7 +11046,7 @@
     const rows = [];
     rows.push({ label: 'Vytvořeno', dateStr: formatResolvedDateTime(record.createdAt), officerName: record.officerName, sortAt: tsToSortableDate(record.createdAt) });
     (record.resolutionHistory || []).forEach(e=>{
-      rows.push({ label: UNDO_METHOD_LABEL[e.method] || 'Dořešeno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt) });
+      rows.push({ label: (UNDO_METHOD_LABEL[e.method] || 'Dořešeno') + (e.komu ? ' — ' + e.komu : ''), dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt) });
     });
     (record.editHistory || []).forEach((e, idx)=>{
       rows.push({ label: 'Upraveno', dateStr: formatResolvedDateTime(e.resolvedAt), officerName: e.officerName, sortAt: tsToSortableDate(e.resolvedAt), edit: true, changes: e.changes || [], editIdx: idx });
@@ -11085,6 +11111,9 @@
     const menuBtn = document.getElementById('resolveMenuBtn');
     // Kontrola osoby je uzavřená hned při uložení — nic se nedořešuje.
     menuBtn.style.display = isSluzebni(record) ? 'none' : '';
+    const zavBtn = document.getElementById('zavadaOznamitBtn');
+    zavBtn.style.display = isZavada(record) ? '' : 'none';
+    if(isZavada(record)) zavBtn.textContent = zavadaOznamena(record) ? '✓ Oznámeno' + (record.oznamenoKomu ? ' — ' + record.oznamenoKomu : '') : 'Oznámit';
     if(isSluzebni(record)) return;
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     const domluvaBtn = document.getElementById('menuDomluvaBtn');
@@ -11154,6 +11183,7 @@
     // "resolvedAt" nahoře (aktuální/poslední řešení) zůstává serverAt,
     // stejně jako dřív.
     const historyEntry = { method, resolvedAt: firebase.firestore.Timestamp.now(), officerName };
+    if(extra && extra.oznamenoKomu) historyEntry.komu = extra.oznamenoKomu;
     const updateData = {
       resolved: true,
       resolvedMethod: method,
@@ -11185,6 +11215,7 @@
     // tady se jen posílá dál do Firestore, aby i re-download z detailu
     // vygeneroval stejnou verzi dokumentu.
     if(extra && extra.oznameniAsPrestupce != null) updateData.oznameniAsPrestupce = extra.oznameniAsPrestupce;
+    if(extra && extra.oznamenoKomu) updateData.oznamenoKomu = extra.oznamenoKomu;
     await db.collection('prestupky').doc(record.id).update(updateData);
     record.resolved = true;
     record.resolvedMethod = method;
@@ -11200,10 +11231,12 @@
       record.provozovatel = osobyPair ? osobyPair.provozovatel : null;
     }
     if(extra && extra.oznameniAsPrestupce != null) record.oznameniAsPrestupce = extra.oznameniAsPrestupce;
+    if(extra && extra.oznamenoKomu) record.oznamenoKomu = extra.oznamenoKomu;
     updateResolveBtn(record);
     if(currentDetailRecord && currentDetailRecord.id === record.id){
       renderResolutionHistory(record);
       updateDetailRail(record);
+      if(isZavada(record)) document.getElementById('detailHeadInfo').innerHTML = buildDetailHeadHtml(record);
     }
     refreshView();
     if(!isEdit) showUndoToast(record, method);
@@ -14031,12 +14064,12 @@
   // dořešený záznam možné jedním klikem vrátit zpět na nevyřešený.
   let undoTimer = null;
   let undoRecord = null;
-  const UNDO_METHOD_LABEL = { oznameni: 'Oznámeno', vyzva: 'Zaslána výzva', prikaz: 'Dořešeno příkazem', domluva: 'Dořešeno domluvou', kontrola: 'Kontrola osoby', zavada: 'Závada' };
+  const UNDO_METHOD_LABEL = { oznameni: 'Oznámeno', vyzva: 'Zaslána výzva', prikaz: 'Dořešeno příkazem', domluva: 'Dořešeno domluvou', kontrola: 'Kontrola osoby', zavada: 'Závada', zavadaOznamena: 'Oznámeno' };
   function showUndoToast(record, method){
     undoRecord = record;
     clearTimeout(undoTimer);
     const toast = document.getElementById('undoToast');
-    document.getElementById('undoToastText').textContent = (UNDO_METHOD_LABEL[method] || 'Dořešeno') + ' — ' + (formatPlate(record.plate) || '');
+    document.getElementById('undoToastText').textContent = (UNDO_METHOD_LABEL[method] || 'Dořešeno') + ' — ' + (formatPlate(record.plate) || (isZavada(record) ? 'závada' + (record.oznamenoKomu ? ' (' + record.oznamenoKomu + ')' : '') : ''));
     toast.classList.add('open');
     undoTimer = setTimeout(()=>{
       toast.classList.remove('open');
@@ -14073,6 +14106,40 @@
       return false;
     }
   }
+
+  // ---------- Závada → Oznámit (komu) ----------
+  const ZAVADA_KOMU = ['Odbor SRM', 'Technické služby', 'SÚS JMK', 'VAS', 'Elektřina', 'Plyn'];
+  function openZavadaMenu(){
+    const box = document.getElementById('zavadaMenuBtns');
+    const rec = currentDetailRecord;
+    box.innerHTML = '';
+    ZAVADA_KOMU.forEach(k=>{
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'confirm-btn ' + (rec && rec.oznamenoKomu === k ? 'confirm-yes' : 'confirm-no');
+      b.textContent = k;
+      b.addEventListener('click', async ()=>{
+        document.getElementById('zavadaMenuOverlay').classList.remove('open');
+        if(!currentDetailRecord) return;
+        try{
+          await markResolved(currentDetailRecord, 'zavadaOznamena', { oznamenoKomu: k });
+          setDetailNote('Závada označena jako oznámená: ' + k + '.', 'ok');
+        }catch(e){
+          setDetailNote('Uložení se nepovedlo (' + (e && e.message ? e.message : e) + ').', 'err');
+        }
+      });
+      box.appendChild(b);
+    });
+    const c = document.createElement('button');
+    c.type = 'button'; c.className = 'confirm-cancel'; c.textContent = 'Zrušit';
+    c.addEventListener('click', ()=> document.getElementById('zavadaMenuOverlay').classList.remove('open'));
+    box.appendChild(c);
+    document.getElementById('zavadaMenuOverlay').classList.add('open');
+  }
+  document.getElementById('zavadaOznamitBtn').addEventListener('click', openZavadaMenu);
+  document.getElementById('zavadaMenuOverlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'zavadaMenuOverlay') e.target.classList.remove('open');
+  });
 
   let menuFocusIndex = -1;
   document.getElementById('resolveMenuBtn').addEventListener('click', ()=>{

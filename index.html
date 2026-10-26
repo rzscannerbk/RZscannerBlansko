@@ -1241,7 +1241,7 @@
   }catch(e){}
 
   // Verze aplikace — při každé změně zvýšit (zobrazuje se na úvodní obrazovce).
-  const APP_VERSION = '1.9';
+  const APP_VERSION = '2.0';
   const APP_BUILD_DATE = '26. 10. 2026';
   document.getElementById('appVersion').textContent = 'RZ Scanner v' + APP_VERSION + ' · ' + APP_BUILD_DATE;
 
@@ -1994,7 +1994,7 @@
 
   // ---------- Závada — fotky (max 6) + popis + místo → přehled ----------
   // Ukládá se jako samostatný záznam v kolekci prestupky (docType 'zavada',
-  // rovnou uzavřený — v přehledu stav "Závada"), fotky v data/photos.
+  // nevyřešený — v přehledu se oznámí tlačítkem Oznámit), fotky v data/photos.
   (function(){
     const $ = id => document.getElementById(id);
     const MAX = 6;
@@ -2106,17 +2106,15 @@
           offenseVerb: null,
           offenseCitation: null,
           hasPhotos: photos.length > 0,
-          resolved: true,
+          // Závada je nevyřešená, dokud ji v přehledu někdo neoznámí
+          // (tlačítko Oznámit → komu).
+          resolved: false,
           expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180*24*60*60*1000)),
           submittedBy: auth.currentUser ? auth.currentUser.email : null,
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         const extraData = {
           officerName: officer,
-          resolvedMethod: 'zavada',
-          resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          resolvedByOfficer: officer,
-          resolutionHistory: [{ method: 'zavada', resolvedAt: firebase.firestore.Timestamp.now(), officerName: officer }],
           noticeNumber,
           lat: zvGps ? zvGps.lat : null,
           lng: zvGps ? zvGps.lng : null,
@@ -2129,11 +2127,7 @@
           await docRef.set({ ...baseData, ...extraData });
         }catch(e){
           if(e && e.code === 'permission-denied'){
-            try{ await docRef.set({ ...baseData, offenseLabel: 'Závada: ' + popis.slice(0, 300) }); }
-            catch(e2){
-              if(e2 && e2.code === 'permission-denied') await docRef.set({ ...baseData, offenseLabel: 'Závada: ' + popis.slice(0, 300), resolved: false });
-              else throw e2;
-            }
+            await docRef.set({ ...baseData, offenseLabel: 'Závada: ' + popis.slice(0, 300) });
           } else throw e;
         }
         if(photos.length) await docRef.collection('data').doc('photos').set({ photos, photoMime: 'image/jpeg' });
@@ -2165,7 +2159,10 @@
     function openSheet(){
       sheetNote('');
       $('zvSheet').classList.add('open');
-      setTimeout(()=> $('zvPopis').focus(), 50);
+      // iOS otevře klávesnici jen při focus() přímo v klepnutí (ne v timeoutu).
+      const ta = $('zvPopis');
+      ta.focus();
+      try{ const n = ta.value.length; ta.setSelectionRange(n, n); }catch(e){}
     }
     $('zvPopisBtn').addEventListener('click', openSheet);
     $('zvPopisPreview').addEventListener('click', openSheet);

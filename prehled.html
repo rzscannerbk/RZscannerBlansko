@@ -1761,9 +1761,9 @@
       x += textEl((zav ? 'Místo závady' : 'Místo kontroly') + '\n', { align: 'center', em: true });
       x += textEl(wrapWords(record.address) + '\n\n', { align: 'center' });
     }
-    if(zav && record.popisZavady){
+    if(zav && zavadaPopis(record)){
       x += textEl('Popis závady\n', { align: 'center', em: true });
-      x += textEl(wrapWords(record.popisZavady) + '\n\n', { align: 'center' });
+      x += textEl(wrapWords(zavadaPopis(record)) + '\n\n', { align: 'center' });
     }
     if(record.duvodKontroly){
       x += textEl('Důvod kontroly\n', { align: 'center', em: true });
@@ -1997,7 +1997,7 @@
       const zavR = isZavada(r);
       const kontr = isKontrola(r) || zavR;
       const item = document.createElement('div');
-      item.className = 'record-item' + (r.resolved ? ' resolved' : '') + (r.docType === 'boticka' ? ' boticka' : '');
+      item.className = 'record-item' + ((zavR ? (r.resolved && r.resolvedMethod === 'zavadaOznamena') : r.resolved) ? ' resolved' : '') + (r.docType === 'boticka' ? ' boticka' : '');
 
       const topRow = document.createElement('div');
       topRow.className = 'record-top-row';
@@ -2015,6 +2015,12 @@
       docTypeBadge.textContent = zavR ? 'Závada' : kontr ? 'Kontrola osoby' : (r.docType === 'boticka' ? 'Botička' : 'Parkovačka');
       plateRow.appendChild(docTypeBadge);
 
+      if(zavR && r.resolved && r.resolvedMethod === 'zavadaOznamena'){
+        const badge = document.createElement('div');
+        badge.className = 'record-resolved-badge';
+        badge.textContent = 'Oznámeno' + (r.oznamenoKomu ? ' – ' + r.oznamenoKomu : '');
+        plateRow.appendChild(badge);
+      }
       if(r.resolved && !kontr){
         const badge = document.createElement('div');
         badge.className = 'record-resolved-badge';
@@ -2064,7 +2070,7 @@
       if(r.offenseLabel){
         const off = document.createElement('div');
         off.className = 'record-offense';
-        off.textContent = (zavR && r.popisZavady) ? r.popisZavady : r.offenseLabel;
+        off.textContent = (zavR && zavadaPopis(r)) ? zavadaPopis(r) : r.offenseLabel;
         item.appendChild(off);
       }
 
@@ -2290,7 +2296,8 @@
     if(r.noticeNumber) h += '<div class="notice-number"><b>' + e(r.noticeNumber) + '</b></div>';
     h += '<div class="notice-datetime">Datum: ' + e(formatDateCz(r.date)) + '&nbsp;&nbsp;&nbsp;Čas: ' + e(r.time || '—') + '</div>';
     if(r.address) h += '<div class="notice-section"><div class="notice-heading">' + (zav ? 'Místo závady' : 'Místo kontroly') + '</div><div class="notice-address">' + e(r.address) + '</div></div>';
-    if(zav && r.popisZavady) h += '<div class="notice-section"><div class="notice-heading">Popis závady</div><div class="notice-address" style="white-space:pre-wrap">' + e(r.popisZavady) + '</div></div>';
+    if(zav) h += '<div class="notice-section"><div class="notice-heading">Stav</div><div class="notice-address">' + ((r.resolved && r.resolvedMethod === 'zavadaOznamena') ? 'Oznámeno' + (r.oznamenoKomu ? ' – ' + e(r.oznamenoKomu) : '') : 'Nevyřešeno') + '</div></div>';
+    if(zav && zavadaPopis(r)) h += '<div class="notice-section"><div class="notice-heading">Popis závady</div><div class="notice-address" style="white-space:pre-wrap">' + e(zavadaPopis(r)) + '</div></div>';
     if(r.duvodKontroly) h += '<div class="notice-section"><div class="notice-heading">Důvod kontroly</div><div class="notice-address">' + e(r.duvodKontroly) + '</div></div>';
     osoby.forEach((p, i)=>{
       h += '<div class="notice-section"><div class="notice-heading">' + (osoby.length > 1 ? 'Osoba ' + (i + 1) : 'Osoba') + '</div>' +
@@ -2310,7 +2317,14 @@
   }
   // Závada (Služební záležitosti → Závada) — také uložená rovnou uzavřená.
   function isZavada(r){
-    return !!r && (r.docType === 'zavada' || r.source === 'zavada' || r.resolvedMethod === 'zavada');
+    return !!r && (r.docType === 'zavada' || r.source === 'zavada' || r.resolvedMethod === 'zavada' ||
+      (!r.plate && /^Závada(:|$)/.test(String(r.offenseLabel || '').trim())));
+  }
+  // Popis závady — u záznamu uloženého bez extra polí je v offenseLabel "Závada: …".
+  function zavadaPopis(r){
+    if(r && r.popisZavady) return r.popisZavady;
+    const m = String((r && r.offenseLabel) || '').match(/^Závada:\s*(.+)$/s);
+    return m ? m[1] : '';
   }
   function updateResolveBtn(record){
     const menuBtn = document.getElementById('resolveMenuBtn');
