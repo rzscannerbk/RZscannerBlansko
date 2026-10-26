@@ -463,6 +463,45 @@
   .blur-toolbar button.blur-danger{background:transparent; border-color:#555; color:#ff6b6b;}
 
   /* ---------- HISTORY ---------- */
+
+  /* ---------- SCREEN: SLUŽEBNÍ ZÁLEŽITOSTI + OSOBY ---------- */
+  #sluzebniScreen, #osobyScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
+  .sz-top{display:flex; align-items:center; gap:14px;}
+  .sz-back{width:44px; height:44px; flex:none; border-radius:50%; background:var(--asphalt-2); border:1px solid var(--asphalt-3);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;}
+  .sz-back svg{width:20px; height:20px;}
+  .sz-title{font-family:'Oswald',sans-serif; font-weight:600; font-size:28px; letter-spacing:.02em; text-transform:uppercase; margin:0; line-height:1.05; color:var(--text);}
+  .sz-sub{color:var(--muted); font-size:14px; margin:6px 0 24px 58px;}
+  .sz-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:18px 14px;}
+  .sz-tile{display:flex; flex-direction:column; align-items:center; gap:10px; background:none; border:0; padding:0; cursor:pointer; color:var(--text); font:inherit;}
+  .sz-ico{width:100%; aspect-ratio:1/1; border-radius:24px; background:linear-gradient(160deg, var(--asphalt-3), var(--asphalt-2));
+    border:1px solid var(--line); box-shadow:0 10px 30px rgba(255,176,32,.12); display:flex; align-items:center; justify-content:center; color:var(--text);}
+  .sz-ico svg{width:62%; height:62%;}
+  .sz-tile:active .sz-ico{transform:scale(.96);}
+  .sz-lbl{font-weight:600; font-size:15px;}
+  .sz-badge{margin-left:auto; width:44px; height:44px; flex:none; border-radius:12px; background:linear-gradient(160deg, var(--asphalt-3), var(--asphalt-2));
+    border:1px solid var(--line); display:flex; align-items:center; justify-content:center; color:var(--text);}
+  .sz-badge svg{width:28px; height:28px;}
+  .os-form{display:flex; flex-direction:column; gap:12px; margin-top:22px;}
+  .os-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .os-field{background:var(--asphalt-2); border:1px solid var(--asphalt-3); border-radius:16px; padding:10px 16px 12px; display:block;}
+  .os-field:focus-within{border-color:var(--amber); box-shadow:0 0 0 3px rgba(255,176,32,.12);}
+  .os-field span{display:block; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin-bottom:4px;}
+  .os-field input{width:100%; background:transparent; border:0; outline:none; color:var(--text); font:600 19px 'Inter',sans-serif; padding:2px 0;}
+  .os-field input::placeholder{color:var(--muted); opacity:.55; font-weight:500;}
+  .os-photo{margin-top:4px; border:1.5px dashed var(--line); border-radius:18px; min-height:140px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; color:var(--amber); font-weight:600; font-size:16px; cursor:pointer; padding:14px; text-align:center;}
+  .os-photo .os-cam{width:54px; height:54px; border-radius:50%; background:rgba(255,176,32,.12); display:flex; align-items:center; justify-content:center;}
+  .os-photo small{color:var(--muted); font-weight:400; font-size:12.5px;}
+  .os-thumbs{display:flex; flex-wrap:wrap; gap:10px; justify-content:center;}
+  .os-thumb{position:relative; width:86px; height:86px; border-radius:12px; overflow:hidden; border:1px solid var(--line);}
+  .os-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .os-thumb button{position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; border:0; background:rgba(0,0,0,.65); color:#fff; font-size:14px; line-height:24px; padding:0; cursor:pointer;}
+  .os-copy{margin-top:22px; width:100%; height:58px; border-radius:16px; border:0; background:var(--amber); color:#241a00; font:700 17px 'Inter',sans-serif; cursor:pointer;}
+  .os-copy:active{transform:scale(.98);}
+  .os-note{margin-top:12px; text-align:center; font-size:13px; line-height:1.5; color:var(--muted); min-height:20px;}
+  .os-note.ok{color:var(--good);} .os-note.err{color:var(--bad);}
+  .os-clear{display:block; margin:6px auto 0; background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer;}
   #historyScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
   .history-header{display:flex; align-items:center; gap:14px; margin-bottom:20px;}
   .history-back{
@@ -597,6 +636,48 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- SLUŽEBNÍ ZÁLEŽITOSTI (klepnutí na logo) -->
+  <div id="sluzebniScreen" class="screen">
+    <div class="sz-top">
+      <button type="button" class="sz-back" id="szBackBtn" aria-label="Zpět"><svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="sz-title">Služební záležitosti</h1>
+    </div>
+    <div class="sz-sub">Vyber, co chceš řešit</div>
+    <div class="sz-grid">
+      <button type="button" class="sz-tile" id="szOsobyTile">
+        <div class="sz-ico"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><defs><linearGradient id="osobyG1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC65B"/><stop offset="1" stop-color="#FFA000"/></linearGradient></defs><circle cx="26" cy="21" r="10" fill="url(#osobyG1)"/><path d="M7 50c0-10.5 8.5-17 19-17 3.4 0 6.6.7 9.3 2.1-3.4 2.9-5.3 7.1-5.3 11.6 0 1.1.1 2.2.3 3.3H7z" fill="url(#osobyG1)"/><circle cx="44" cy="46" r="9.5" stroke="currentColor" stroke-width="4"/><path d="M51 53l6.5 6.5" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg></div>
+        <div class="sz-lbl">Osoby</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- OSOBY — údaje pro lustraci v MP Manageru -->
+  <div id="osobyScreen" class="screen">
+    <div class="sz-top">
+      <button type="button" class="sz-back" id="osBackBtn" aria-label="Zpět"><svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="sz-title">Osoby</h1>
+      <div class="sz-badge"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><defs><linearGradient id="osobyG2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC65B"/><stop offset="1" stop-color="#FFA000"/></linearGradient></defs><circle cx="26" cy="21" r="10" fill="url(#osobyG2)"/><path d="M7 50c0-10.5 8.5-17 19-17 3.4 0 6.6.7 9.3 2.1-3.4 2.9-5.3 7.1-5.3 11.6 0 1.1.1 2.2.3 3.3H7z" fill="url(#osobyG2)"/><circle cx="44" cy="46" r="9.5" stroke="currentColor" stroke-width="4"/><path d="M51 53l6.5 6.5" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg></div>
+    </div>
+    <div class="os-form">
+      <div class="os-row">
+        <label class="os-field"><span>Jméno</span><input id="osJmeno" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Jméno"></label>
+        <label class="os-field"><span>Příjmení</span><input id="osPrijmeni" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Příjmení"></label>
+      </div>
+      <label class="os-field"><span>Datum narození</span><input id="osNarozeni" type="text" inputmode="decimal" autocomplete="off" placeholder="d. m. rrrr"></label>
+      <label class="os-field"><span>Číslo dokladu</span><input id="osDoklad" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="OP / pas / řidičský průkaz"></label>
+      <div class="os-photo" id="osPhotoBox">
+        <div class="os-thumbs" id="osThumbs"></div>
+        <div class="os-cam"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="var(--amber)" stroke-width="1.8"/><circle cx="12" cy="13" r="3.4" stroke="var(--amber)" stroke-width="1.8"/></svg></div>
+        Přidat foto
+        <small>vyfotit nebo vybrat z galerie</small>
+      </div>
+      <input type="file" id="osPhotoInput" accept="image/*" multiple style="display:none">
+    </div>
+    <button type="button" class="os-copy" id="osCopyBtn">Kopírovat do MP Manageru</button>
+    <div class="os-note" id="osNote"></div>
+    <button type="button" class="os-clear" id="osClearBtn">Vymazat formulář</button>
   </div>
 
   <!-- CAMERA -->
@@ -1086,6 +1167,8 @@
     brand: document.getElementById('brandScreen'),
     login: document.getElementById('loginScreen'),
     pdfPreview: document.getElementById('pdfPreviewScreen'),
+    sluzebni: document.getElementById('sluzebniScreen'),
+    osoby: document.getElementById('osobyScreen'),
   };
   function show(name){
     Object.values(screens).forEach(s=>s.classList.remove('active'));
@@ -1796,6 +1879,118 @@
     if(suppressStartClick){ suppressStartClick = false; return; }
     openCamera();
   });
+
+
+  // ---------- Služební záležitosti (klepnutí na logo) ----------
+  // Logo má zároveň skryté 4s podržení pro přepnutí tématu — klepnutí se
+  // proto bere jen jako krátký dotyk (pod 600 ms), dlouhé držení stránku
+  // neotevře.
+  (function(){
+    const logo = document.querySelector('.app-logo');
+    if(!logo) return;
+    let touchStartAt = 0;
+    logo.style.cursor = 'pointer';
+    logo.addEventListener('touchstart', ()=>{ touchStartAt = Date.now(); }, { passive: true });
+    logo.addEventListener('click', ()=>{
+      if(touchStartAt && Date.now() - touchStartAt > 600){ touchStartAt = 0; return; }
+      touchStartAt = 0;
+      show('sluzebni');
+    });
+    document.getElementById('szBackBtn').addEventListener('click', ()=> show('start'));
+    document.getElementById('szOsobyTile').addEventListener('click', ()=> show('osoby'));
+    document.getElementById('osBackBtn').addEventListener('click', ()=> show('sluzebni'));
+  })();
+
+  // ---------- Osoby — kopírování údajů pro lustraci v MP Manageru ----------
+  // Údaje jdou JEN do schránky (nikam se neukládají ani neodesílají).
+  // Bookmarklet "Osoba do MP" v MP Manageru schránku přečte podle
+  // značky #RZS-OSOBA a vyplní formulář Osoby > Základní registry
+  // (MZRE05F.asp). Fotky zůstávají jen v telefonu, do schránky nejdou.
+  (function(){
+    const $ = id => document.getElementById(id);
+    const note = (t, k)=>{ const n = $('osNote'); n.textContent = t || ''; n.className = 'os-note' + (k ? ' ' + k : ''); };
+    let osPhotos = [];
+
+    // "29061980", "29.6.1980", "29 6 1980", "29/06/1980" → "29.6.1980"
+    function normalizeDob(v){
+      v = String(v || '').trim();
+      if(!v) return '';
+      let d, m, y;
+      const digits = v.replace(/\D/g, '');
+      const parts = v.split(/[^0-9]+/).filter(Boolean);
+      if(parts.length === 3){ [d, m, y] = parts; }
+      else if(digits.length === 8){ d = digits.slice(0,2); m = digits.slice(2,4); y = digits.slice(4); }
+      else return null;
+      d = parseInt(d, 10); m = parseInt(m, 10); y = parseInt(y, 10);
+      if(y < 100) y += (y > (new Date().getFullYear() % 100) ? 1900 : 2000);
+      const dt = new Date(y, m - 1, d);
+      if(!d || !m || !y || dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d || dt > new Date()) return null;
+      return d + '.' + m + '.' + y;
+    }
+    $('osNarozeni').addEventListener('blur', (e)=>{
+      const n = normalizeDob(e.target.value);
+      if(n) e.target.value = n;
+    });
+
+    async function copyText(text){
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(text); return true; }
+      }catch(e){}
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+        const ok = document.execCommand('copy'); ta.remove(); return ok;
+      }catch(e){ return false; }
+    }
+
+    $('osCopyBtn').addEventListener('click', async ()=>{
+      const jmeno = $('osJmeno').value.trim();
+      const prijmeni = $('osPrijmeni').value.trim();
+      const narRaw = $('osNarozeni').value.trim();
+      const doklad = $('osDoklad').value.trim().replace(/\s+/g, '').toUpperCase();
+      const narozeni = narRaw ? normalizeDob(narRaw) : '';
+      if(narRaw && !narozeni){ note('Datum narození nejde přečíst — zadej ho jako d. m. rrrr.', 'err'); $('osNarozeni').focus(); return; }
+      if(narozeni) $('osNarozeni').value = narozeni;
+      // MP Manager hledá buď podle jména + příjmení + data narození, nebo
+      // podle čísla dokladu — aspoň jedna z těch dvou kombinací musí být celá.
+      if(!((jmeno && prijmeni && narozeni) || doklad)){
+        note('Vyplň jméno, příjmení a datum narození, nebo číslo dokladu.', 'err');
+        return;
+      }
+      const text = ['#RZS-OSOBA',
+        'Jméno: ' + jmeno,
+        'Příjmení: ' + prijmeni,
+        'Datum narození: ' + (narozeni || ''),
+        'Číslo dokladu: ' + doklad].join('\n');
+      const ok = await copyText(text);
+      if(ok) note('✓ Zkopírováno. Přepni se do MP Manageru a spusť bookmarklet „Osoba do MP“.', 'ok');
+      else note('Kopírování se nepovedlo — zkus to prosím znovu.', 'err');
+    });
+
+    $('osClearBtn').addEventListener('click', ()=>{
+      ['osJmeno','osPrijmeni','osNarozeni','osDoklad'].forEach(id => $(id).value = '');
+      osPhotos = []; renderThumbs(); note('');
+    });
+
+    function renderThumbs(){
+      const box = $('osThumbs');
+      box.innerHTML = '';
+      osPhotos.forEach((url, i)=>{
+        const t = document.createElement('div'); t.className = 'os-thumb';
+        const img = document.createElement('img'); img.src = url; img.alt = 'Foto ' + (i + 1);
+        const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Odebrat fotku');
+        x.addEventListener('click', (ev)=>{ ev.stopPropagation(); URL.revokeObjectURL(url); osPhotos.splice(i, 1); renderThumbs(); });
+        t.appendChild(img); t.appendChild(x); box.appendChild(t);
+      });
+    }
+    $('osPhotoBox').addEventListener('click', ()=> $('osPhotoInput').click());
+    $('osPhotoInput').addEventListener('change', (e)=>{
+      Array.from(e.target.files || []).forEach(f => osPhotos.push(URL.createObjectURL(f)));
+      e.target.value = '';
+      renderThumbs();
+    });
+  })();
 
   // Skrytý přepínač světlý/tmavý režim — 4s podržení loga.
   (function(){
