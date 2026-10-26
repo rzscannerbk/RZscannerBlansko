@@ -214,8 +214,7 @@
     if(d.udalostId && d.udalostText){
       set('tUdalost', d.udalostText);
       set('tUdalostN', d.udalostId);
-      var tree = document.getElementById('tUdalostRKUP');
-      if(tree) tree.style.display = 'none';
+      ['tUdalostRKUP','tUdalostRKUT','tUdalostRKUO'].forEach(function(tid){ var tree = document.getElementById(tid); if(tree) tree.style.display = 'none'; });
       var btn = document.getElementById('tUdalostBtn');
       if(btn) btn.innerHTML = 'Vybrat';
     } else {

@@ -5376,8 +5376,69 @@
     };
   }
 
+  // Kontrola osoby → nová událost v MP Manageru: Ostatní / Kontrolní
+  // činnost - kontroly veřejného prostranství (53187), oprávnění §11 + §12,
+  // první osoba do kontaktu, všechny osoby a důvod do popisu. Způsob
+  // řešení vždy: Osoby poučeny (51776), Protiprávní jednání nezjištěno
+  // (52126), Vykázání z místa (51771).
+  const KONTROLA_MPM_SOLUTION_IDS = ['51776', '52126', '51771'];
+  function buildKontrolaMpmData(record){
+    const { town, street } = parseAddressForMPM(record.address);
+    const osoby = (Array.isArray(record.osoby) && record.osoby.length) ? record.osoby : (record.prestupce ? [record.prestupce] : []);
+    const desc = [];
+    desc.push('Kontrola osob' + (osoby.length > 1 ? ' (' + osoby.length + ')' : '') + ' — RZ Scanner č. ' + (record.noticeNumber || ''));
+    if(record.duvodKontroly) desc.push('Důvod kontroly: ' + record.duvodKontroly);
+    osoby.forEach((o, i)=>{
+      desc.push((osoby.length > 1 ? (i + 1) + '. ' : '') +
+        [o.jmeno, o.prijmeni].filter(Boolean).join(' ') +
+        (o.datumNarozeni ? ', nar. ' + o.datumNarozeni : '') +
+        (o.cisloDokladu ? ', doklad ' + o.cisloDokladu : '') +
+        (o.lustrovano ? ' — lustrováno v ZR' : ''));
+    });
+    if(record.address) desc.push('Místo: ' + record.address);
+    if(record.lat != null && record.lng != null) desc.push('GPS: ' + Number(record.lat).toFixed(6) + ', ' + Number(record.lng).toFixed(6));
+    const start = (record.date && record.time) ? { date: isoToCzDate(record.date), time: record.time } : timestampToMpmDateTime(record.createdAt);
+    const end = record.resolvedAt ? timestampToMpmDateTime(record.resolvedAt) : start;
+    const prvni = osoby[0] || {};
+    return {
+      rz: '', carSubType: '',
+      town, street,
+      desc: desc.join('\n'),
+      dateStart: start.date, timeStart: start.time,
+      dateEnd: end.date, timeEnd: end.time,
+      department: { name: 'Výkon služby', id: '16' },
+      eventTypeRadioId: 'tKodUdalostiKUO',
+      udalostId: '53187',
+      udalostText: 'Kontrolní činnost - kontroly veřejného prostranství',
+      authorizationIds: ['40001', '40003'],
+      solutionIds: KONTROLA_MPM_SOLUTION_IDS.slice(),
+      pachatelJmeno: prvni.jmeno || null,
+      pachatelPrijmeni: prvni.prijmeni || null,
+      pachatelDatumNarozeni: prvni.datumNarozeni || null,
+      pachatelCisloDokladu: prvni.cisloDokladu || null,
+      penalty: null, payType: null,
+      straznikRole: 'resil',
+      doplnitUlozenou: false,
+      methodSolutionIds: KONTROLA_MPM_SOLUTION_IDS.slice(),
+      resolverJmeno: record.officerName || null,
+      resolverCislo: OFFICER_BADGE_NUMBERS[record.officerName] || null,
+      pridatStraznikaCislo: OFFICER_BADGE_NUMBERS[record.officerName] || null,
+      pridatStraznikaJmeno: record.officerName || null
+    };
+  }
+
   async function exportToMPManager(record){
     if(!record) return;
+    if(isKontrola(record)){
+      try{
+        await navigator.clipboard.writeText(JSON.stringify(buildKontrolaMpmData(record)));
+        setDetailNote('Kontrola zkopírována. V MP Manageru otevři Přidat událost a spusť záložku „z RZ do MP“.', 'ok');
+        return true;
+      }catch(e){
+        setDetailNote('Nepodařilo se zkopírovat do schránky — aplikace k tomu potřebuje HTTPS a oprávnění prohlížeče.', 'err');
+        return false;
+      }
+    }
     const { town, street } = parseAddressForMPM(record.address);
     const vehicleBits = [record.brand, record.color].filter(Boolean).join(', ');
     const descLines = [];
@@ -10815,7 +10876,9 @@
     const noticeCardContainer = document.getElementById('noticeCardContainer');
     const detailTabKopie = document.getElementById('detailTabKopie');
     const kontr = isKontrola(record);
-    ['mpmExportBtn', 'detailPasteMpBtn'].forEach(id=>{ const b = document.getElementById(id); if(b) b.style.display = kontr ? 'none' : ''; });
+    // U kontroly osoby zůstává jen MPM (založení události v MP Manageru),
+    // "Vložit z MP" nedává smysl.
+    ['detailPasteMpBtn'].forEach(id=>{ const b = document.getElementById(id); if(b) b.style.display = kontr ? 'none' : ''; });
     if(record.source === 'addEvent' || kontr){
       noticeCardContainer.innerHTML = '';
       detailTabKopie.style.display = 'none';
