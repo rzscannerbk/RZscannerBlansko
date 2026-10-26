@@ -6,7 +6,7 @@
  * a vyplní formulář:
  *   - jméno + příjmení + datum narození → hledání "podle data narození",
  *   - jinak číslo dokladu → hledání "podle čísla dokladu".
- * Potvrdit nechává na strážníkovi (zkontroluje důvod lustrace a typ dokladu).
+ * Potom sám klikne na Potvrdit (důvod zůstává výchozí z MP Manageru).
  *
  * Spouští se odkudkoliv v MP Manageru (typicky z úvodní obrazovky
  * Default.asp). Mimo MZRE05F.asp se formulář otevře v celoobrazovkovém
@@ -120,7 +120,15 @@
     msg('✓ Vyplněno (' + (mode === 'Birth'
       ? 'podle data narození: ' + who + ', ' + d.narozeni
       : 'podle čísla dokladu: ' + d.doklad) +
-      '). Zkontroluj důvod' + (mode === 'Paper' ? ' a typ dokladu' : '') + ' a klepni na Potvrdit.', '#33D399');
+      '). Odesílám lustraci…', '#33D399');
+    // Automatické Potvrdit — krátká pauza, ať se formulář po přepnutí
+    // způsobu hledání (E05FindBy) stihne překreslit.
+    if(btn){
+      setTimeout(function(){
+        try{ btn.click(); }
+        catch(e){ msg('Potvrdit se nepodařilo stisknout — klepni na něj prosím sám.', '#FF6058'); }
+      }, 400);
+    }
     pasteBtn.style.display = 'none';
     ta.style.display = 'none';
     filled = true;
