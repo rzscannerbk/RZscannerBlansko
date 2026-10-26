@@ -33,7 +33,7 @@
       '<b style="color:#FFB020;font-size:15px">RZ Scanner → lustrace osoby</b>' +
       '<button type="button" data-x style="margin-left:auto;background:none;border:0;color:#8B92A0;font-size:22px;line-height:1;cursor:pointer">×</button>' +
     '</div>' +
-    '<div data-msg>Čtu schránku…</div>' +
+    '<div data-msg>Klepni na tlačítko a pak na „Vložit“.</div>' +
     '<button type="button" data-paste style="display:none;margin-top:10px;width:100%;height:44px;border:0;border-radius:10px;background:#FFB020;color:#241a00;font:bold 15px Arial,sans-serif;cursor:pointer">Vložit ze schránky</button>' +
     '<textarea data-ta placeholder="…nebo sem údaje vlož ručně (dlouhé podržení → Vložit)" style="display:none;margin-top:10px;width:100%;box-sizing:border-box;height:70px;border-radius:10px;border:1px solid #262B33;background:#0A0C10;color:#ECEDEF;padding:8px;font:13px Arial,sans-serif"></textarea>';
   document.body.appendChild(panel);
@@ -107,6 +107,9 @@
       '). Zkontroluj důvod' + (mode === 'Paper' ? ' a typ dokladu' : '') + ' a klepni na Potvrdit.', '#33D399');
     pasteBtn.style.display = 'none';
     ta.style.display = 'none';
+    // Panel dolů, ať nezakrývá formulář ani výsledek lustrace (× zavře vše).
+    panel.style.top = 'auto';
+    panel.style.bottom = '10px';
   }
 
   function go(d){
@@ -131,7 +134,9 @@
     document.body.appendChild(frame);
   }
 
+  var handled = false;
   function handle(text){
+    if(handled) return;
     var d = parse(text);
     if(!d){
       msg('Ve schránce nejsou údaje z RZ Scanneru. V RZ Scanneru klepni na „Kopírovat do MP Manageru“ a zkus to znovu.', '#FF6058');
@@ -139,6 +144,7 @@
       ta.style.display = 'block';
       return;
     }
+    handled = true;
     go(d);
   }
 
@@ -151,15 +157,14 @@
     });
   };
 
-  // Na počítači (povolená schránka) to projde rovnou; na iPhonu je čtení
-  // schránky povolené jen po klepnutí → ukáže se tlačítko "Vložit ze schránky".
-  try{
-    navigator.clipboard.readText().then(handle, function(){
-      msg('Klepni na tlačítko a pak na „Vložit“.');
-      pasteBtn.style.display = 'block';
-    });
-  }catch(e){
-    msg('Klepni na tlačítko a pak na „Vložit“.');
-    pasteBtn.style.display = 'block';
+  // Tlačítko i ruční pole jsou vidět hned — Chrome na iPhonu při čtení
+  // schránky bez klepnutí ukáže "Povolit vložení", ale text pak nemusí
+  // vrátit a bookmarklet by zůstal viset. Na počítači (povolená schránka)
+  // to automatické čtení na pozadí obvykle projde rovnou.
+  pasteBtn.style.display = 'block';
+  ta.style.display = 'block';
+  var isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if(!isTouch && navigator.clipboard && navigator.clipboard.readText){
+    try{ navigator.clipboard.readText().then(function(t){ if(t && t.indexOf(MARK) !== -1) handle(t); }, function(){}); }catch(e){}
   }
 })();
