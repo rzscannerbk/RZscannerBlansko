@@ -287,6 +287,7 @@
   .record-notice-number{font-family:'Roboto Mono',monospace; font-size:15px; font-weight:700; color:var(--faint); letter-spacing:.02em;}
 
   .record-doctype-badge{font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; width:fit-content; letter-spacing:.02em; color:#8FB6FF; background:rgba(93,156,255,.14); margin-top:2px; justify-self:center;}
+  .record-doctype-badge.kontrola{color:#B28CFF; background:rgba(178,140,255,.15);}
   .record-doctype-badge.boticka{color:var(--amber); background:var(--amber-glow);}
 
   .record-addr{font-size:12.5px; color:var(--muted); line-height:1.4; padding-top:3px; padding-right:10px; text-align:center;}
@@ -7387,7 +7388,7 @@
     const hasPachatel = Object.values(pachatel).some(v => v);
     const updateData = {
       plate: document.getElementById('aeSpz').value.trim(),
-      docType: document.getElementById('aeDocType').value,
+      docType: isKontrola(adminEditRecord) ? 'kontrola' : document.getElementById('aeDocType').value,
       brand: document.getElementById('aeBrand').value.trim(),
       color: document.getElementById('aeColor').value.trim(),
       address: document.getElementById('aeAddress').value.trim(),
@@ -7525,7 +7526,18 @@
     }
   }
 
+  // Kontrola osoby (z RZ Scanneru, Služební záležitosti > Osoby) — není to
+  // přestupek: ukládá se rovnou uzavřená, má vlastní typ i stav a do
+  // počtů přestupků ve svodce se nepočítá (má tam vlastní řádek).
+  function isKontrola(r){
+    return !!r && (r.docType === 'kontrola' || r.source === 'kontrolaOsoby' || r.resolvedMethod === 'kontrola');
+  }
+  function docTypeKey(r){
+    if(isKontrola(r)) return 'kontrola';
+    return (r.docType || 'vyzva') === 'boticka' ? 'boticka' : 'vyzva';
+  }
   function recordStatusKey(r){
+    if(isKontrola(r)) return 'kontrola';
     if(!r.resolved) return 'pending';
     if(r.resolvedMethod === 'oznameni') return 'oznameni';
     if(r.resolvedMethod === 'vyzva') return 'vyzva';
@@ -7536,7 +7548,7 @@
 
   function passesFilters(r){
     if(filterStatus !== 'all' && recordStatusKey(r) !== filterStatus) return false;
-    if(filterType !== 'all' && (r.docType || 'vyzva') !== filterType) return false;
+    if(filterType !== 'all' && docTypeKey(r) !== filterType) return false;
     if(filterOfficer !== 'all' && r.officerName !== filterOfficer) return false;
     if(filterRange !== 'all'){
       if(!r.date) return false;
@@ -7561,12 +7573,12 @@
   function renderRail(){
     const rail = document.getElementById('rail');
     const base = allRecords; // počty vždy z celé sady, ne z aktuálně filtrovaného pohledu
-    const statusCounts = { pending:0, oznameni:0, vyzva:0, prikaz:0, domluva:0 };
-    const typeCounts = { vyzva:0, boticka:0 };
+    const statusCounts = { pending:0, oznameni:0, vyzva:0, prikaz:0, domluva:0, kontrola:0 };
+    const typeCounts = { vyzva:0, boticka:0, kontrola:0 };
     const officerCounts = {};
     base.forEach(r=>{
       statusCounts[recordStatusKey(r)]++;
-      typeCounts[(r.docType || 'vyzva') === 'boticka' ? 'boticka' : 'vyzva']++;
+      typeCounts[docTypeKey(r)]++;
       if(r.officerName) officerCounts[r.officerName] = (officerCounts[r.officerName] || 0) + 1;
     });
     const officers = Object.keys(officerCounts).sort((a,b)=> officerCounts[b]-officerCounts[a]);
@@ -7612,6 +7624,7 @@
     const gType = group('Typ dokumentu');
     gType.appendChild(item('Parkovačka', typeCounts.vyzva, filterType === 'vyzva', ()=>{ filterType = filterType==='vyzva' ? 'all' : 'vyzva'; refreshView(); }));
     gType.appendChild(item('Botička', typeCounts.boticka, filterType === 'boticka', ()=>{ filterType = filterType==='boticka' ? 'all' : 'boticka'; refreshView(); }));
+    gType.appendChild(item('Kontrola osoby', typeCounts.kontrola, filterType === 'kontrola', ()=>{ filterType = filterType==='kontrola' ? 'all' : 'kontrola'; refreshView(); }));
     rail.appendChild(gType);
 
     const gOfficer = group('Strážník');
@@ -7667,7 +7680,7 @@
   // (podle createdAt sestupně, jak přichází z Firestore dotazu).
   let sortKey = null;
   let sortDir = 1;
-  const STATUS_ORDER = ['pending', 'oznameni', 'vyzva', 'prikaz', 'domluva'];
+  const STATUS_ORDER = ['pending', 'oznameni', 'vyzva', 'prikaz', 'domluva', 'kontrola'];
 
   // Šipka "zpět na začátek" — objeví se po odscrollování seznamu níž
   // než o ~1,5 obrazovky řádků, klik plynule odscrolluje nahoru.
@@ -7687,7 +7700,7 @@
     arr.sort((a, b)=>{
       let va, vb;
       if(sortKey === 'plate'){ va = a.plate || ''; vb = b.plate || ''; }
-      else if(sortKey === 'type'){ va = (a.docType || 'vyzva'); vb = (b.docType || 'vyzva'); }
+      else if(sortKey === 'type'){ va = docTypeKey(a); vb = docTypeKey(b); }
       else if(sortKey === 'address'){ va = a.address || ''; vb = b.address || ''; }
       else if(sortKey === 'offense'){ va = a.offenseLabel || ''; vb = b.offenseLabel || ''; }
       else if(sortKey === 'status'){ va = STATUS_ORDER.indexOf(recordStatusKey(a)); vb = STATUS_ORDER.indexOf(recordStatusKey(b)); }
@@ -7841,8 +7854,8 @@
       return;
     }
 
-    const statusLabel = { pending:'Nevyřešeno', oznameni:'Oznámeno', vyzva:'Odeslána výzva', prikaz:'Dořešeno příkazem', domluva:'Dořešeno domluvou' };
-    const statusDot = { pending:'var(--faint)', oznameni:'#8FB6FF', prikaz:'var(--good)', domluva:'#D9A94E' };
+    const statusLabel = { pending:'Nevyřešeno', oznameni:'Oznámeno', vyzva:'Odeslána výzva', prikaz:'Dořešeno příkazem', domluva:'Dořešeno domluvou', kontrola:'Kontrola osoby' };
+    const statusDot = { pending:'var(--faint)', oznameni:'#8FB6FF', prikaz:'var(--good)', domluva:'#D9A94E', kontrola:'#B28CFF' };
 
     filtered.forEach(r=>{
       const sKey = recordStatusKey(r);
@@ -7861,7 +7874,7 @@
       plateCol.className = 'record-plate-col';
       const plate = document.createElement('span');
       plate.className = 'record-plate mono';
-      plate.textContent = r.plate ? formatPlate(r.plate) : 'NEZNÁMÁ SPZ';
+      plate.textContent = r.plate ? formatPlate(r.plate) : (isKontrola(r) ? 'OSOBA' : 'NEZNÁMÁ SPZ');
       if(r.plate){
         plate.title = 'Kliknutím zkopírovat SPZ';
         plate.style.cursor = 'pointer';
@@ -7884,8 +7897,9 @@
       item.appendChild(plateCol);
 
       const doctype = document.createElement('span');
-      doctype.className = 'record-doctype-badge' + (isBoticka ? ' boticka' : '');
-      doctype.textContent = isBoticka ? 'Botička' : 'Parkovačka';
+      const isKontr = isKontrola(r);
+      doctype.className = 'record-doctype-badge' + (isBoticka ? ' boticka' : '') + (isKontr ? ' kontrola' : '');
+      doctype.textContent = isKontr ? 'Kontrola osoby' : (isBoticka ? 'Botička' : 'Parkovačka');
       item.appendChild(doctype);
 
       const addr = document.createElement('span');
@@ -8256,7 +8270,10 @@
     });
   }
 
-  function computeStatsForRecords(records){
+  function computeStatsForRecords(allRecs){
+    // Kontroly osob nejsou přestupky — počítají se zvlášť (stats.kontroly).
+    const kontroly = allRecs.filter(isKontrola).length;
+    const records = allRecs.filter(r => !isKontrola(r));
     const statusCounts = { pending:0, oznameni:0, vyzva:0, prikaz:0, domluva:0 };
     // Rozpad příkazů na místě podle způsobu platby (record.platba se
     // vyplňuje jen u resolvedMethod 'prikaz') + součet vybraných částek —
@@ -8287,7 +8304,7 @@
     const officerRows = Object.keys(officers)
       .map(name=>({ name, ...officers[name] }))
       .sort((a,b)=> b.total - a.total || a.name.localeCompare(b.name, 'cs'));
-    return { total: records.length, statusCounts, officerRows, paymentBreakdown, typeCounts };
+    return { total: records.length, kontroly, statusCounts, officerRows, paymentBreakdown, typeCounts };
   }
 
   function formatShiftHeading(win){
@@ -8323,8 +8340,9 @@
   // vyfiltruje záznamy dané směny (recordsInWindow(win)) podle stejné
   // podmínky, jakou počítadlo v poli zobrazuje, a ukáže je jako seznam.
   const STAT_FILTERS = {
-    celkem: () => true,
-    nevyresene: r => !r.resolved,
+    celkem: r => !isKontrola(r),
+    nevyresene: r => !r.resolved && !isKontrola(r),
+    kontrola: r => isKontrola(r),
     domluva: r => recordStatusKey(r) === 'domluva',
     prikaz_hotove: r => recordStatusKey(r) === 'prikaz' && r.platba === 'Hotově',
     prikaz_kartou: r => recordStatusKey(r) === 'prikaz' && r.platba === 'Kartou',
@@ -8332,7 +8350,7 @@
     vyzva: r => recordStatusKey(r) === 'vyzva',
     oznameno: r => recordStatusKey(r) === 'oznameni',
     boticka: r => (r.docType || 'vyzva') === 'boticka',
-    parkovacka: r => (r.docType || 'vyzva') !== 'boticka'
+    parkovacka: r => (r.docType || 'vyzva') !== 'boticka' && !isKontrola(r)
   };
   const STAT_LABELS = {
     celkem: 'Celkem přestupků',
@@ -8344,7 +8362,8 @@
     vyzva: 'Zaslána výzva',
     oznameno: 'Oznámeno',
     boticka: 'Botička',
-    parkovacka: 'Parkovačka'
+    parkovacka: 'Parkovačka',
+    kontrola: 'Kontrola osoby'
   };
   function statusLabelForRecord(r){
     if(!r.resolved) return 'Nevyřešeno';
@@ -8358,7 +8377,7 @@
     const win = currentModalWindow();
     const stats = computeStatsForRecords(recordsInWindow(win));
     const content = document.getElementById('shiftSummaryContent');
-    if(stats.total === 0){
+    if(stats.total === 0 && !stats.kontroly){
       content.innerHTML = '<div class="shift-summary-empty">Žádné přestupky za ' + escapeHtml(formatShiftHeading(win)) + '.</div>';
       return;
     }
@@ -8386,6 +8405,7 @@
     html += '<div class="shift-summary-stats shift-summary-stats-total">' +
       statBox(stats.statusCounts.pending, 'Nevyřešeno', null, 'nevyresene') +
       statBox(stats.total, 'Celkem přestupků', null, 'celkem') +
+      statBox(stats.kontroly, 'Kontrola osoby', null, 'kontrola') +
       '</div>';
     html += '<div class="shift-summary-title">Podle strážníka</div>';
     stats.officerRows.forEach(o=>{
@@ -9715,6 +9735,8 @@
     body += docxLabelValuePara('Parkovačka:', String(stats.typeCounts.vyzva), { size: 20, spacingAfter: 40, tabPos: 3200 });
     body += docxLabelValuePara('Botička:', String(stats.typeCounts.boticka), { size: 20, spacingAfter: 300, tabPos: 3200 });
 
+    body += docxLabelValuePara('Kontroly osob:', String(stats.kontroly || 0), { size: 22, bold: true, spacingAfter: 300, tabPos: 3200 });
+
     body += docxPara('Podle strážníka', { bold: true, size: 22, spacingAfter: 150 });
     if(stats.officerRows.length === 0){
       body += docxPara('Žádné záznamy.', { size: 20 });
@@ -9983,6 +10005,8 @@
     rows.push({ cells: [] });
     rows.push({ cells: ['Parkovačka', stats.typeCounts.vyzva] });
     rows.push({ cells: ['Botička', stats.typeCounts.boticka] });
+    rows.push({ cells: [] });
+    rows.push({ cells: ['Kontroly osob', stats.kontroly || 0] });
     rows.push({ cells: [] });
     rows.push({ cells: ['Podle strážníka', { v: 'Celkem', style: 'center' }, { v: 'Dořešeno', style: 'center' }, { v: 'Nevyřešeno', style: 'center' }] });
     rows.push({ cells: [] });
@@ -10556,7 +10580,7 @@
   // volá se z openDetail a znovu po dotažení fotek, ať se náhled doplní,
   // jakmile jsou k dispozici.
   function updateDetailRail(record){
-    document.getElementById('detailRailPlate').textContent = record.plate ? formatPlate(record.plate) : 'NEZNÁMÁ SPZ';
+    document.getElementById('detailRailPlate').textContent = record.plate ? formatPlate(record.plate) : (isKontrola(record) ? 'OSOBA' : 'NEZNÁMÁ SPZ');
 
     const badge = document.getElementById('detailRailBadge');
     if(record.resolved){
@@ -10739,7 +10763,9 @@
     // "Kopie výzvy/oznámení") nemá smysl a schová se.
     const noticeCardContainer = document.getElementById('noticeCardContainer');
     const detailTabKopie = document.getElementById('detailTabKopie');
-    if(record.source === 'addEvent'){
+    const kontr = isKontrola(record);
+    ['mpmExportBtn', 'detailPasteMpBtn'].forEach(id=>{ const b = document.getElementById(id); if(b) b.style.display = kontr ? 'none' : ''; });
+    if(record.source === 'addEvent' || kontr){
       noticeCardContainer.innerHTML = '';
       detailTabKopie.style.display = 'none';
     } else {
@@ -10899,6 +10925,9 @@
 
   function updateResolveBtn(record){
     const menuBtn = document.getElementById('resolveMenuBtn');
+    // Kontrola osoby je uzavřená hned při uložení — nic se nedořešuje.
+    menuBtn.style.display = isKontrola(record) ? 'none' : '';
+    if(isKontrola(record)) return;
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     const domluvaBtn = document.getElementById('menuDomluvaBtn');
     const penaltyText = getOffensePenaltyText(record);
@@ -13844,7 +13873,7 @@
   // dořešený záznam možné jedním klikem vrátit zpět na nevyřešený.
   let undoTimer = null;
   let undoRecord = null;
-  const UNDO_METHOD_LABEL = { oznameni: 'Oznámeno', vyzva: 'Zaslána výzva', prikaz: 'Dořešeno příkazem', domluva: 'Dořešeno domluvou' };
+  const UNDO_METHOD_LABEL = { oznameni: 'Oznámeno', vyzva: 'Zaslána výzva', prikaz: 'Dořešeno příkazem', domluva: 'Dořešeno domluvou', kontrola: 'Kontrola osoby' };
   function showUndoToast(record, method){
     undoRecord = record;
     clearTimeout(undoTimer);

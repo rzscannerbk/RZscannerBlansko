@@ -294,6 +294,7 @@
     font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
     padding:3px 8px; border-radius:20px; color:#5B8DEF; border:1px solid #5B8DEF;
   }
+  .record-doctype-badge.kontrola{color:#B28CFF; background:rgba(178,140,255,.15);}
   .record-doctype-badge.boticka{color:var(--amber); border-color:var(--amber);}
   .record-meta{
     font-family:'Roboto Mono',monospace; font-size:11.5px; color:var(--muted);
@@ -1951,6 +1952,7 @@
     }
 
     filtered.forEach(r=>{
+      const kontr = isKontrola(r);
       const item = document.createElement('div');
       item.className = 'record-item' + (r.resolved ? ' resolved' : '') + (r.docType === 'boticka' ? ' boticka' : '');
 
@@ -1962,15 +1964,15 @@
 
       const plate = document.createElement('div');
       plate.className = 'record-plate';
-      plate.textContent = r.plate || 'NEZNÁMÁ SPZ';
+      plate.textContent = r.plate || (kontr ? 'OSOBA' : 'NEZNÁMÁ SPZ');
       plateRow.appendChild(plate);
 
       const docTypeBadge = document.createElement('div');
-      docTypeBadge.className = 'record-doctype-badge' + (r.docType === 'boticka' ? ' boticka' : '');
-      docTypeBadge.textContent = r.docType === 'boticka' ? 'Botička' : 'Parkovačka';
+      docTypeBadge.className = 'record-doctype-badge' + (r.docType === 'boticka' ? ' boticka' : '') + (kontr ? ' kontrola' : '');
+      docTypeBadge.textContent = kontr ? 'Kontrola osoby' : (r.docType === 'boticka' ? 'Botička' : 'Parkovačka');
       plateRow.appendChild(docTypeBadge);
 
-      if(r.resolved){
+      if(r.resolved && !kontr){
         const badge = document.createElement('div');
         badge.className = 'record-resolved-badge';
         badge.textContent = r.resolvedMethod === 'oznameni' ? 'Oznámeno'
@@ -1982,7 +1984,9 @@
       }
       topRow.appendChild(plateRow);
 
-      if(r.noticeNumber || (r.pachatel && (r.pachatel.jmeno || r.pachatel.prijmeni))){
+      // U kontroly osoby je osoba v r.prestupce (ne v r.pachatel).
+      const osobaR = r.pachatel || (kontr ? r.prestupce : null);
+      if(r.noticeNumber || (osobaR && (osobaR.jmeno || osobaR.prijmeni))){
         const numRow = document.createElement('div');
         numRow.className = 'record-notice-row';
         if(r.noticeNumber){
@@ -1994,9 +1998,9 @@
         // Pachatel aplikace ukáže jen když ho z dialogu "Pachatel" zná
         // (jméno/příjmení + obec) — obec aplikace bere ze stejného
         // uloženého "PSČ, Obec" formátu, jen bez té PSČ části.
-        if(r.pachatel && (r.pachatel.jmeno || r.pachatel.prijmeni)){
-          const jmenoPrijmeni = [r.pachatel.jmeno, r.pachatel.prijmeni].filter(Boolean).join(' ');
-          const mesto = r.pachatel.mesto || '';
+        if(osobaR && (osobaR.jmeno || osobaR.prijmeni)){
+          const jmenoPrijmeni = [osobaR.jmeno, osobaR.prijmeni].filter(Boolean).join(' ');
+          const mesto = osobaR.mesto || (kontr ? (osobaR.datumNarozeni ? 'nar. ' + osobaR.datumNarozeni : '') : '');
           const commaIdx = mesto.indexOf(', ');
           const obecName = commaIdx !== -1 ? mesto.slice(commaIdx + 2) : mesto;
           const pachatelInfo = document.createElement('span');
@@ -2232,8 +2236,15 @@
     show('detail');
   }
 
+  // Kontrola osoby (RZ Scanner > Služební záležitosti > Osoby) — uložená
+  // rovnou uzavřená, nic se u ní nedořešuje.
+  function isKontrola(r){
+    return !!r && (r.docType === 'kontrola' || r.source === 'kontrolaOsoby' || r.resolvedMethod === 'kontrola');
+  }
   function updateResolveBtn(record){
     const menuBtn = document.getElementById('resolveMenuBtn');
+    menuBtn.style.display = isKontrola(record) ? 'none' : '';
+    if(isKontrola(record)) return;
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     const domluvaBtn = document.getElementById('menuDomluvaBtn');
     const penaltyText = getOffensePenaltyText(record);
