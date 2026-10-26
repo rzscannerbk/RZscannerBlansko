@@ -466,7 +466,7 @@
   /* ---------- HISTORY ---------- */
 
   /* ---------- SCREEN: SLUŽEBNÍ ZÁLEŽITOSTI + OSOBY ---------- */
-  #sluzebniScreen, #osobyScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
+  #sluzebniScreen, #osobyScreen, #zavadaScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
   .sz-top{display:flex; align-items:center; gap:14px;}
   .sz-back{width:44px; height:44px; flex:none; border-radius:50%; background:var(--asphalt-2); border:1px solid var(--asphalt-3);
     display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;}
@@ -518,6 +518,22 @@
   .os-copy:active{transform:scale(.98);}
   .os-note{margin-top:12px; text-align:center; font-size:13px; line-height:1.5; color:var(--muted); min-height:20px;}
   .os-note.ok{color:var(--good);} .os-note.err{color:var(--bad);}
+  .zv-actions{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .zv-btn{height:52px; border-radius:14px; border:1.5px solid var(--amber); background:transparent; color:var(--amber); font:700 15px 'Inter',sans-serif; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;}
+  .zv-btn.primary{background:var(--amber); color:#241a00;}
+  .zv-btn:disabled{opacity:.4;}
+  .zv-btn:active{transform:scale(.98);}
+  .zv-gal{background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer; margin:-4px auto 0; display:block;}
+  .zv-popis-preview{background:var(--asphalt-2); border:1px solid var(--asphalt-3); border-radius:16px; padding:10px 16px 12px; font-size:15px; line-height:1.4; white-space:pre-wrap; cursor:pointer;}
+  .zv-popis-preview span{display:block; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin-bottom:4px;}
+  .zv-sheet{position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.55); display:none; align-items:flex-start; justify-content:center; padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 14px;}
+  .zv-sheet.open{display:flex;}
+  .zv-sheet-box{width:100%; max-width:520px; background:var(--asphalt); border:1px solid var(--line); border-radius:22px; padding:16px; display:flex; flex-direction:column; gap:12px;}
+  .zv-sheet-head{display:flex; align-items:center; justify-content:space-between;}
+  .zv-sheet-head b{font-family:'Oswald',sans-serif; font-weight:600; font-size:20px; letter-spacing:.04em; text-transform:uppercase;}
+  .zv-sheet-x{width:36px; height:36px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:20px; line-height:1; padding:0; cursor:pointer;}
+  .zv-sheet textarea{width:100%; min-height:160px; background:var(--asphalt-2); border:1px solid var(--asphalt-3); border-radius:16px; padding:12px 14px; color:var(--text); font:500 17px 'Inter',sans-serif; line-height:1.4; resize:vertical; outline:none;}
+  .zv-sheet textarea:focus{border-color:var(--amber);}
   .os-clear{display:block; margin:6px auto 0; background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; cursor:pointer;}
   #historyScreen{overflow-y:auto; padding:calc(env(safe-area-inset-top,0px) + 20px) 20px calc(env(safe-area-inset-bottom,0px) + 24px);}
   .history-header{display:flex; align-items:center; gap:14px; margin-bottom:20px;}
@@ -672,7 +688,7 @@
         <div class="sz-ico"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><defs><linearGradient id="vrakG1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC65B"/><stop offset="1" stop-color="#FFA000"/></linearGradient></defs><g transform="rotate(6 32 32)"><path d="M4 38v-5c0-2.2 1.6-4 3.8-4.4l7.2-1.4 6.2-8.2c1.1-1.5 2.9-2.4 4.8-2.4h13c1.9 0 3.6.9 4.8 2.4l6.2 8.2 5 1c2.2.4 3.8 2.3 3.8 4.6V38c0 1.1-.9 2-2 2h-2.6a7 7 0 0 0-13.8 0H23.6a7 7 0 0 0-13.8 0H6c-1.1 0-2-.9-2-2z" fill="url(#vrakG1)"/><path d="M20.5 27.5l4.6-6.2c.4-.5 1-.8 1.6-.8h4.8v7h-11zM35.5 27.5v-7h4.3c.6 0 1.2.3 1.6.8l4.6 6.2h-10.5z" fill="var(--asphalt-2)"/><circle cx="16.7" cy="41" r="5.2" fill="url(#vrakG1)"/><circle cx="16.7" cy="41" r="2" fill="var(--asphalt-2)"/></g><path d="M22 22l4 5-3 3 4 4" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="50" cy="44" r="5.4" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3 2.4"/><path d="M8 54h48" stroke="var(--muted)" stroke-width="2.4" stroke-linecap="round" opacity=".6"/></svg></div>
         <div class="sz-lbl">Vrak</div>
       </button>
-      <button type="button" class="sz-tile sz-soon" id="szZavadaTile">
+      <button type="button" class="sz-tile" id="szZavadaTile">
         <div class="sz-ico"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><defs><linearGradient id="zavadaG1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC65B"/><stop offset="1" stop-color="#FFA000"/></linearGradient></defs><path d="M18 58V22c0-8 6-14 14-14h8" stroke="url(#zavadaG1)" stroke-width="5" stroke-linecap="round"/><path d="M34 12h16c2 0 3 2 2 3.5L49 20H35z" fill="url(#zavadaG1)"/><path d="M11 58h14" stroke="#FFB020" stroke-width="5" stroke-linecap="round"/><path d="M42 26l-4 7h6l-4 8" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M50 26l3-3M53 32h4" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></div>
         <div class="sz-lbl">Závada</div>
       </button>
@@ -701,6 +717,41 @@
     </div>
     <div class="os-note" id="osNote"></div>
     <button type="button" class="os-clear" id="osClearBtn">Nová kontrola (vymazat vše)</button>
+  </div>
+
+  <!-- ZÁVADA — fotky + popis + místo → přehled -->
+  <div id="zavadaScreen" class="screen">
+    <div class="sz-top">
+      <button type="button" class="sz-back" id="zvBackBtn" aria-label="Zpět"><svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="sz-title">Závada</h1>
+    </div>
+    <div class="os-form">
+      <div class="os-photo" id="zvPhotoEmpty">
+        <div class="os-cam"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12.5" r="3.5" stroke="currentColor" stroke-width="1.7"/></svg></div>
+        Vyfotit závadu
+        <small>až 6 fotografií</small>
+      </div>
+      <div class="os-thumbs" id="zvThumbs"></div>
+      <div class="zv-actions" id="zvActions" style="display:none">
+        <button type="button" class="zv-btn" id="zvAddPhotoBtn">+ Přidat foto</button>
+        <button type="button" class="zv-btn primary" id="zvPopisBtn">Popis závady</button>
+      </div>
+      <button type="button" class="zv-gal" id="zvGalBtn">nebo vybrat z galerie</button>
+      <div class="zv-popis-preview" id="zvPopisPreview" style="display:none"><span>Popis závady</span><div id="zvPopisPreviewText"></div></div>
+      <label class="os-field os-field-misto"><span>Místo závady</span><input id="zvMisto" type="text" autocomplete="off" spellcheck="false" placeholder="Zjišťuji polohu…"><button type="button" class="os-loc" id="zvMistoRefresh" aria-label="Znovu zjistit polohu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></button></label>
+      <input type="file" id="zvCamInput" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="zvGalInput" accept="image/*" multiple style="display:none">
+    </div>
+    <div class="os-note" id="zvNote"></div>
+    <button type="button" class="os-clear" id="zvClearBtn">Nová závada (vymazat vše)</button>
+  </div>
+  <div class="zv-sheet" id="zvSheet">
+    <div class="zv-sheet-box">
+      <div class="zv-sheet-head"><b>Popis závady</b><button type="button" class="zv-sheet-x" id="zvSheetClose" aria-label="Zavřít">×</button></div>
+      <textarea id="zvPopis" autocomplete="off" placeholder="Co je poškozené / nefunkční, kde přesně, rozsah…"></textarea>
+      <button type="button" class="zv-btn primary" id="zvSendBtn">Uložit a odeslat</button>
+      <div class="os-note" id="zvSheetNote" style="margin-top:0"></div>
+    </div>
   </div>
 
   <!-- CAMERA -->
@@ -1190,7 +1241,7 @@
   }catch(e){}
 
   // Verze aplikace — při každé změně zvýšit (zobrazuje se na úvodní obrazovce).
-  const APP_VERSION = '1.8';
+  const APP_VERSION = '1.9';
   const APP_BUILD_DATE = '26. 10. 2026';
   document.getElementById('appVersion').textContent = 'RZ Scanner v' + APP_VERSION + ' · ' + APP_BUILD_DATE;
 
@@ -1208,6 +1259,7 @@
     pdfPreview: document.getElementById('pdfPreviewScreen'),
     sluzebni: document.getElementById('sluzebniScreen'),
     osoby: document.getElementById('osobyScreen'),
+    zavada: document.getElementById('zavadaScreen'),
   };
   function show(name){
     Object.values(screens).forEach(s=>s.classList.remove('active'));
@@ -1938,6 +1990,193 @@
     document.getElementById('szBackBtn').addEventListener('click', ()=> show('start'));
     document.getElementById('szOsobyTile').addEventListener('click', ()=> show('osoby'));
     document.getElementById('osBackBtn').addEventListener('click', ()=> show('sluzebni'));
+  })();
+
+  // ---------- Závada — fotky (max 6) + popis + místo → přehled ----------
+  // Ukládá se jako samostatný záznam v kolekci prestupky (docType 'zavada',
+  // rovnou uzavřený — v přehledu stav "Závada"), fotky v data/photos.
+  (function(){
+    const $ = id => document.getElementById(id);
+    const MAX = 6;
+    let zvPhotos = [];      // { file, url }
+    let zvGps = null;
+    let sending = false;
+    const note = (t, k)=>{ const n = $('zvNote'); n.textContent = t || ''; n.className = 'os-note' + (k ? ' ' + k : ''); };
+    const sheetNote = (t, k)=>{ const n = $('zvSheetNote'); n.textContent = t || ''; n.className = 'os-note' + (k ? ' ' + k : ''); };
+
+    function render(){
+      const box = $('zvThumbs');
+      box.innerHTML = '';
+      zvPhotos.forEach((p, i)=>{
+        const t = document.createElement('div'); t.className = 'os-thumb';
+        const img = document.createElement('img'); img.src = p.url; img.alt = 'Foto ' + (i + 1);
+        const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Odebrat fotku');
+        x.addEventListener('click', ()=>{ URL.revokeObjectURL(p.url); zvPhotos.splice(i, 1); render(); });
+        t.appendChild(img); t.appendChild(x); box.appendChild(t);
+      });
+      const has = zvPhotos.length > 0;
+      $('zvPhotoEmpty').style.display = has ? 'none' : '';
+      $('zvActions').style.display = has ? '' : 'none';
+      $('zvAddPhotoBtn').textContent = '+ Přidat foto (' + zvPhotos.length + '/' + MAX + ')';
+      $('zvAddPhotoBtn').disabled = zvPhotos.length >= MAX;
+      $('zvGalBtn').style.display = zvPhotos.length >= MAX ? 'none' : '';
+      const popis = $('zvPopis').value.trim();
+      $('zvPopisPreview').style.display = popis ? '' : 'none';
+      $('zvPopisPreviewText').textContent = popis;
+      $('zvPopisBtn').textContent = popis ? 'Upravit popis' : 'Popis závady';
+    }
+    function addFiles(files){
+      let over = 0;
+      Array.from(files || []).forEach(f=>{
+        if(zvPhotos.length >= MAX){ over++; return; }
+        zvPhotos.push({ file: f, url: URL.createObjectURL(f) });
+      });
+      note(over ? 'Víc než ' + MAX + ' fotek uložit nejde — ' + over + (over === 1 ? ' fotka se nepřidala.' : ' fotky se nepřidaly.') : '', over ? 'err' : '');
+      render();
+    }
+    function openCamera(){ if(zvPhotos.length < MAX) $('zvCamInput').click(); }
+
+    async function fillMisto(force){
+      const inp = $('zvMisto');
+      if(inp.value.trim() && !force) return;
+      inp.placeholder = 'Zjišťuji polohu…';
+      try{
+        const loc = await getLocationAndAddress();
+        zvGps = (loc && loc.lat != null) ? { lat: loc.lat, lng: loc.lng } : null;
+        if(loc && loc.address && (!inp.value.trim() || force)) inp.value = loc.address;
+      }catch(e){}
+      inp.placeholder = 'Místo se nepodařilo dohledat, zadej ručně';
+    }
+
+    function fileToDataUrl(file){
+      return new Promise((resolve, reject)=>{ const r = new FileReader(); r.onload = ()=> resolve(r.result); r.onerror = ()=> reject(r.error); r.readAsDataURL(file); });
+    }
+    async function preparePhotos(){
+      const raw = [];
+      for(const p of zvPhotos) raw.push(await fileToDataUrl(p.file));
+      // Firestore dokument má limit 1 MB → všechny fotky dohromady pod ~950 kB.
+      const steps = [[950, 0.68], [800, 0.6], [650, 0.5], [500, 0.45], [420, 0.4]];
+      for(const [dim, q] of steps){
+        const out = [];
+        for(const u of raw) out.push((await preparePhotoForUpload(u, dim, q)).split(',')[1]);
+        if(out.reduce((s, x)=> s + x.length, 0) <= 950000) return out;
+      }
+      throw new Error('Fotky jsou i po zmenšení příliš velké — odeber některou.');
+    }
+    function officerNameNow(){
+      const sel = document.getElementById('officerSelect');
+      const v = sel ? sel.value.trim() : '';
+      if(v) return v;
+      try{ const l = getLockedOfficerName(); if(l) return l; }catch(e){}
+      return null;
+    }
+
+    function resetAll(){
+      zvPhotos.forEach(p=> URL.revokeObjectURL(p.url));
+      zvPhotos = []; zvGps = null;
+      $('zvPopis').value = ''; $('zvMisto').value = '';
+      render();
+    }
+
+    async function send(){
+      if(sending) return;
+      const popis = $('zvPopis').value.trim();
+      if(!popis){ sheetNote('Napiš popis závady.', 'err'); $('zvPopis').focus(); return; }
+      if(!zvPhotos.length && !confirm('Závada nemá žádnou fotku. Odeslat i tak?')) return;
+      if(!auth.currentUser){ sheetNote('Nejdřív se přihlas (box „Přihlášený strážník“ na úvodní obrazovce).', 'err'); return; }
+      sending = true;
+      const btn = $('zvSendBtn');
+      btn.disabled = true; btn.textContent = 'Odesílám…'; sheetNote('');
+      try{
+        const photos = await preparePhotos();
+        const officer = officerNameNow();
+        const misto = $('zvMisto').value.trim();
+        const now = new Date();
+        const pad2 = n => String(n).padStart(2, '0');
+        let noticeNumber;
+        try{ noticeNumber = await getNextNoticeNumber(); }
+        catch(e){ noticeNumber = String(Date.now() % 1000000).padStart(6, '0'); }
+        const docRef = db.collection('prestupky').doc();
+        const baseData = {
+          plate: null,
+          date: now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()),
+          time: now.toTimeString().slice(0, 5),
+          address: misto || null,
+          offenseLabel: 'Závada',
+          offenseVerb: null,
+          offenseCitation: null,
+          hasPhotos: photos.length > 0,
+          resolved: true,
+          expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180*24*60*60*1000)),
+          submittedBy: auth.currentUser ? auth.currentUser.email : null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        const extraData = {
+          officerName: officer,
+          resolvedMethod: 'zavada',
+          resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          resolvedByOfficer: officer,
+          resolutionHistory: [{ method: 'zavada', resolvedAt: firebase.firestore.Timestamp.now(), officerName: officer }],
+          noticeNumber,
+          lat: zvGps ? zvGps.lat : null,
+          lng: zvGps ? zvGps.lng : null,
+          brand: null, color: null,
+          docType: 'zavada',
+          source: 'zavada',
+          popisZavady: popis
+        };
+        try{
+          await docRef.set({ ...baseData, ...extraData });
+        }catch(e){
+          if(e && e.code === 'permission-denied'){
+            try{ await docRef.set({ ...baseData, offenseLabel: 'Závada: ' + popis.slice(0, 300) }); }
+            catch(e2){
+              if(e2 && e2.code === 'permission-denied') await docRef.set({ ...baseData, offenseLabel: 'Závada: ' + popis.slice(0, 300), resolved: false });
+              else throw e2;
+            }
+          } else throw e;
+        }
+        if(photos.length) await docRef.collection('data').doc('photos').set({ photos, photoMime: 'image/jpeg' });
+        $('zvSheet').classList.remove('open');
+        resetAll();
+        note('✓ Závada odeslána do přehledu (č. ' + noticeNumber + ').', 'ok');
+      }catch(e){
+        sheetNote('Odeslání se nepovedlo: ' + (e && e.message ? e.message : e), 'err');
+      }finally{
+        sending = false;
+        btn.disabled = false; btn.textContent = 'Uložit a odeslat';
+      }
+    }
+
+    $('szZavadaTile').addEventListener('click', ()=>{
+      show('zavada');
+      note('');
+      render();
+      fillMisto(false);
+      // Fotoaparát rovnou (musí být ve stejném klepnutí, jinak ho iOS nepustí).
+      if(!zvPhotos.length) openCamera();
+    });
+    $('zvBackBtn').addEventListener('click', ()=> show('sluzebni'));
+    $('zvPhotoEmpty').addEventListener('click', openCamera);
+    $('zvAddPhotoBtn').addEventListener('click', openCamera);
+    $('zvGalBtn').addEventListener('click', ()=> $('zvGalInput').click());
+    $('zvCamInput').addEventListener('change', e=>{ addFiles(e.target.files); e.target.value = ''; });
+    $('zvGalInput').addEventListener('change', e=>{ addFiles(e.target.files); e.target.value = ''; });
+    function openSheet(){
+      sheetNote('');
+      $('zvSheet').classList.add('open');
+      setTimeout(()=> $('zvPopis').focus(), 50);
+    }
+    $('zvPopisBtn').addEventListener('click', openSheet);
+    $('zvPopisPreview').addEventListener('click', openSheet);
+    $('zvSheetClose').addEventListener('click', ()=>{ $('zvSheet').classList.remove('open'); render(); });
+    $('zvSheet').addEventListener('click', e=>{ if(e.target === $('zvSheet')){ $('zvSheet').classList.remove('open'); render(); } });
+    $('zvSendBtn').addEventListener('click', send);
+    $('zvMistoRefresh').addEventListener('click', e=>{ e.preventDefault(); fillMisto(true); });
+    $('zvClearBtn').addEventListener('click', ()=>{
+      if((zvPhotos.length || $('zvPopis').value.trim()) && !confirm('Vymazat fotky i popis?')) return;
+      resetAll(); note(''); fillMisto(true);
+    });
   })();
 
   // ---------- Osoby — kontrola osob (jedna i víc) + lustrace v MP Manageru ----------

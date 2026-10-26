@@ -295,6 +295,7 @@
     padding:3px 8px; border-radius:20px; color:#5B8DEF; border:1px solid #5B8DEF;
   }
   .record-doctype-badge.kontrola{color:#B28CFF; background:rgba(178,140,255,.15);}
+  .record-doctype-badge.zavada{color:#5CC8FF; background:rgba(92,200,255,.14);}
   .record-doctype-badge.boticka{color:var(--amber); border-color:var(--amber);}
   .record-meta{
     font-family:'Roboto Mono',monospace; font-size:11.5px; color:var(--muted);
@@ -1751,19 +1752,24 @@
   // kontrolované osoby a strážník.
   function buildKontrolaPrintXml(record){
     let x = '';
-    x += textEl('KONTROLA OSOBY\n', { align: 'center', width: 2, height: 2, em: true });
+    const zav = isZavada(record);
+    x += textEl((zav ? 'ZÁVADA' : 'KONTROLA OSOBY') + '\n', { align: 'center', width: 2, height: 2, em: true });
     if(record.noticeNumber) x += textEl(record.noticeNumber + '\n', { align: 'center', em: true, width: 2, height: 2 });
     x += textEl('--------------------------------\n', { align: 'center' });
     x += textEl('Datum: ' + formatDateCz(record.date) + '   Čas: ' + (record.time || '—') + '\n\n', { align: 'left' });
     if(record.address){
-      x += textEl('Místo kontroly\n', { align: 'center', em: true });
+      x += textEl((zav ? 'Místo závady' : 'Místo kontroly') + '\n', { align: 'center', em: true });
       x += textEl(wrapWords(record.address) + '\n\n', { align: 'center' });
+    }
+    if(zav && record.popisZavady){
+      x += textEl('Popis závady\n', { align: 'center', em: true });
+      x += textEl(wrapWords(record.popisZavady) + '\n\n', { align: 'center' });
     }
     if(record.duvodKontroly){
       x += textEl('Důvod kontroly\n', { align: 'center', em: true });
       x += textEl(wrapWords(record.duvodKontroly) + '\n\n', { align: 'center' });
     }
-    const osoby = (Array.isArray(record.osoby) && record.osoby.length) ? record.osoby : (record.prestupce ? [record.prestupce] : []);
+    const osoby = zav ? [] : (Array.isArray(record.osoby) && record.osoby.length) ? record.osoby : (record.prestupce ? [record.prestupce] : []);
     osoby.forEach((o, i)=>{
       x += textEl((osoby.length > 1 ? 'Osoba ' + (i + 1) : 'Osoba') + '\n', { align: 'center', em: true });
       const jm = [o.jmeno, o.prijmeni].filter(Boolean).join(' ');
@@ -1782,7 +1788,7 @@
   }
 
   function buildEposPrintXml(record){
-    if(isKontrola(record)) return buildKontrolaPrintXml(record);
+    if(isKontrola(record) || isZavada(record)) return buildKontrolaPrintXml(record);
     const isBoticka = record.docType === 'boticka';
     let x = '';
 
@@ -1970,6 +1976,7 @@
       (r.noticeNumber || '').toLowerCase().includes(q) ||
       (r.officerName || '').toLowerCase().includes(q) ||
       (r.offenseLabel || '').toLowerCase().includes(q) ||
+      (r.popisZavady || '').toLowerCase().includes(q) ||
       (r.date || '').toLowerCase().includes(q) ||
       formatDateCz(r.date).toLowerCase().includes(q)
     );
@@ -1987,7 +1994,8 @@
     }
 
     filtered.forEach(r=>{
-      const kontr = isKontrola(r);
+      const zavR = isZavada(r);
+      const kontr = isKontrola(r) || zavR;
       const item = document.createElement('div');
       item.className = 'record-item' + (r.resolved ? ' resolved' : '') + (r.docType === 'boticka' ? ' boticka' : '');
 
@@ -1999,12 +2007,12 @@
 
       const plate = document.createElement('div');
       plate.className = 'record-plate';
-      plate.textContent = r.plate || (kontr ? 'OSOBA' : 'NEZNÁMÁ SPZ');
+      plate.textContent = r.plate || (zavR ? 'ZÁVADA' : kontr ? 'OSOBA' : 'NEZNÁMÁ SPZ');
       plateRow.appendChild(plate);
 
       const docTypeBadge = document.createElement('div');
-      docTypeBadge.className = 'record-doctype-badge' + (r.docType === 'boticka' ? ' boticka' : '') + (kontr ? ' kontrola' : '');
-      docTypeBadge.textContent = kontr ? 'Kontrola osoby' : (r.docType === 'boticka' ? 'Botička' : 'Parkovačka');
+      docTypeBadge.className = 'record-doctype-badge' + (r.docType === 'boticka' ? ' boticka' : '') + (zavR ? ' zavada' : kontr ? ' kontrola' : '');
+      docTypeBadge.textContent = zavR ? 'Závada' : kontr ? 'Kontrola osoby' : (r.docType === 'boticka' ? 'Botička' : 'Parkovačka');
       plateRow.appendChild(docTypeBadge);
 
       if(r.resolved && !kontr){
@@ -2056,7 +2064,7 @@
       if(r.offenseLabel){
         const off = document.createElement('div');
         off.className = 'record-offense';
-        off.textContent = r.offenseLabel;
+        off.textContent = (zavR && r.popisZavady) ? r.popisZavady : r.offenseLabel;
         item.appendChild(off);
       }
 
@@ -2222,8 +2230,8 @@
 
   function openDetail(record){
     currentDetailRecord = record;
-    document.getElementById('detailPlateLabel').textContent = record.plate || (isKontrola(record) ? 'KONTROLA OSOBY' : 'DETAIL');
-    document.getElementById('noticeCardContainer').innerHTML = isKontrola(record) ? buildKontrolaHtml(record) : buildNoticeHtml(record);
+    document.getElementById('detailPlateLabel').textContent = record.plate || (isZavada(record) ? 'ZÁVADA' : isKontrola(record) ? 'KONTROLA OSOBY' : 'DETAIL');
+    document.getElementById('noticeCardContainer').innerHTML = (isKontrola(record) || isZavada(record)) ? buildKontrolaHtml(record) : buildNoticeHtml(record);
 
     const photoToggleRow = document.getElementById('photoToggleRow');
     const photoToggleBtn = document.getElementById('photoToggleBtn');
@@ -2276,11 +2284,13 @@
   // místo, čas a strážník.
   function buildKontrolaHtml(r){
     const e = v => escapeHtml(v == null ? '' : String(v));
-    const osoby = (Array.isArray(r.osoby) && r.osoby.length) ? r.osoby : (r.prestupce ? [r.prestupce] : []);
-    let h = '<div class="notice-card"><div class="notice-title">Kontrola osoby</div>';
+    const zav = isZavada(r);
+    const osoby = zav ? [] : (Array.isArray(r.osoby) && r.osoby.length) ? r.osoby : (r.prestupce ? [r.prestupce] : []);
+    let h = '<div class="notice-card"><div class="notice-title">' + (zav ? 'Závada' : 'Kontrola osoby') + '</div>';
     if(r.noticeNumber) h += '<div class="notice-number"><b>' + e(r.noticeNumber) + '</b></div>';
     h += '<div class="notice-datetime">Datum: ' + e(formatDateCz(r.date)) + '&nbsp;&nbsp;&nbsp;Čas: ' + e(r.time || '—') + '</div>';
-    if(r.address) h += '<div class="notice-section"><div class="notice-heading">Místo kontroly</div><div class="notice-address">' + e(r.address) + '</div></div>';
+    if(r.address) h += '<div class="notice-section"><div class="notice-heading">' + (zav ? 'Místo závady' : 'Místo kontroly') + '</div><div class="notice-address">' + e(r.address) + '</div></div>';
+    if(zav && r.popisZavady) h += '<div class="notice-section"><div class="notice-heading">Popis závady</div><div class="notice-address" style="white-space:pre-wrap">' + e(r.popisZavady) + '</div></div>';
     if(r.duvodKontroly) h += '<div class="notice-section"><div class="notice-heading">Důvod kontroly</div><div class="notice-address">' + e(r.duvodKontroly) + '</div></div>';
     osoby.forEach((p, i)=>{
       h += '<div class="notice-section"><div class="notice-heading">' + (osoby.length > 1 ? 'Osoba ' + (i + 1) : 'Osoba') + '</div>' +
@@ -2298,10 +2308,14 @@
   function isKontrola(r){
     return !!r && (r.docType === 'kontrola' || r.source === 'kontrolaOsoby' || r.resolvedMethod === 'kontrola');
   }
+  // Závada (Služební záležitosti → Závada) — také uložená rovnou uzavřená.
+  function isZavada(r){
+    return !!r && (r.docType === 'zavada' || r.source === 'zavada' || r.resolvedMethod === 'zavada');
+  }
   function updateResolveBtn(record){
     const menuBtn = document.getElementById('resolveMenuBtn');
-    menuBtn.style.display = isKontrola(record) ? 'none' : '';
-    if(isKontrola(record)) return;
+    menuBtn.style.display = (isKontrola(record) || isZavada(record)) ? 'none' : '';
+    if(isKontrola(record) || isZavada(record)) return;
     const vyresenoBtn = document.getElementById('menuVyresenoBtn');
     const domluvaBtn = document.getElementById('menuDomluvaBtn');
     const penaltyText = getOffensePenaltyText(record);
