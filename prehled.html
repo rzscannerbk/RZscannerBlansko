@@ -2246,6 +2246,7 @@
     if(r.noticeNumber) h += '<div class="notice-number"><b>' + e(r.noticeNumber) + '</b></div>';
     h += '<div class="notice-datetime">Datum: ' + e(formatDateCz(r.date)) + '&nbsp;&nbsp;&nbsp;Čas: ' + e(r.time || '—') + '</div>';
     if(r.address) h += '<div class="notice-section"><div class="notice-heading">Místo kontroly</div><div class="notice-address">' + e(r.address) + '</div></div>';
+    if(r.duvodKontroly) h += '<div class="notice-section"><div class="notice-heading">Důvod kontroly</div><div class="notice-address">' + e(r.duvodKontroly) + '</div></div>';
     osoby.forEach((p, i)=>{
       h += '<div class="notice-section"><div class="notice-heading">' + (osoby.length > 1 ? 'Osoba ' + (i + 1) : 'Osoba') + '</div>' +
         '<div class="notice-address"><b>' + e([p.jmeno, p.prijmeni].filter(Boolean).join(' ') || '—') + '</b>' +

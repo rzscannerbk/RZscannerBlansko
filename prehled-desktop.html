@@ -10723,10 +10723,16 @@
   function buildDetailOsobaHtml(record){
     const has = p => p && (p.jmeno || p.prijmeni || p.firma);
     // Kontrola osob — všechny kontrolované osoby pod sebou.
-    if(isKontrola(record) && Array.isArray(record.osoby) && record.osoby.some(has)){
-      return record.osoby.filter(has).map((p, i, arr)=>
-        buildOsobaSectionHtml(p, arr.length > 1 ? 'Kontrolovaná osoba ' + (i + 1) : 'Kontrolovaná osoba')
-      ).join('');
+    if(isKontrola(record)){
+      const duvodHtml = record.duvodKontroly
+        ? '<div class="detail-info-section"><h4>Důvod kontroly</h4><div class="detail-info-fields">' + detailInfoField('Důvod', record.duvodKontroly) + '</div></div>'
+        : '';
+      const list = (Array.isArray(record.osoby) && record.osoby.some(has)) ? record.osoby.filter(has) : (has(record.prestupce) ? [record.prestupce] : []);
+      if(list.length){
+        return duvodHtml + list.map((p, i, arr)=>
+          buildOsobaSectionHtml(p, arr.length > 1 ? 'Kontrolovaná osoba ' + (i + 1) : 'Kontrolovaná osoba')
+        ).join('');
+      }
     }
     if(has(record.prestupce) || has(record.provozovatel)){
       let html = '';

@@ -64,7 +64,7 @@
     text = String(text || '');
     var i = text.indexOf(MARK);
     if(i === -1) return null;
-    var out = { jmeno: '', prijmeni: '', narozeni: '', doklad: '' };
+    var out = { jmeno: '', prijmeni: '', narozeni: '', doklad: '', duvod: '' };
     text.slice(i + MARK.length).split(/\r?\n/).forEach(function(line){
       var k = line.indexOf(':');
       if(k === -1) return;
@@ -74,6 +74,7 @@
       else if(key === 'příjmení' || key === 'prijmeni') out.prijmeni = val;
       else if(key.indexOf('narozen') === 0 || key.indexOf('datum') === 0) out.narozeni = val;
       else if(key.indexOf('doklad') !== -1) out.doklad = val;
+      else if(key === 'důvod' || key === 'duvod') out.duvod = val;
     });
     return out;
   }
@@ -88,6 +89,27 @@
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }catch(e){}
     return true;
+  }
+  // "Upřesnění důvodu" — id pole neznáme, najde se jako první textové
+  // pole za popiskem "Upřesnění důvodu".
+  function fillUpresneni(doc, text){
+    try{
+      var walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT, null);
+      var label = null, n;
+      while((n = walker.nextNode())){ if(/Up[řr]esn[ěe]n[íi]\s+d[ůu]vodu/i.test(n.nodeValue)){ label = n; break; } }
+      if(!label) return false;
+      var fields = doc.querySelectorAll('input[type="text"], input:not([type]), textarea');
+      for(var i = 0; i < fields.length; i++){
+        if(label.compareDocumentPosition(fields[i]) & Node.DOCUMENT_POSITION_FOLLOWING){
+          var el = fields[i];
+          if(el.maxLength > 0 && text.length > el.maxLength) text = text.slice(0, el.maxLength);
+          el.value = text;
+          try{ el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }catch(e){}
+          return true;
+        }
+      }
+    }catch(e){}
+    return false;
   }
   function fill(doc, win, d){
     var mode = (d.jmeno && d.prijmeni && d.narozeni) ? 'Birth' : (d.doklad ? 'Paper' : 'Birth');
@@ -107,6 +129,7 @@
     setVal(doc, 'tLastName', d.prijmeni);
     setVal(doc, 'tBirthDtm', d.narozeni);
     setVal(doc, 'tPapers', d.doklad);
+    if(d.duvod) fillUpresneni(doc, d.duvod);
 
     var btn = doc.getElementById('ButtonSaveEvent');
     if(btn){

@@ -500,6 +500,8 @@
   .os-lustr{margin-top:2px !important; height:50px !important; font-size:16px !important;}
   .os-lustr.done{background:transparent !important; border:1.5px solid var(--amber) !important; color:var(--amber) !important;}
   .os-add{height:48px; border-radius:14px; border:1.5px dashed var(--line); background:transparent; color:var(--amber); font:600 15px 'Inter',sans-serif; cursor:pointer;}
+  .os-field textarea{width:100%; background:transparent; border:0; outline:none; color:var(--text); font:500 16px 'Inter',sans-serif; padding:2px 0; resize:none; min-height:44px; line-height:1.35;}
+  .os-field textarea::placeholder{color:var(--muted); opacity:.55;}
   .os-field-misto{position:relative; padding-right:54px;}
   .os-field-misto input{font-size:16px; font-weight:500;}
   .os-loc{position:absolute; right:10px; top:50%; transform:translateY(-50%); width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:var(--asphalt); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;}
@@ -679,6 +681,7 @@
       <div id="osPersons"></div>
       <button type="button" class="os-add" id="osAddBtn">+ Další osoba</button>
       <label class="os-field os-field-misto"><span>Místo kontroly</span><input id="osMisto" type="text" autocomplete="off" spellcheck="false" placeholder="Zjišťuji polohu…"><button type="button" class="os-loc" id="osMistoRefresh" aria-label="Znovu zjistit polohu" title="Znovu zjistit polohu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/></svg></button></label>
+      <label class="os-field"><span>Důvod kontroly</span><textarea id="osDuvod" rows="2" autocomplete="off" placeholder="např. podezření z přestupku, pátrání, oznámení…"></textarea></label>
       <div class="os-photo" id="osPhotoBox">
         <div class="os-thumbs" id="osThumbs"></div>
         <div class="os-cam"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.66-1.15A2 2 0 0 1 10.46 3h3.08a2 2 0 0 1 1.73 1.35l.66 1.15a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="var(--amber)" stroke-width="1.8"/><circle cx="12" cy="13" r="3.4" stroke="var(--amber)" stroke-width="1.8"/></svg></div>
@@ -1089,9 +1092,19 @@
   // zvýrazněné (= dnešní datum) — navenek to vypadá, že kalendář jen
   // "problikne" a sám vyplní dnešek. Výšku po odchodu z pole doženeme přes
   // 'focusout' níž.
+  // Při psaní do textového pole (otevřená klávesnice) se výška NEpřepočítává
+  // — iOS při klávesnici zmenší visualViewport a aplikace by se smrskla na
+  // pruh nad klávesnicí (zbytek černý). Výška se dožene po opuštění pole.
+  function isTypingField(el){
+    if(!el) return false;
+    if(el.tagName === 'TEXTAREA' || el.isContentEditable) return true;
+    if(el.tagName !== 'INPUT') return false;
+    return !/^(button|submit|reset|checkbox|radio|file|range|color|image|hidden)$/i.test(el.type || 'text');
+  }
   function setAppHeight(){
     const active = document.activeElement;
     if(active && active.tagName === 'INPUT' && (active.type === 'date' || active.type === 'time')) return;
+    if(isTypingField(active)) return;
     const h = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
     document.documentElement.style.setProperty('--app-height', h + 'px');
   }
@@ -1104,6 +1117,7 @@
   document.addEventListener('focusout', (e)=>{
     const t = e.target;
     if(t && t.tagName === 'INPUT' && (t.type === 'date' || t.type === 'time')) setTimeout(setAppHeight, 50);
+    else if(isTypingField(t)) setTimeout(setAppHeight, 350); // po zavření klávesnice
   });
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', setAppHeight);
@@ -1167,7 +1181,7 @@
   }catch(e){}
 
   // Verze aplikace — při každé změně zvýšit (zobrazuje se na úvodní obrazovce).
-  const APP_VERSION = '1.4';
+  const APP_VERSION = '1.5';
   const APP_BUILD_DATE = '26. 10. 2026';
   document.getElementById('appVersion').textContent = 'RZ Scanner v' + APP_VERSION + ' · ' + APP_BUILD_DATE;
 
@@ -1947,7 +1961,7 @@
     function saveDraft(){
       try{
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          persons, kontrolaId, noticeNumber, osGps, misto: $('osMisto').value, savedAt: Date.now()
+          persons, kontrolaId, noticeNumber, osGps, misto: $('osMisto').value, duvod: $('osDuvod').value, savedAt: Date.now()
         }));
       }catch(e){}
     }
@@ -1961,6 +1975,7 @@
         noticeNumber = d.noticeNumber || null;
         osGps = d.osGps || null;
         if(d.misto) $('osMisto').value = d.misto;
+        if(d.duvod) $('osDuvod').value = d.duvod;
       }catch(e){}
     }
 
@@ -2042,6 +2057,7 @@
     $('szOsobyTile').addEventListener('click', ()=>{ renderPersons(); fillMisto(false); });
     $('osMistoRefresh').addEventListener('click', (e)=>{ e.preventDefault(); fillMisto(true); });
     $('osMisto').addEventListener('input', saveDraft);
+    $('osDuvod').addEventListener('input', saveDraft);
 
     async function copyText(text){
       try{
@@ -2117,6 +2133,7 @@
     async function saveKontrola(){
       const osoby = persons.filter(personHasData).map(personToRecord);
       const misto = $('osMisto').value.trim();
+      const duvod = $('osDuvod').value.trim();
       const officer = officerNameNow();
       const label = 'Kontrola osoby' + (osoby.length > 1 ? ' (' + osoby.length + (osoby.length < 5 ? ' osoby)' : ' osob)') : '');
       if(!kontrolaId){
@@ -2154,6 +2171,7 @@
           brand: null, color: null,
           docType: 'kontrola',
           source: 'kontrolaOsoby',
+          duvodKontroly: duvod || null,
           prestupce: osoby[0] || null,
           osoby
         };
@@ -2180,7 +2198,7 @@
       }
       // Doplnění už uložené kontroly (další osoba, změněné místo/fotky).
       const ref = db.collection('prestupky').doc(kontrolaId);
-      const upd = { osoby, prestupce: osoby[0] || null, offenseLabel: label, address: misto || null };
+      const upd = { osoby, prestupce: osoby[0] || null, offenseLabel: label, address: misto || null, duvodKontroly: duvod || null };
       if(photosDirty){
         const photos = await preparePhotos();
         upd.hasPhotos = photos.length > 0;
@@ -2224,7 +2242,8 @@
         'Jméno: ' + jmeno,
         'Příjmení: ' + prijmeni,
         'Datum narození: ' + (narozeni || ''),
-        'Číslo dokladu: ' + doklad].join('\n');
+        'Číslo dokladu: ' + doklad,
+        'Důvod: ' + $('osDuvod').value.trim().replace(/\s+/g, ' ')].join('\n');
       const copyPromise = copyText(text);   // hned v klepnutí
       const hash = '#' + encodeURIComponent(text);
 
@@ -2257,6 +2276,7 @@
       osPhotos.forEach(p => URL.revokeObjectURL(p.url));
       osPhotos = []; photosDirty = false; renderThumbs();
       $('osMisto').value = '';
+      $('osDuvod').value = '';
       note('');
       try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
       renderPersons();
