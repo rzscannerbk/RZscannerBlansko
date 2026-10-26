@@ -81,7 +81,9 @@
     var mode = (d.jmeno && d.prijmeni && d.narozeni) ? 'Birth' : (d.doklad ? 'Paper' : 'Birth');
     var radio = doc.querySelector('input[name="tFindBy"][value="' + mode + '"]');
     if(!radio || !doc.getElementById('tFirstName')){
-      msg('Formulář lustrace se nepodařilo najít. Jsi přihlášený v MP Manageru?', '#FF6058');
+      var where = '';
+      try{ where = doc.location.pathname.split('/').pop() || doc.location.pathname; }catch(e){}
+      msg('Formulář lustrace se nepodařilo najít (stránka: ' + (where || '?') + '). Jsi přihlášený v MP Manageru? Zkus otevřít Osoby › Základní registry a spustit bookmarklet tam.', '#FF6058');
       return;
     }
     radio.checked = true;
@@ -139,7 +141,7 @@
     if(handled) return;
     var d = parse(text);
     if(!d){
-      msg('Ve schránce nejsou údaje z RZ Scanneru. V RZ Scanneru klepni na „Kopírovat do MP Manageru“ a zkus to znovu.', '#FF6058');
+      msg('Ve schránce nejsou údaje z RZ Scanneru (je v ní: „' + String(text || '').slice(0, 30) + (String(text || '').length > 30 ? '…' : '') + '“). V RZ Scanneru klepni znovu na „Kopírovat do MP Manageru“.', '#FF6058');
       pasteBtn.style.display = 'block';
       ta.style.display = 'block';
       return;
@@ -148,11 +150,11 @@
     go(d);
   }
 
-  ta.addEventListener('input', function(){ if(ta.value.indexOf(MARK) !== -1) handle(ta.value); });
+  ta.addEventListener('input', function(){ if(ta.value.trim()) handle(ta.value); });
   pasteBtn.onclick = function(){
     if(!navigator.clipboard || !navigator.clipboard.readText){ msg('Prohlížeč neumí číst schránku — vlož údaje do pole níže.', '#FF6058'); ta.style.display = 'block'; return; }
     navigator.clipboard.readText().then(handle, function(){
-      msg('Schránku se nepodařilo přečíst — vlož údaje do pole níže.', '#FF6058');
+      msg('Prohlížeč nedovolil přečíst schránku. Podrž prst v poli níže a dej „Vložit“.', '#FF6058');
       ta.style.display = 'block';
     });
   };

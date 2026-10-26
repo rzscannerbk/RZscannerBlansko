@@ -1910,7 +1910,10 @@
     const $ = id => document.getElementById(id);
     const note = (t, k)=>{ const n = $('osNote'); n.textContent = t || ''; n.className = 'os-note' + (k ? ' ' + k : ''); };
     let osPhotos = [];
-    const MPM_LUSTRACE_PATH = 'mp.blansko.cz/Mobile/MZRE05F.asp';
+    // Úvodní stránka MP Manageru — přímý odkaz na MZRE05F.asp MP Manager
+    // přesměruje na úvod (a údaje v odkazu by se ztratily). Lustraci otevře
+    // až bookmarklet uvnitř stránky.
+    const MPM_LUSTRACE_PATH = 'mp.blansko.cz/Mobile/Default.asp';
 
     // "29061980", "29.6.1980", "29 6 1980", "29/06/1980" → "29.6.1980"
     function normalizeDob(v){
