@@ -42,28 +42,122 @@
   var KONTROLA_KEY = 'rzsKontrolaOsoby:';
   function jeKontrola(d){ return d && typeof d === 'object' && d.kontrolaOsoby && Array.isArray(d.osoby) && d.osoby.length; }
   function kontrolaKey(d){ return KONTROLA_KEY + (d.kontrolaId || d.desc || ''); }
+  // Automatické přidání osob do "Identifikace obyvatel" (bez obnovení
+  // stránky — MP Manager hledá i přidává kontakty přes AJAX):
+  // vyplnit hledání → Najít (tFindC) → počkat na výsledky v #xKontakt →
+  // jediný / jednoznačný výsledek (příjmení + datum narození) přidat
+  // (AddPerson) → nové roli kontaktu (select tTypyL<n>) dát "kontrolovaná
+  // osoba" → další osoba. Při víc výsledcích / žádném se zastaví a nechá
+  // výběr strážníkovi (další spuštění záložky pokračuje další osobou).
+  function bezDiakritiky(x){ return normTxt(x).toUpperCase(); }
+  function cekej(podminka, ms, hotovo){
+    var start = Date.now();
+    (function tik(){
+      var r = null;
+      try{ r = podminka(); }catch(e){}
+      if(r) return hotovo(r);
+      if(Date.now() - start > ms) return hotovo(null);
+      setTimeout(tik, 200);
+    })();
+  }
+  function roleKontaktuSelecty(){
+    return Array.prototype.slice.call(document.querySelectorAll('select[name^="tTypyL"]'));
+  }
+  function nastavRoliKontrolovana(sel){
+    if(!sel) return false;
+    for(var i = 0; i < sel.options.length; i++){
+      if(normTxt(sel.options[i].text).indexOf('kontrolovan') !== -1){
+        sel.value = sel.options[i].value;
+        try{ sel.dispatchEvent(new Event('change', { bubbles: true })); }catch(e){}
+        return true;
+      }
+    }
+    return false;
+  }
+  // Kontakty přidané ručně (bez role) — dostanou "kontrolovaná osoba".
+  function doplnPrazdneRole(){
+    roleKontaktuSelecty().forEach(function(sel){ if(!sel.value) nastavRoliKontrolovana(sel); });
+  }
+  function zpracujOsoby(d, od){
+    var key = kontrolaKey(d);
+    var i = od;
+    var pridano = [];
+    var najitBtn = document.getElementsByName('tFindC')[0];
+    var vysl = document.getElementById('xKontakt');
+    function ulozIdx(n){ try{ sessionStorage.setItem(key, String(n)); }catch(e){} }
+    function konec(zprava){
+      alert((pridano.length ? 'Přidáno jako kontrolovaná osoba: ' + pridano.join(', ') + '.' : '') + (zprava ? (pridano.length ? '\n\n' : '') + zprava : ''));
+    }
+    function setK(id, v){ var el = document.getElementById(id); if(el){ el.value = v || ''; } }
+    function dalsi(){
+      if(i >= d.osoby.length){ ulozIdx(d.osoby.length); konec(pridano.length ? '' : 'Všechny osoby jsou vložené.'); return; }
+      var o = d.osoby[i];
+      var jm = [o.jmeno, o.prijmeni].filter(Boolean).join(' ');
+      setK('tKontaktPR', o.prijmeni); setK('tKontaktJM', o.jmeno); setK('tKontaktDN', o.datumNarozeni);
+      setK('tKontaktPapers', o.cisloDokladu); setK('tKontaktRC', '');
+      if(!najitBtn || !vysl){
+        ulozIdx(i + 1);
+        konec('Osoba ' + (i + 1) + ' (' + jm + ') je vyplněná v Identifikace obyvatel — klikni na Najít a vyber ji.');
+        return;
+      }
+      vysl.innerHTML = '';
+      najitBtn.click();
+      cekej(function(){ return vysl.innerHTML.trim() ? vysl : null; }, 12000, function(ok){
+        if(!ok){ ulozIdx(i); konec('Osoba ' + (i + 1) + ' (' + jm + '): MP Manager neodpověděl na hledání — zkus Najít ručně.'); return; }
+        // Krátká rezerva, ať je seznam výsledků celý.
+        setTimeout(function(){
+          var odkazy = Array.prototype.slice.call(vysl.querySelectorAll('a[onclick*="AddPerson"]'));
+          var vyber = null;
+          if(odkazy.length === 1) vyber = odkazy[0];
+          else if(odkazy.length > 1){
+            var pr = bezDiakritiky(o.prijmeni), dn = (o.datumNarozeni || '').trim();
+            var shoda = odkazy.filter(function(a){ var t = bezDiakritiky(a.textContent); return (!pr || t.indexOf(pr) !== -1) && (!dn || t.indexOf(dn) !== -1); });
+            if(shoda.length === 1) vyber = shoda[0];
+          }
+          if(!vyber){
+            ulozIdx(i + 1);
+            konec('Osoba ' + (i + 1) + ' (' + jm + '): ' + (odkazy.length ? 'nalezeno ' + odkazy.length + ' záznamů — vyber správný ručně' : 'v evidenci nenalezena — přidej ji ručně (Nový kontakt)') +
+              '.' + (i + 1 < d.osoby.length ? '\n\nPak spusť záložku znovu — pokračuje další osobou (a ručně přidané osobě nastaví roli).' : ''));
+            try{ vysl.scrollIntoView({ block: 'center' }); }catch(e){}
+            return;
+          }
+          var pred = roleKontaktuSelecty().length;
+          vyber.click();
+          cekej(function(){ var sel = roleKontaktuSelecty(); return sel.length > pred ? sel : null; }, 10000, function(sel){
+            if(!sel){ ulozIdx(i + 1); konec('Osoba ' + (i + 1) + ' (' + jm + ') se nepřidala do seznamu kontaktů — zkontroluj ji ručně.'); return; }
+            var novy = sel[sel.length - 1];
+            if(!nastavRoliKontrolovana(novy)){
+              ulozIdx(i + 1);
+              konec('Osobu ' + jm + ' jsem přidal, ale roli „kontrolovaná osoba“ jsem v nabídce nenašel — nastav ji ručně.');
+              return;
+            }
+            pridano.push(jm);
+            i++;
+            ulozIdx(i);
+            setTimeout(dalsi, 400);
+          });
+        }, 400);
+      });
+    }
+    doplnPrazdneRole();
+    dalsi();
+  }
+
+  // Další spuštění záložky u kontroly: pokračovat od uložené osoby.
+  // Vrací false, když se má místo toho vyplnit celá událost znovu.
   function kontrolaDalsi(d){
     var key = kontrolaKey(d);
-    var next = 1;
-    try{ next = parseInt(sessionStorage.getItem(key) || '1', 10) || 1; }catch(e){}
+    var next = 0;
+    try{ next = parseInt(sessionStorage.getItem(key) || '0', 10) || 0; }catch(e){}
     if(next >= d.osoby.length){
+      doplnPrazdneRole();
       if(confirm('Všechny osoby z kontroly (' + d.osoby.length + ') už jsou vložené.\n\nVyplnit celou událost znovu od začátku?')){
         try{ sessionStorage.removeItem(key); }catch(e){}
         return false; // → normální vyplnění celé události
       }
       return true;
     }
-    var o = d.osoby[next];
-    function setK(id, v){ var el = document.getElementById(id); if(el){ el.value = v || ''; } }
-    setK('tKontaktJM', o.jmeno);
-    setK('tKontaktPR', o.prijmeni);
-    setK('tKontaktDN', o.datumNarozeni);
-    setK('tKontaktPapers', o.cisloDokladu);
-    try{ sessionStorage.setItem(key, String(next + 1)); }catch(e){}
-    var f = document.getElementById('tKontaktPR');
-    if(f){ try{ f.scrollIntoView({ block: 'center' }); f.style.outline = '3px solid #FFB020'; }catch(e){} }
-    alert('Osoba ' + (next + 1) + ' z ' + d.osoby.length + ' (' + [o.jmeno, o.prijmeni].filter(Boolean).join(' ') + ') je vyplněná v Identifikace obyvatel — klikni na Najít.' +
-      (next + 1 < d.osoby.length ? '\n\nPro další osobu spusť záložku znovu.' : ''));
+    zpracujOsoby(d, next);
     return true;
   }
 
@@ -222,7 +316,7 @@
       }
     }
     if(jeKontrola(d)){
-      try{ sessionStorage.setItem(kontrolaKey(d), '1'); }catch(e){}
+      try{ sessionStorage.setItem(kontrolaKey(d), '0'); }catch(e){}
     }
     function set(id,v){ var el=document.getElementById(id); if(el&&v){ el.value=v; } }
     set('tSPZ', d.rz);
@@ -326,6 +420,8 @@
     dokoncit();
 
     function dokoncit(){
+    // Kontrola osob: po vyplnění události rovnou přidat všechny osoby.
+    if(jeKontrola(d)){ setTimeout(function(){ zpracujOsoby(d, 0); }, 300); return; }
     if(AUTO_SAVE){
       // Rovnou uložit a pokračovat — jakmile se stránka po uložení
       // přenačte a dostane reálné EventID, "Ověřit v RSV" si klikni sám.
