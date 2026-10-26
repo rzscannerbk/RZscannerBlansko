@@ -1747,7 +1747,42 @@
       escapeXml(data) + '</text>';
   }
 
+  // Lístek "KONTROLA OSOBY" (místo výzvy) — číslo, čas, místo, důvod,
+  // kontrolované osoby a strážník.
+  function buildKontrolaPrintXml(record){
+    let x = '';
+    x += textEl('KONTROLA OSOBY\n', { align: 'center', width: 2, height: 2, em: true });
+    if(record.noticeNumber) x += textEl(record.noticeNumber + '\n', { align: 'center', em: true, width: 2, height: 2 });
+    x += textEl('--------------------------------\n', { align: 'center' });
+    x += textEl('Datum: ' + formatDateCz(record.date) + '   Čas: ' + (record.time || '—') + '\n\n', { align: 'left' });
+    if(record.address){
+      x += textEl('Místo kontroly\n', { align: 'center', em: true });
+      x += textEl(wrapWords(record.address) + '\n\n', { align: 'center' });
+    }
+    if(record.duvodKontroly){
+      x += textEl('Důvod kontroly\n', { align: 'center', em: true });
+      x += textEl(wrapWords(record.duvodKontroly) + '\n\n', { align: 'center' });
+    }
+    const osoby = (Array.isArray(record.osoby) && record.osoby.length) ? record.osoby : (record.prestupce ? [record.prestupce] : []);
+    osoby.forEach((o, i)=>{
+      x += textEl((osoby.length > 1 ? 'Osoba ' + (i + 1) : 'Osoba') + '\n', { align: 'center', em: true });
+      const jm = [o.jmeno, o.prijmeni].filter(Boolean).join(' ');
+      if(jm) x += textEl(wrapWords(jm) + '\n', { align: 'center' });
+      if(o.datumNarozeni) x += textEl('nar. ' + o.datumNarozeni + '\n', { align: 'center' });
+      if(o.cisloDokladu) x += textEl('doklad ' + o.cisloDokladu + '\n', { align: 'center' });
+      x += textEl('\n', { align: 'center' });
+    });
+    if(record.officerName) x += textEl(officerPrintLabel(record.officerName) + '\n', { align: 'center', em: true });
+    x += textEl('Městská policie Blansko\n', { align: 'center', em: true });
+    x += textEl('Sadová 149/2, 678 01 Blansko\n\n', { align: 'center' });
+    x += textEl('vygenerováno aplikací\n', { align: 'center' });
+    x += textEl('RZ Scanner © Šuraj\n', { align: 'center' });
+    x += '<feed unit="130"/>';
+    return x;
+  }
+
   function buildEposPrintXml(record){
+    if(isKontrola(record)) return buildKontrolaPrintXml(record);
     const isBoticka = record.docType === 'boticka';
     let x = '';
 
