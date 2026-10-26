@@ -5405,6 +5405,11 @@
     const end = record.resolvedAt ? timestampToMpmDateTime(record.resolvedAt) : start;
     const prvni = osoby[0] || {};
     return {
+      // Kontrola víc osob: bookmarklet "z RZ do MP" při dalších spuštěních
+      // vyplní do Identifikace obyvatel postupně další osoby.
+      kontrolaOsoby: true,
+      kontrolaId: record.id || record.noticeNumber || null,
+      osoby: osoby.map(o => ({ jmeno: o.jmeno || '', prijmeni: o.prijmeni || '', datumNarozeni: o.datumNarozeni || '', cisloDokladu: o.cisloDokladu || '' })),
       rz: '', carSubType: '',
       town, street,
       desc: desc.join('\n'),

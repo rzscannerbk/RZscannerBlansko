@@ -34,6 +34,39 @@
     return true;
   }
 
+  // ---- Kontrola osob z RZ Scanneru (víc osob) ----
+  // První spuštění vyplní celou událost s první osobou v "Identifikace
+  // obyvatel"; každé další spuštění se stejnou kontrolou ve schránce
+  // vyplní do vyhledání kontaktu DALŠÍ osobu (pořadí si pamatuje
+  // sessionStorage, takže přežije i znovunačtení stránky po "Najít").
+  var KONTROLA_KEY = 'rzsKontrolaOsoby:';
+  function jeKontrola(d){ return d && typeof d === 'object' && d.kontrolaOsoby && Array.isArray(d.osoby) && d.osoby.length; }
+  function kontrolaKey(d){ return KONTROLA_KEY + (d.kontrolaId || d.desc || ''); }
+  function kontrolaDalsi(d){
+    var key = kontrolaKey(d);
+    var next = 1;
+    try{ next = parseInt(sessionStorage.getItem(key) || '1', 10) || 1; }catch(e){}
+    if(next >= d.osoby.length){
+      if(confirm('Všechny osoby z kontroly (' + d.osoby.length + ') už jsou vložené.\n\nVyplnit celou událost znovu od začátku?')){
+        try{ sessionStorage.removeItem(key); }catch(e){}
+        return false; // → normální vyplnění celé události
+      }
+      return true;
+    }
+    var o = d.osoby[next];
+    function setK(id, v){ var el = document.getElementById(id); if(el){ el.value = v || ''; } }
+    setK('tKontaktJM', o.jmeno);
+    setK('tKontaktPR', o.prijmeni);
+    setK('tKontaktDN', o.datumNarozeni);
+    setK('tKontaktPapers', o.cisloDokladu);
+    try{ sessionStorage.setItem(key, String(next + 1)); }catch(e){}
+    var f = document.getElementById('tKontaktPR');
+    if(f){ try{ f.scrollIntoView({ block: 'center' }); f.style.outline = '3px solid #FFB020'; }catch(e){} }
+    alert('Osoba ' + (next + 1) + ' z ' + d.osoby.length + ' (' + [o.jmeno, o.prijmeni].filter(Boolean).join(' ') + ') je vyplněná v Identifikace obyvatel — klikni na Najít.' +
+      (next + 1 < d.osoby.length ? '\n\nPro další osobu spusť záložku znovu.' : ''));
+    return true;
+  }
+
   if(eventId && eventId !== '0'){
     // Uložená událost: když je ve schránce JSON z MPM s dořešením (role
     // jiná než hlídka a známý strážník), přepne se do DOPLŇOVACÍHO
@@ -41,6 +74,10 @@
     navigator.clipboard.readText().then(function(t){
       var dd = null;
       try{ dd = JSON.parse(t); }catch(e){}
+      if(jeKontrola(dd)){
+        if(!kontrolaDalsi(dd)) alert('Událost je už uložená — celou ji znovu vyplnit nejde. Otevři novou událost.');
+        return;
+      }
       if(dd && typeof dd === 'object' && dd.doplnitUlozenou && dd.straznikRole && dd.straznikRole !== 'hlidka' && dd.resolverCislo){
         doplnitUlozenou(dd);
       } else {
@@ -162,12 +199,6 @@
     });
   }
 
-  if(window.__rzScannerMPMFilled){
-    if(!confirm('Tato záložka už na tomto formuláři jednou proběhla. Spustit znovu? (Oprávnění a Způsob řešení se nepřidají podruhé, ostatní pole se přepíšou.)')){
-      return;
-    }
-  }
-
   navigator.clipboard.readText().then(function(t){
     var d;
     try{ d = JSON.parse(t); } catch(e){ d = null; }
@@ -178,6 +209,20 @@
     if(!d || typeof d !== 'object' || !('rz' in d)){
       alert('Ve schránce nejsou data z RZ Scanneru.\n\nV přehledu RZ Scanneru nejdřív klikni na tlačítko MPM a hned potom spusť tuhle záložku.\n\nZačátek schránky: ' + (t ? String(t).slice(0, 60) : '(prázdná)'));
       return;
+    }
+    // Kontrola osob, kterou už tahle karta jednou vyplnila → jen další osoba.
+    if(jeKontrola(d)){
+      var uz = null;
+      try{ uz = sessionStorage.getItem(kontrolaKey(d)); }catch(e){}
+      if(uz && kontrolaDalsi(d)) return;
+    }
+    if(window.__rzScannerMPMFilled){
+      if(!confirm('Tato záložka už na tomto formuláři jednou proběhla. Spustit znovu? (Oprávnění a Způsob řešení se nepřidají podruhé, ostatní pole se přepíšou.)')){
+        return;
+      }
+    }
+    if(jeKontrola(d)){
+      try{ sessionStorage.setItem(kontrolaKey(d), '1'); }catch(e){}
     }
     function set(id,v){ var el=document.getElementById(id); if(el&&v){ el.value=v; } }
     set('tSPZ', d.rz);
