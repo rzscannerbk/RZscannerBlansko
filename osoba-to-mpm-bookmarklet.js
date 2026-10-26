@@ -157,6 +157,16 @@
     });
   };
 
+  // Údaje v odkazu (RZ Scanner otevírá MZRE05F.asp#<údaje>) — bez schránky.
+  // Po přečtení se z adresy hned smažou.
+  var fromHash = '';
+  try{ fromHash = decodeURIComponent((location.hash || '').slice(1)); }catch(e){}
+  if(fromHash.indexOf(MARK) !== -1){
+    try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+    handle(fromHash);
+    if(handled) return;
+  }
+
   // Tlačítko i ruční pole jsou vidět hned — Chrome na iPhonu při čtení
   // schránky bez klepnutí ukáže "Povolit vložení", ale text pak nemusí
   // vrátit a bookmarklet by zůstal viset. Na počítači (povolená schránka)

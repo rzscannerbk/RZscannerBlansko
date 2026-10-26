@@ -1910,6 +1910,7 @@
     const $ = id => document.getElementById(id);
     const note = (t, k)=>{ const n = $('osNote'); n.textContent = t || ''; n.className = 'os-note' + (k ? ' ' + k : ''); };
     let osPhotos = [];
+    const MPM_LUSTRACE_PATH = 'mp.blansko.cz/Mobile/MZRE05F.asp';
 
     // "29061980", "29.6.1980", "29 6 1980", "29/06/1980" → "29.6.1980"
     function normalizeDob(v){
@@ -1963,9 +1964,21 @@
         'Příjmení: ' + prijmeni,
         'Datum narození: ' + (narozeni || ''),
         'Číslo dokladu: ' + doklad].join('\n');
+      // Schránka zůstává jako záloha (např. když Chrome nejdřív ukáže
+      // přihlášení do MP Manageru a odkaz s údaji se tím ztratí).
       const ok = await copyText(text);
-      if(ok) note('✓ Zkopírováno. Přepni se do MP Manageru a spusť bookmarklet „Osoba do MP“.', 'ok');
-      else note('Kopírování se nepovedlo — zkus to prosím znovu.', 'err');
+      // Údaje jdou i v odkazu za "#" — tahle část adresy se na server MP
+      // Manageru neodesílá, čte ji jen bookmarklet (a hned ji z adresy smaže).
+      const hash = '#' + encodeURIComponent(text);
+      const httpsUrl = 'https://' + MPM_LUSTRACE_PATH + hash;
+      const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      note((ok ? '✓ Zkopírováno. ' : '') + 'Otevírám MP Manager v Chrome — spusť tam bookmarklet „Osoba do MP“.', 'ok');
+      if(isIOS){
+        // googlechromes:// otevře přímo aplikaci Chrome (ne Safari).
+        location.href = 'googlechromes://' + MPM_LUSTRACE_PATH + hash;
+      } else {
+        window.open(httpsUrl, '_blank');
+      }
     });
 
     $('osClearBtn').addEventListener('click', ()=>{
