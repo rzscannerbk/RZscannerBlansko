@@ -490,6 +490,16 @@
   .os-field span{display:block; font-family:'Roboto Mono',monospace; font-size:10.5px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; margin-bottom:4px;}
   .os-field input{width:100%; background:transparent; border:0; outline:none; color:var(--text); font:600 19px 'Inter',sans-serif; padding:2px 0;}
   .os-field input::placeholder{color:var(--muted); opacity:.55; font-weight:500;}
+  .os-person{background:var(--asphalt-2); border:1px solid var(--line); border-radius:20px; padding:12px; display:flex; flex-direction:column; gap:10px;}
+  .os-person + .os-person{margin-top:12px;}
+  .os-person .os-field{background:var(--asphalt); }
+  .os-person-head{display:flex; align-items:center; gap:10px; padding:0 4px;}
+  .os-person-head b{font-family:'Oswald',sans-serif; font-weight:600; font-size:16px; letter-spacing:.04em; text-transform:uppercase;}
+  .os-lustr-state{font-size:12px; color:var(--good); font-weight:600;}
+  .os-person-del{margin-left:auto; width:32px; height:32px; border-radius:50%; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:18px; line-height:1; cursor:pointer; padding:0;}
+  .os-lustr{margin-top:2px !important; height:50px !important; font-size:16px !important;}
+  .os-lustr.done{background:transparent !important; border:1.5px solid var(--amber) !important; color:var(--amber) !important;}
+  .os-add{height:48px; border-radius:14px; border:1.5px dashed var(--line); background:transparent; color:var(--amber); font:600 15px 'Inter',sans-serif; cursor:pointer;}
   .os-field-misto{position:relative; padding-right:54px;}
   .os-field-misto input{font-size:16px; font-weight:500;}
   .os-loc{position:absolute; right:10px; top:50%; transform:translateY(-50%); width:38px; height:38px; border-radius:50%; border:1px solid var(--line); background:var(--asphalt); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;}
@@ -666,12 +676,8 @@
       <div class="sz-badge"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><defs><linearGradient id="osobyG2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFC65B"/><stop offset="1" stop-color="#FFA000"/></linearGradient></defs><circle cx="26" cy="21" r="10" fill="url(#osobyG2)"/><path d="M7 50c0-10.5 8.5-17 19-17 3.4 0 6.6.7 9.3 2.1-3.4 2.9-5.3 7.1-5.3 11.6 0 1.1.1 2.2.3 3.3H7z" fill="url(#osobyG2)"/><circle cx="44" cy="46" r="9.5" stroke="currentColor" stroke-width="4"/><path d="M51 53l6.5 6.5" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"/></svg></div>
     </div>
     <div class="os-form">
-      <div class="os-row">
-        <label class="os-field"><span>Jméno</span><input id="osJmeno" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Jméno"></label>
-        <label class="os-field"><span>Příjmení</span><input id="osPrijmeni" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Příjmení"></label>
-      </div>
-      <label class="os-field"><span>Datum narození</span><input id="osNarozeni" type="text" inputmode="decimal" autocomplete="off" placeholder="d. m. rrrr"></label>
-      <label class="os-field"><span>Číslo dokladu</span><input id="osDoklad" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="OP / pas / řidičský průkaz"></label>
+      <div id="osPersons"></div>
+      <button type="button" class="os-add" id="osAddBtn">+ Další osoba</button>
       <label class="os-field os-field-misto"><span>Místo kontroly</span><input id="osMisto" type="text" autocomplete="off" spellcheck="false" placeholder="Zjišťuji polohu…"><button type="button" class="os-loc" id="osMistoRefresh" aria-label="Znovu zjistit polohu" title="Znovu zjistit polohu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7.5"/></svg></button></label>
       <div class="os-photo" id="osPhotoBox">
         <div class="os-thumbs" id="osThumbs"></div>
@@ -681,9 +687,8 @@
       </div>
       <input type="file" id="osPhotoInput" accept="image/*" multiple style="display:none">
     </div>
-    <button type="button" class="os-copy" id="osCopyBtn">Kopírovat do MP Manageru</button>
     <div class="os-note" id="osNote"></div>
-    <button type="button" class="os-clear" id="osClearBtn">Vymazat formulář</button>
+    <button type="button" class="os-clear" id="osClearBtn">Nová kontrola (vymazat vše)</button>
   </div>
 
   <!-- CAMERA -->
@@ -1162,7 +1167,7 @@
   }catch(e){}
 
   // Verze aplikace — při každé změně zvýšit (zobrazuje se na úvodní obrazovce).
-  const APP_VERSION = '1.3';
+  const APP_VERSION = '1.4';
   const APP_BUILD_DATE = '26. 10. 2026';
   document.getElementById('appVersion').textContent = 'RZ Scanner v' + APP_VERSION + ' · ' + APP_BUILD_DATE;
 
@@ -1912,24 +1917,52 @@
     document.getElementById('osBackBtn').addEventListener('click', ()=> show('sluzebni'));
   })();
 
-  // ---------- Osoby — kontrola osoby + lustrace v MP Manageru ----------
-  // "Kopírovat do MP Manageru":
-  //  1) zkopíruje údaje do schránky (záloha pro bookmarklet),
-  //  2) uloží do přehledu novou událost "Kontrola osoby" (osoba, místo,
-  //     čas, fotky — stejná kolekce prestupky jako ostatní záznamy,
-  //     osoba v poli prestupce, fotky v data/photos),
+  // ---------- Osoby — kontrola osob (jedna i víc) + lustrace v MP Manageru ----------
+  // Jedna kontrola = jedna událost "Kontrola osoby" v přehledu, může mít
+  // víc osob (record.osoby, první osoba i v record.prestupce kvůli
+  // sloupci Přestupce). Místo a fotky jsou společné.
+  // "Lustrovat v MP Manageru" u osoby:
+  //  1) zkopíruje její údaje do schránky (záloha pro bookmarklet),
+  //  2) uloží / doplní kontrolu v přehledu (první klepnutí ji založí,
+  //     další osoby se do stejné události jen doplní),
   //  3) otevře MP Manager v Safari s údaji v odkazu — bookmarklet
-  //     "Osoba do MP" tam provede lustraci.
+  //     "Osoba do MP" provede lustraci.
+  // Rozpracovaná kontrola (osoby, místo, id události) se drží
+  // v localStorage, ať přežije přepnutí do Safari a zpět. Fotky jen do
+  // nahrání.
   (function(){
     const $ = id => document.getElementById(id);
     const note = (t, k)=>{ const n = $('osNote'); n.textContent = t || ''; n.className = 'os-note' + (k ? ' ' + k : ''); };
-    let osPhotos = [];          // { file, url }
-    let osGps = null;           // { lat, lng } z posledního dohledání místa
-    let lastSavedKey = null;    // ať se stejná kontrola při druhém klepnutí neuloží znovu
-    // Úvodní stránka MP Manageru — přímý odkaz na MZRE05F.asp MP Manager
-    // přesměruje na úvod (a údaje v odkazu by se ztratily). Lustraci otevře
-    // až bookmarklet uvnitř stránky.
+    const DRAFT_KEY = 'rzsKontrolaDraft';
     const MPM_LUSTRACE_PATH = 'mp.blansko.cz/Mobile/Default.asp';
+    const emptyPerson = ()=> ({ jmeno:'', prijmeni:'', narozeni:'', doklad:'', lustrovano:false });
+
+    let persons = [emptyPerson()];
+    let kontrolaId = null;      // id uložené události v kolekci prestupky
+    let noticeNumber = null;
+    let osGps = null;
+    let osPhotos = [];          // { file, url }
+    let photosDirty = false;    // fotky změněné od posledního nahrání
+
+    function saveDraft(){
+      try{
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          persons, kontrolaId, noticeNumber, osGps, misto: $('osMisto').value, savedAt: Date.now()
+        }));
+      }catch(e){}
+    }
+    function loadDraft(){
+      try{
+        const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+        // Rozpracovaná kontrola platí 12 hodin (jedna směna).
+        if(!d || !d.savedAt || Date.now() - d.savedAt > 12*3600*1000) return;
+        if(Array.isArray(d.persons) && d.persons.length) persons = d.persons;
+        kontrolaId = d.kontrolaId || null;
+        noticeNumber = d.noticeNumber || null;
+        osGps = d.osGps || null;
+        if(d.misto) $('osMisto').value = d.misto;
+      }catch(e){}
+    }
 
     // "29061980", "29.6.1980", "29 6 1980", "29/06/1980" → "29.6.1980"
     function normalizeDob(v){
@@ -1947,13 +1980,53 @@
       if(!d || !m || !y || dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d || dt > new Date()) return null;
       return d + '.' + m + '.' + y;
     }
-    $('osNarozeni').addEventListener('blur', (e)=>{
-      const n = normalizeDob(e.target.value);
-      if(n) e.target.value = n;
+    const personHasData = p => !!(p.jmeno || p.prijmeni || p.narozeni || p.doklad);
+
+    // ---- Karty osob ----
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    function renderPersons(){
+      const box = $('osPersons');
+      box.innerHTML = '';
+      persons.forEach((p, i)=>{
+        const card = document.createElement('div');
+        card.className = 'os-person';
+        card.innerHTML =
+          '<div class="os-person-head"><b>Osoba ' + (i + 1) + '</b>' +
+            '<span class="os-lustr-state">' + (p.lustrovano ? '✓ lustrováno' : '') + '</span>' +
+            (persons.length > 1 ? '<button type="button" class="os-person-del" data-del aria-label="Odebrat osobu">×</button>' : '') +
+          '</div>' +
+          '<div class="os-row">' +
+            '<label class="os-field"><span>Jméno</span><input data-f="jmeno" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Jméno" value="' + esc(p.jmeno) + '"></label>' +
+            '<label class="os-field"><span>Příjmení</span><input data-f="prijmeni" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" placeholder="Příjmení" value="' + esc(p.prijmeni) + '"></label>' +
+          '</div>' +
+          '<label class="os-field"><span>Datum narození</span><input data-f="narozeni" type="text" inputmode="decimal" autocomplete="off" placeholder="d. m. rrrr" value="' + esc(p.narozeni) + '"></label>' +
+          '<label class="os-field"><span>Číslo dokladu</span><input data-f="doklad" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="OP / pas / řidičský průkaz" value="' + esc(p.doklad) + '"></label>' +
+          '<button type="button" class="os-copy os-lustr' + (p.lustrovano ? ' done' : '') + '" data-lustr>' + (p.lustrovano ? 'Lustrovat znovu' : 'Lustrovat v MP Manageru') + '</button>';
+        card.querySelectorAll('input[data-f]').forEach(inp=>{
+          inp.addEventListener('input', ()=>{ p[inp.dataset.f] = inp.value; saveDraft(); });
+          if(inp.dataset.f === 'narozeni') inp.addEventListener('blur', ()=>{
+            const n = normalizeDob(inp.value); if(n){ inp.value = n; p.narozeni = n; saveDraft(); }
+          });
+        });
+        const del = card.querySelector('[data-del]');
+        if(del) del.addEventListener('click', ()=>{
+          if(personHasData(p) && !confirm('Odebrat osobu ' + (i + 1) + '?')) return;
+          persons.splice(i, 1); renderPersons(); saveDraft();
+          if(kontrolaId) saveKontrola().catch(()=>{});
+        });
+        card.querySelector('[data-lustr]').addEventListener('click', (ev)=> lustrovat(i, ev.currentTarget));
+        box.appendChild(card);
+      });
+    }
+    $('osAddBtn').addEventListener('click', ()=>{
+      persons.push(emptyPerson());
+      renderPersons(); saveDraft();
+      const cards = $('osPersons').querySelectorAll('.os-person');
+      const last = cards[cards.length - 1];
+      if(last){ last.scrollIntoView({ behavior:'smooth', block:'center' }); const f = last.querySelector('input'); if(f) setTimeout(()=> f.focus(), 300); }
     });
 
-    // Místo kontroly — při otevření formuláře se dohledá podle polohy
-    // (stejně jako u přestupku), strážník ho může přepsat.
+    // ---- Místo kontroly ----
     async function fillMisto(force){
       const inp = $('osMisto');
       if(inp.value.trim() && !force) return;
@@ -1962,11 +2035,13 @@
         const loc = await getLocationAndAddress();
         osGps = (loc && loc.lat != null) ? { lat: loc.lat, lng: loc.lng } : null;
         if(loc && loc.address && (!inp.value.trim() || force)) inp.value = loc.address;
+        saveDraft();
       }catch(e){}
       inp.placeholder = 'Místo se nepodařilo dohledat, zadej ručně';
     }
-    $('szOsobyTile').addEventListener('click', ()=> fillMisto(false));
+    $('szOsobyTile').addEventListener('click', ()=>{ renderPersons(); fillMisto(false); });
     $('osMistoRefresh').addEventListener('click', (e)=>{ e.preventDefault(); fillMisto(true); });
+    $('osMisto').addEventListener('input', saveDraft);
 
     async function copyText(text){
       try{
@@ -1980,6 +2055,7 @@
       }catch(e){ return false; }
     }
 
+    // ---- Fotky ----
     function fileToDataUrl(file){
       return new Promise((resolve, reject)=>{
         const r = new FileReader();
@@ -1988,8 +2064,6 @@
         r.readAsDataURL(file);
       });
     }
-    // Fotky zmenšené jako u přestupku; když by se do limitu Firestore
-    // (~1 MB na dokument) nevešly, zmenší se ještě víc.
     async function preparePhotos(){
       const raw = [];
       for(const p of osPhotos) raw.push(await fileToDataUrl(p.file));
@@ -2001,6 +2075,24 @@
       }
       throw new Error('Fotky jsou i po zmenšení příliš velké — odeber některou.');
     }
+    function renderThumbs(){
+      const box = $('osThumbs');
+      box.innerHTML = '';
+      osPhotos.forEach((p, i)=>{
+        const t = document.createElement('div'); t.className = 'os-thumb';
+        const img = document.createElement('img'); img.src = p.url; img.alt = 'Foto ' + (i + 1);
+        const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Odebrat fotku');
+        x.addEventListener('click', (ev)=>{ ev.stopPropagation(); URL.revokeObjectURL(p.url); osPhotos.splice(i, 1); photosDirty = true; renderThumbs(); });
+        t.appendChild(img); t.appendChild(x); box.appendChild(t);
+      });
+    }
+    $('osPhotoBox').addEventListener('click', ()=> $('osPhotoInput').click());
+    $('osPhotoInput').addEventListener('change', (e)=>{
+      Array.from(e.target.files || []).forEach(f => osPhotos.push({ file: f, url: URL.createObjectURL(f) }));
+      e.target.value = '';
+      photosDirty = true;
+      renderThumbs();
+    });
 
     function officerNameNow(){
       const sel = document.getElementById('officerSelect');
@@ -2010,98 +2102,118 @@
       return null;
     }
 
-    async function saveKontrola(o){
-      const photos = await preparePhotos();
-      const now = new Date();
+    // ---- Uložení / doplnění kontroly ----
+    function personToRecord(p){
       const pad2 = n => String(n).padStart(2, '0');
-      let noticeNumber;
-      try{ noticeNumber = await getNextNoticeNumber(); }
-      catch(e){ noticeNumber = String(Date.now() % 1000000).padStart(6, '0'); }
-      const dn = o.narozeni ? o.narozeni.split('.').map((x, i)=> i < 2 ? pad2(x) : x).join('.') : null;
-      const osoba = {
-        jmeno: o.jmeno || null, prijmeni: o.prijmeni || null,
-        datumNarozeni: dn, cisloDokladu: o.doklad || null,
+      const n = p.narozeni ? normalizeDob(p.narozeni) : '';
+      const dn = n ? n.split('.').map((x, i)=> i < 2 ? pad2(x) : x).join('.') : null;
+      return {
+        jmeno: p.jmeno.trim() || null, prijmeni: p.prijmeni.trim() || null,
+        datumNarozeni: dn, cisloDokladu: p.doklad.trim().replace(/\s+/g, '').toUpperCase() || null,
+        lustrovano: !!p.lustrovano,
         firma: null, ico: null, datovaSchranka: null, mesto: null, ulice: null, cisloDomu: null
       };
-      const docRef = db.collection('prestupky').doc();
-      const baseData = {
-        plate: null,
-        date: now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()),
-        time: now.toTimeString().slice(0, 5),
-        address: o.misto || null,
-        offenseLabel: 'Kontrola osoby',
-        offenseVerb: null,
-        offenseCitation: null,
-        hasPhotos: photos.length > 0,
-        // Kontrola osoby se ukládá rovnou uzavřená (v přehledu stav
-        // "Kontrola osoby", nic se nedořešuje).
-        resolved: true,
-        expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180*24*60*60*1000)),
-        submittedBy: auth.currentUser ? auth.currentUser.email : null,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
+    }
+    async function saveKontrola(){
+      const osoby = persons.filter(personHasData).map(personToRecord);
+      const misto = $('osMisto').value.trim();
       const officer = officerNameNow();
-      const extraData = {
-        officerName: officer,
-        resolvedMethod: 'kontrola',
-        resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        resolvedByOfficer: officer,
-        resolutionHistory: [{ method: 'kontrola', resolvedAt: firebase.firestore.Timestamp.now(), officerName: officer }],
-        noticeNumber,
-        lat: osGps ? osGps.lat : null,
-        lng: osGps ? osGps.lng : null,
-        brand: null, color: null,
-        docType: 'kontrola',
-        source: 'kontrolaOsoby',
-        prestupce: osoba
-      };
-      let extrasBlocked = false;
-      try{
-        await docRef.set({ ...baseData, ...extraData });
-      }catch(e){
-        if(e && e.code === 'permission-denied'){
-          extrasBlocked = true;
-          try{ await docRef.set(baseData); }
-          catch(e2){
-            // Pravidla by mohla nedovolit založit záznam rovnou vyřešený.
-            if(e2 && e2.code === 'permission-denied') await docRef.set({ ...baseData, resolved: false });
-            else throw e2;
-          }
+      const label = 'Kontrola osoby' + (osoby.length > 1 ? ' (' + osoby.length + (osoby.length < 5 ? ' osoby)' : ' osob)') : '');
+      if(!kontrolaId){
+        const photos = await preparePhotos();
+        const now = new Date();
+        const pad2 = n => String(n).padStart(2, '0');
+        try{ noticeNumber = await getNextNoticeNumber(); }
+        catch(e){ noticeNumber = String(Date.now() % 1000000).padStart(6, '0'); }
+        const docRef = db.collection('prestupky').doc();
+        const baseData = {
+          plate: null,
+          date: now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate()),
+          time: now.toTimeString().slice(0, 5),
+          address: misto || null,
+          offenseLabel: label,
+          offenseVerb: null,
+          offenseCitation: null,
+          hasPhotos: photos.length > 0,
+          // Kontrola osoby se ukládá rovnou uzavřená (v přehledu stav
+          // "Kontrola osoby", nic se nedořešuje).
+          resolved: true,
+          expireAt: firebase.firestore.Timestamp.fromDate(new Date(Date.now() + 180*24*60*60*1000)),
+          submittedBy: auth.currentUser ? auth.currentUser.email : null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        const extraData = {
+          officerName: officer,
+          resolvedMethod: 'kontrola',
+          resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          resolvedByOfficer: officer,
+          resolutionHistory: [{ method: 'kontrola', resolvedAt: firebase.firestore.Timestamp.now(), officerName: officer }],
+          noticeNumber,
+          lat: osGps ? osGps.lat : null,
+          lng: osGps ? osGps.lng : null,
+          brand: null, color: null,
+          docType: 'kontrola',
+          source: 'kontrolaOsoby',
+          prestupce: osoby[0] || null,
+          osoby
+        };
+        let extrasBlocked = false;
+        try{
+          await docRef.set({ ...baseData, ...extraData });
+        }catch(e){
+          if(e && e.code === 'permission-denied'){
+            extrasBlocked = true;
+            try{ await docRef.set(baseData); }
+            catch(e2){
+              if(e2 && e2.code === 'permission-denied') await docRef.set({ ...baseData, resolved: false });
+              else throw e2;
+            }
+          } else throw e;
         }
-        else throw e;
+        if(photos.length){
+          await docRef.collection('data').doc('photos').set({ photos, photoMime: 'image/jpeg' });
+        }
+        photosDirty = false;
+        kontrolaId = docRef.id;
+        saveDraft();
+        return { created: true, extrasBlocked };
       }
-      if(photos.length){
-        await docRef.collection('data').doc('photos').set({ photos, photoMime: 'image/jpeg' });
+      // Doplnění už uložené kontroly (další osoba, změněné místo/fotky).
+      const ref = db.collection('prestupky').doc(kontrolaId);
+      const upd = { osoby, prestupce: osoby[0] || null, offenseLabel: label, address: misto || null };
+      if(photosDirty){
+        const photos = await preparePhotos();
+        upd.hasPhotos = photos.length > 0;
+        if(photos.length) await ref.collection('data').doc('photos').set({ photos, photoMime: 'image/jpeg' });
+        photosDirty = false;
       }
-      return { noticeNumber, extrasBlocked };
+      await ref.update(upd);
+      return { created: false };
     }
 
     function openMpm(hash){
       const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       if(isIOS){
         // x-safari-https:// otevře plné Safari (s Oblíbenými a bookmarklety).
-        // Obyčejný https odkaz by z aplikace na ploše otevřel jen vložené
-        // okno Safari bez záložek.
         location.href = 'x-safari-https://' + MPM_LUSTRACE_PATH + hash;
       } else {
         window.open('https://' + MPM_LUSTRACE_PATH + hash, '_blank');
       }
     }
 
-    $('osCopyBtn').addEventListener('click', async ()=>{
-      const btn = $('osCopyBtn');
-      const jmeno = $('osJmeno').value.trim();
-      const prijmeni = $('osPrijmeni').value.trim();
-      const narRaw = $('osNarozeni').value.trim();
-      const doklad = $('osDoklad').value.trim().replace(/\s+/g, '').toUpperCase();
-      const misto = $('osMisto').value.trim();
+    async function lustrovat(i, btn){
+      const p = persons[i];
+      const jmeno = (p.jmeno || '').trim();
+      const prijmeni = (p.prijmeni || '').trim();
+      const narRaw = (p.narozeni || '').trim();
+      const doklad = (p.doklad || '').trim().replace(/\s+/g, '').toUpperCase();
       const narozeni = narRaw ? normalizeDob(narRaw) : '';
-      if(narRaw && !narozeni){ note('Datum narození nejde přečíst — zadej ho jako d. m. rrrr.', 'err'); $('osNarozeni').focus(); return; }
-      if(narozeni) $('osNarozeni').value = narozeni;
+      if(narRaw && !narozeni){ note('Osoba ' + (i + 1) + ': datum narození nejde přečíst — zadej ho jako d. m. rrrr.', 'err'); return; }
+      if(narozeni) p.narozeni = narozeni;
       // MP Manager hledá buď podle jména + příjmení + data narození, nebo
       // podle čísla dokladu — aspoň jedna z těch dvou kombinací musí být celá.
       if(!((jmeno && prijmeni && narozeni) || doklad)){
-        note('Vyplň jméno, příjmení a datum narození, nebo číslo dokladu.', 'err');
+        note('Osoba ' + (i + 1) + ': vyplň jméno, příjmení a datum narození, nebo číslo dokladu.', 'err');
         return;
       }
       if(!auth.currentUser){
@@ -2113,62 +2225,46 @@
         'Příjmení: ' + prijmeni,
         'Datum narození: ' + (narozeni || ''),
         'Číslo dokladu: ' + doklad].join('\n');
-      // Schránka hned v klepnutí (záloha pro bookmarklet).
-      const copyPromise = copyText(text);
+      const copyPromise = copyText(text);   // hned v klepnutí
       const hash = '#' + encodeURIComponent(text);
 
-      const key = [jmeno, prijmeni, narozeni, doklad, misto, osPhotos.length].join('|');
+      p.lustrovano = true;
+      saveDraft();
       const original = btn.textContent;
       btn.disabled = true;
-      let savedInfo = '';
+      btn.textContent = kontrolaId ? 'Doplňuji kontrolu…' : 'Ukládám kontrolu…';
+      let info = '';
       try{
-        if(key !== lastSavedKey){
-          btn.textContent = 'Ukládám kontrolu…';
-          const r = await saveKontrola({ jmeno, prijmeni, narozeni, doklad, misto });
-          lastSavedKey = key;
-          savedInfo = '✓ Kontrola osoby uložena (č. ' + r.noticeNumber + ')' + (r.extrasBlocked ? ' — bez údajů osoby (Firestore pravidla)' : '') + '. ';
-        } else {
-          savedInfo = '✓ Kontrola už je uložená. ';
-        }
+        const r = await saveKontrola();
+        info = r.created
+          ? '✓ Kontrola uložena (č. ' + noticeNumber + ')' + (r.extrasBlocked ? ' — bez údajů osob (Firestore pravidla)' : '') + '. '
+          : '✓ Osoba doplněna do kontroly č. ' + (noticeNumber || '') + '. ';
       }catch(e){
         console.error('Uložení kontroly osoby selhalo:', e);
-        note('Kontrolu se nepodařilo uložit (' + (e && e.message ? e.message : 'chyba sítě') + '). Lustraci můžeš i tak spustit — klepni znovu.', 'err');
-        btn.disabled = false; btn.textContent = original;
-        lastSavedKey = '__failed__' + key; // druhé klepnutí: už neukládat znovu, jen otevřít MP Manager
-        return;
-      }finally{
-        await copyPromise;
+        info = '⚠ Kontrolu se nepodařilo uložit (' + (e && e.message ? e.message : 'chyba sítě') + '). ';
       }
+      await copyPromise;
       btn.disabled = false; btn.textContent = original;
-      note(savedInfo + 'Otevírám MP Manager v Safari — spusť tam z Oblíbených „Osoba do MP“.', 'ok');
+      renderPersons();
+      note(info + 'Otevírám MP Manager v Safari — spusť tam z Oblíbených „Osoba do MP“.', info.charAt(0) === '⚠' ? 'err' : 'ok');
       openMpm(hash);
-    });
+    }
 
     $('osClearBtn').addEventListener('click', ()=>{
-      ['osJmeno','osPrijmeni','osNarozeni','osDoklad'].forEach(id => $(id).value = '');
+      if(persons.some(personHasData) && !confirm('Začít novou kontrolu? Rozpracované údaje se vymažou (uložená kontrola v přehledu zůstane).')) return;
+      persons = [emptyPerson()];
+      kontrolaId = null; noticeNumber = null;
       osPhotos.forEach(p => URL.revokeObjectURL(p.url));
-      osPhotos = []; renderThumbs(); note('');
-      lastSavedKey = null;
+      osPhotos = []; photosDirty = false; renderThumbs();
+      $('osMisto').value = '';
+      note('');
+      try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
+      renderPersons();
       fillMisto(true);
     });
 
-    function renderThumbs(){
-      const box = $('osThumbs');
-      box.innerHTML = '';
-      osPhotos.forEach((p, i)=>{
-        const t = document.createElement('div'); t.className = 'os-thumb';
-        const img = document.createElement('img'); img.src = p.url; img.alt = 'Foto ' + (i + 1);
-        const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Odebrat fotku');
-        x.addEventListener('click', (ev)=>{ ev.stopPropagation(); URL.revokeObjectURL(p.url); osPhotos.splice(i, 1); renderThumbs(); });
-        t.appendChild(img); t.appendChild(x); box.appendChild(t);
-      });
-    }
-    $('osPhotoBox').addEventListener('click', ()=> $('osPhotoInput').click());
-    $('osPhotoInput').addEventListener('change', (e)=>{
-      Array.from(e.target.files || []).forEach(f => osPhotos.push({ file: f, url: URL.createObjectURL(f) }));
-      e.target.value = '';
-      renderThumbs();
-    });
+    loadDraft();
+    renderPersons();
   })();
 
   // Skrytý přepínač světlý/tmavý režim — 4s podržení loga.

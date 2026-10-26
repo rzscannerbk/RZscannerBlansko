@@ -2005,7 +2005,8 @@
           const obecName = commaIdx !== -1 ? mesto.slice(commaIdx + 2) : mesto;
           const pachatelInfo = document.createElement('span');
           pachatelInfo.className = 'record-pachatel-info';
-          pachatelInfo.textContent = [jmenoPrijmeni, obecName].filter(Boolean).join(', ');
+          pachatelInfo.textContent = [jmenoPrijmeni, obecName].filter(Boolean).join(', ') +
+            (kontr && Array.isArray(r.osoby) && r.osoby.length > 1 ? ' +' + (r.osoby.length - 1) + ' další' : '');
           numRow.appendChild(pachatelInfo);
         }
         topRow.appendChild(numRow);
@@ -2186,8 +2187,8 @@
 
   function openDetail(record){
     currentDetailRecord = record;
-    document.getElementById('detailPlateLabel').textContent = record.plate || 'DETAIL';
-    document.getElementById('noticeCardContainer').innerHTML = buildNoticeHtml(record);
+    document.getElementById('detailPlateLabel').textContent = record.plate || (isKontrola(record) ? 'KONTROLA OSOBY' : 'DETAIL');
+    document.getElementById('noticeCardContainer').innerHTML = isKontrola(record) ? buildKontrolaHtml(record) : buildNoticeHtml(record);
 
     const photoToggleRow = document.getElementById('photoToggleRow');
     const photoToggleBtn = document.getElementById('photoToggleBtn');
@@ -2234,6 +2235,26 @@
     currentRecordPrinted = false;
 
     show('detail');
+  }
+
+  // Karta detailu kontroly osob (místo karty výzvy) — všechny osoby,
+  // místo, čas a strážník.
+  function buildKontrolaHtml(r){
+    const e = v => escapeHtml(v == null ? '' : String(v));
+    const osoby = (Array.isArray(r.osoby) && r.osoby.length) ? r.osoby : (r.prestupce ? [r.prestupce] : []);
+    let h = '<div class="notice-card"><div class="notice-title">Kontrola osoby</div>';
+    if(r.noticeNumber) h += '<div class="notice-number"><b>' + e(r.noticeNumber) + '</b></div>';
+    h += '<div class="notice-datetime">Datum: ' + e(formatDateCz(r.date)) + '&nbsp;&nbsp;&nbsp;Čas: ' + e(r.time || '—') + '</div>';
+    if(r.address) h += '<div class="notice-section"><div class="notice-heading">Místo kontroly</div><div class="notice-address">' + e(r.address) + '</div></div>';
+    osoby.forEach((p, i)=>{
+      h += '<div class="notice-section"><div class="notice-heading">' + (osoby.length > 1 ? 'Osoba ' + (i + 1) : 'Osoba') + '</div>' +
+        '<div class="notice-address"><b>' + e([p.jmeno, p.prijmeni].filter(Boolean).join(' ') || '—') + '</b>' +
+        (p.datumNarozeni ? '<br>nar. ' + e(p.datumNarozeni) : '') +
+        (p.cisloDokladu ? '<br>doklad ' + e(p.cisloDokladu) : '') +
+        (p.lustrovano ? '<br><span style="color:#1f9d6b">✓ lustrováno v ZR</span>' : '') + '</div></div>';
+    });
+    if(r.officerName) h += '<div class="notice-footer"><div class="notice-officer">str. ' + e(r.officerName) + '</div></div>';
+    return h + '</div>';
   }
 
   // Kontrola osoby (RZ Scanner > Služební záležitosti > Osoby) — uložená
