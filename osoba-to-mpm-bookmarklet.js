@@ -41,10 +41,15 @@
   var pasteBtn = panel.querySelector('[data-paste]');
   var ta = panel.querySelector('[data-ta]');
   function msg(t, color){ msgEl.textContent = t; msgEl.style.color = color || '#ECEDEF'; }
+  var filled = false;
+  // × zavře jen panel. Okno s lustrací zavře jen tehdy, když se vyplnění
+  // nepovedlo (jinak by strážník přišel o vyplněný formulář).
   panel.querySelector('[data-x]').onclick = function(){
     panel.remove();
-    var f = document.getElementById(ID + 'Frame');
-    if(f) f.remove();
+    if(!filled){
+      var f = document.getElementById(ID + 'Frame');
+      if(f) f.remove();
+    }
   };
 
   // ---------- Parsování schránky ----------
@@ -97,6 +102,15 @@
     setVal(doc, 'tPapers', d.doklad);
 
     var btn = doc.getElementById('ButtonSaveEvent');
+    // Formulář v okně uvnitř stránky: Potvrdit odešle lustraci do hlavního
+    // okna — výsledek je pak normální stránka MP Manageru (bez překryvu).
+    if(doc !== document){
+      var form = (btn && btn.form) || doc.getElementById('form1');
+      if(form){
+        form.target = '_top';
+        try{ if(!form.getAttribute('action')) form.action = doc.location.href; }catch(e){}
+      }
+    }
     if(btn){
       btn.style.outline = '3px solid #FFB020';
       btn.style.outlineOffset = '3px';
@@ -109,9 +123,18 @@
       '). Zkontroluj důvod' + (mode === 'Paper' ? ' a typ dokladu' : '') + ' a klepni na Potvrdit.', '#33D399');
     pasteBtn.style.display = 'none';
     ta.style.display = 'none';
-    // Panel dolů, ať nezakrývá formulář ani výsledek lustrace (× zavře vše).
-    panel.style.top = 'auto';
-    panel.style.bottom = '10px';
+    filled = true;
+    // Malý panel nahoře přes hlavičku MP Manageru (nezakrývá Potvrdit),
+    // po 4 s sám zmizí.
+    panel.style.top = '10px';
+    panel.style.bottom = 'auto';
+    panel.style.padding = '8px 12px';
+    panel.style.fontSize = '13px';
+    panel.style.transition = 'opacity .5s';
+    setTimeout(function(){
+      panel.style.opacity = '0';
+      setTimeout(function(){ if(panel.parentNode) panel.remove(); }, 600);
+    }, 4000);
   }
 
   function go(d){
